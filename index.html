@@ -541,7 +541,8 @@ let focusTaskIds  = new Set();   // tasks pinned to focus modal
 let taskHistory   = [];           // completed tasks history
 let deliveryCustomers = [];
 let deliveryBox = [];              // standard box (legacy, kept for compat)
-let boxTypes = [];                 // [{id, name, type:'vasket'|'uvasket', items:[{cropId,qty,unit}]}]
+let boxTypes = [];                 // [{id, name, type:'vasket'|'uvasket', weekdays[], startWeek, endWeek, frequency, baseItems:[{cropId,qty,unit}]}]
+let boxWeeks = [];                 // [{id, boxTypeId, week, year, items:[{cropId,qty,unit}], count, customerAdj:{}}]
 let deliveryMarket = [];           // [{id, cropId, qty, unit}]
 let harvestLog = [];
 let levHistory = [];
@@ -773,8 +774,8 @@ function render() {
   if (currentTab === 'vekster')   renderVekster();
   if (currentTab === 'oppgaver')  renderOppgaver();
   if (currentTab === 'kalender')  renderKalender();
-  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
-  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
+  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) { leveringTab='hoestlogg'; renderLeveringInto(_rl); }})();
+  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) { leveringTab='hoestlogg'; renderLeveringInto(_rl); }})();
 }
 
 // ── Segment helpers ──────────────────────────────────────────────────────────
@@ -4013,6 +4014,16 @@ function toDateKey(d) {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
+function getValidDeliveryWeeks(bt, year) {
+  if (!bt || !bt.startWeek || !bt.endWeek) return [];
+  const weeks = [];
+  const step = bt.frequency === 'biweekly' ? 2 : bt.frequency === 'monthly' ? 4 : 1;
+  for (let w = bt.startWeek; w <= bt.endWeek; w += step) {
+    weeks.push(w);
+  }
+  return weeks;
+}
+
 function getISOWeek(d) {
   const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const day = tmp.getUTCDay() || 7;
@@ -4975,8 +4986,8 @@ function showLeveringOverlay() {
       background:var(--bg-nav);backdrop-filter:blur(12px);
       border-top:1px solid var(--border-accent);display:flex;
       padding-bottom:env(safe-area-inset-bottom)">
-      ${['kasse','marked','hoest','logg'].map((t,i) => {
-        const labels = ['Kasse','Marked','Høst','Logg'];
+      ${['kasse','marked','hoestlogg'].map((t,i) => {
+        const labels = ['Kasse','Marked','Høstelogg'];
         return `<button onclick="leveringTab='${t}';renderLeveringInto(document.getElementById('lev-overlay-content'))"
           id="lev-tab-${t}"
           style="flex:1;min-width:0;padding:20px 2px 18px;border:none;background:transparent;
@@ -4999,7 +5010,7 @@ function closeLeveringOverlay() {
 function renderLeveringInto(el) {
   if (!el) return;
   // Update bottom nav active states
-  ['kunder','kasse','marked','hoest','logg'].forEach(t => {
+  ['kunder','kasse','marked','hoestlogg'].forEach(t => {
     const btn = document.getElementById('lev-tab-' + t);
     if (!btn) return;
     btn.style.color = leveringTab===t ? 'var(--accent-soft)' : 'var(--text-dim)';
@@ -5008,8 +5019,7 @@ function renderLeveringInto(el) {
   if (leveringTab === '_kunder') renderLevKunder(el);
   else if (leveringTab === 'kasse')  renderLevKasse(el);
   else if (leveringTab === 'marked') renderLevMarked(el);
-  else if (leveringTab === 'hoest')  renderLevHoest(el);
-  else if (leveringTab === 'logg')   renderLevLogg(el);
+  else if (leveringTab === 'hoestlogg') renderLevHoestLogg(el);
 }
 
 function toggleTheme() {
@@ -5160,7 +5170,7 @@ async function syncLoadOnStart() {
       if (remote.bedIDs && remote.bedIDs.length) BED_IDS = remote.bedIDs;
       if (remote.gardenMap) gardenMap = remote.gardenMap;
       if (remote.taskHistory) taskHistory = remote.taskHistory;
-      if (remote.levering) { if(remote.levering.customers) deliveryCustomers=remote.levering.customers; if(remote.levering.box) deliveryBox=remote.levering.box; if(remote.levering.boxTypes) boxTypes=remote.levering.boxTypes; if(remote.levering.market) deliveryMarket=remote.levering.market; if(remote.levering.harvest) harvestLog=remote.levering.harvest; }
+      if (remote.levering) { if(remote.levering.customers) deliveryCustomers=remote.levering.customers; if(remote.levering.box) deliveryBox=remote.levering.box; if(remote.levering.boxTypes) boxTypes=remote.levering.boxTypes; if(remote.levering.boxWeeks) boxWeeks=remote.levering.boxWeeks; if(remote.levering.market) deliveryMarket=remote.levering.market; if(remote.levering.harvest) harvestLog=remote.levering.harvest; }
       saveToLocal();
       clearTimeout(syncTimer); syncTimer = null;
       render();
@@ -5214,7 +5224,7 @@ async function syncSave() {
     bedIDs: BED_IDS,
     gardenMap: gardenMap || null,
     taskHistory: taskHistory || [],
-    levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, market: deliveryMarket, harvest: harvestLog },
+    levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog },
     saved: new Date().toISOString()
   };
   const payloadStr = JSON.stringify(payload);
@@ -5375,7 +5385,7 @@ if ('serviceWorker' in navigator) {
 // LEVERING
 // ═══════════════════════════════════════════════════════════════
 
-let leveringTab = 'kasse'; // 'kasse' | 'marked' | 'hoest' | 'logg'
+let leveringTab = 'kasse'; // 'kasse' | 'marked' | 'hoestlogg' // 'kasse' | 'marked' | 'hoest' | 'logg'
 
 function renderLevering() {
   const el = document.getElementById('lev-overlay-content') || document.getElementById('tab-levering');
@@ -5384,8 +5394,7 @@ function renderLevering() {
   const TABS = [
     {id:'kasse',  label:'Kasse'},
     {id:'marked', label:'Marked'},
-    {id:'hoest',  label:'Høst'},
-    {id:'logg',   label:'Logg'},
+    {id:'hoestlogg', label:'Høstelogg'},
   ];
 
   el.innerHTML = `
@@ -5404,8 +5413,7 @@ function renderLevering() {
   if (leveringTab === '_kunder') renderLevKunder(el);
   else if (leveringTab === 'kasse')  renderLevKasse(c);
   else if (leveringTab === 'marked') renderLevMarked(c);
-  else if (leveringTab === 'hoest')  renderLevHoest(c);
-  else if (leveringTab === 'logg')   renderLevLogg(c);
+  else if (leveringTab === 'hoestlogg') renderLevHoestLogg(c);
 }
 
 // ── Kunder ──────────────────────────────────────────────────────
@@ -5444,52 +5452,20 @@ function renderLevKunder(el) {
 }
 
 function openAddCustomer(editIdx) {
-  const cu = editIdx !== undefined ? deliveryCustomers[editIdx] : {name:'',phone:'',boxes:1,type:'uvasket',custom:{}};
+  const cu = editIdx !== undefined ? deliveryCustomers[editIdx] : {name:'',phone:'',boxes:1,boxTypeId:null};
   const modal = document.createElement('div');
   modal.id = 'cust-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:flex-end;justify-content:center';
-  const dp = cu.deliveryPlan || {};
-  const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
-  const FREQ = [['weekly','Ukentlig'],['biweekly','Annenhver uke'],['monthly','Månedlig']];
-  const selDays = dp.weekdays || [];
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;display:flex;align-items:flex-end;justify-content:center';
   modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto">
+    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
       <div style="font-size:15px;color:var(--accent-soft);margin-bottom:16px">${editIdx!==undefined?'Rediger':'Ny'} kunde</div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <input id="cu-name" placeholder="Navn" value="${cu.name}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
         <input id="cu-phone" placeholder="Telefon" value="${cu.phone||''}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        <div style="display:flex;gap:8px;align-items:center">
-          <label style="font-size:13px;color:var(--text-muted)">Antall kasser:</label>
-          <input id="cu-boxes" type="number" min="1" max="50" value="${cu.boxes}" style="width:60px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        </div>
         <select id="cu-boxtype" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="">Velg kassetype...</option>
-          ${boxTypes.map(bt=>`<option value="${bt.id}" ${cu.boxTypeId==bt.id?'selected':''}>${bt.name}</option>`).join('')}
+          ${boxTypes.map(bt=>'<option value="'+bt.id+'" '+(cu.boxTypeId==bt.id?'selected':'')+'>'+bt.name+'</option>').join('')}
         </select>
-        <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:4px">Leveringsdager</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${DAYS.map((d,i)=>`<button type="button" onclick="toggleCuDay(${i})" id="cu-day-${i}"
-            style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);
-            background:${selDays.includes(i)?'var(--accent-bg)':'transparent'};
-            color:${selDays.includes(i)?'var(--accent-soft)':'var(--text-muted)'};
-            cursor:pointer;font-size:13px;font-family:inherit">${d}</button>`).join('')}
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <label style="font-size:13px;color:var(--text-muted);white-space:nowrap">Uke fra–til:</label>
-          <input id="cu-week-start" type="number" min="1" max="52" placeholder="Fra" value="${dp.startWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-          <input id="cu-week-end" type="number" min="1" max="52" placeholder="Til" value="${dp.endWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        </div>
-        <select id="cu-freq" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-          ${FREQ.map(([v,l])=>`<option value="${v}" ${(dp.frequency||'weekly')===v?'selected':''}>${l}</option>`).join('')}
-        </select>
-        <div style="display:flex;gap:8px">
-          <button onclick="document.getElementById('cu-type').value='uvasket'" id="btn-uvasket"
-            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${cu.type==='uvasket'?'var(--accent-bg)':'transparent'};color:${cu.type==='uvasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Uvasket</button>
-          <button onclick="document.getElementById('cu-type').value='vasket'" id="btn-vasket"
-            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${cu.type==='vasket'?'var(--accent-bg)':'transparent'};color:${cu.type==='vasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Vasket</button>
-          <input type="hidden" id="cu-type" value="${cu.type}">
-          <input type="hidden" id="cu-days-val" value="${JSON.stringify(selDays)}">
-        </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button onclick="document.getElementById('cust-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
@@ -5498,7 +5474,6 @@ function openAddCustomer(editIdx) {
     </div>`;
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
-  // Toggle type buttons visually
   ['uvasket','vasket'].forEach(t => {
     const btn = document.getElementById('btn-'+t);
     if (btn) btn.addEventListener('click', () => {
@@ -5509,6 +5484,8 @@ function openAddCustomer(editIdx) {
     });
   });
 }
+
+
 function toggleCuDay(i) {
   const hidden = document.getElementById('cu-days-val');
   if (!hidden) return;
@@ -5529,19 +5506,13 @@ function saveCustomer(editIdx) {
   snapshotLev();
   const name = document.getElementById('cu-name')?.value.trim();
   const phone = document.getElementById('cu-phone')?.value.trim();
-  const boxes = +document.getElementById('cu-boxes')?.value || 1;
-  const type = document.getElementById('cu-type')?.value || 'uvasket';
   const boxTypeId = document.getElementById('cu-boxtype')?.value || null;
-  const days = JSON.parse(document.getElementById('cu-days-val')?.value||'[]');
-  const startWeek = +document.getElementById('cu-week-start')?.value || null;
-  const endWeek = +document.getElementById('cu-week-end')?.value || null;
-  const frequency = document.getElementById('cu-freq')?.value || 'weekly';
-  const deliveryPlan = { weekdays: days, startWeek, endWeek, frequency };
+  const notes = document.getElementById('cu-notes')?.value.trim() || '';
   if (!name) return;
   if (editIdx !== undefined) {
-    deliveryCustomers[editIdx] = {...deliveryCustomers[editIdx], name, phone, boxes, type, boxTypeId, deliveryPlan};
+    deliveryCustomers[editIdx] = {...deliveryCustomers[editIdx], name, phone, boxTypeId, notes};
   } else {
-    deliveryCustomers.push({id: Date.now(), name, phone, boxes, type, boxTypeId, deliveryPlan, custom:{}});
+    deliveryCustomers.push({id: Date.now(), name, phone, boxTypeId, notes, custom:{}});
   }
   saveLevering();
   document.getElementById('cust-modal')?.remove();
@@ -5656,14 +5627,26 @@ function openAddBoxType(editIdx) {
       <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">${editIdx!==undefined?'Rediger':'Ny'} kassetype</div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <input id="bt-name" placeholder="Navn (f.eks. Stor kasse)" value="${bt.name}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        <div style="display:flex;gap:8px">
-          <button onclick="document.getElementById('bt-type').value='uvasket';this.style.background='var(--accent-bg)';this.style.color='var(--accent-soft)';this.nextElementSibling.style.background='transparent';this.nextElementSibling.style.color='var(--text-muted)'"
-            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${bt.type==='uvasket'?'var(--accent-bg)':'transparent'};color:${bt.type==='uvasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Uvasket</button>
-          <button onclick="document.getElementById('bt-type').value='vasket';this.style.background='var(--accent-bg)';this.style.color='var(--accent-soft)';this.previousElementSibling.style.background='transparent';this.previousElementSibling.style.color='var(--text-muted)'"
-            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${bt.type==='vasket'?'var(--accent-bg)':'transparent'};color:${bt.type==='vasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Vasket</button>
-          <input type="hidden" id="bt-type" value="${bt.type}">
+
+          <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:8px">Leveringsplan</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="bt-days-wrap">
+          ${['Man','Tir','Ons','Tor','Fre','Lør','Søn'].map((d,i)=>`<button type="button" onclick="toggleBtDay(${i})" id="bt-day-${i}"
+            style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);
+            background:${(bt.weekdays||[]).includes(i)?'var(--accent-bg)':'transparent'};
+            color:${(bt.weekdays||[]).includes(i)?'var(--accent-soft)':'var(--text-muted)'};
+            cursor:pointer;font-size:13px;font-family:inherit">${d}</button>`).join('')}
         </div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Innhold (vekster) legges til etter opprettelse ved å trykke Rediger.</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;color:var(--text-muted);white-space:nowrap">Uke fra–til:</label>
+          <input id="bt-week-start" type="number" min="1" max="52" placeholder="Fra" value="${bt.startWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <input id="bt-week-end" type="number" min="1" max="52" placeholder="Til" value="${bt.endWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        </div>
+        <select id="bt-freq" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <option value="weekly" ${(bt.frequency||'weekly')==='weekly'?'selected':''}>Ukentlig</option>
+          <option value="biweekly" ${(bt.frequency||'')==='biweekly'?'selected':''}>Annenhver uke</option>
+          <option value="monthly" ${(bt.frequency||'')==='monthly'?'selected':''}>Månedlig</option>
+        </select>
+        <input type="hidden" id="bt-days-val" value="${JSON.stringify(bt.weekdays||[])}">
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button onclick="document.getElementById('box-type-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
@@ -5679,15 +5662,28 @@ function openEditBoxType(i) {
   // After save, open box type item editor
 }
 
+function toggleBtDay(i) {
+  const hidden = document.getElementById('bt-days-val');
+  if (!hidden) return;
+  let days = JSON.parse(hidden.value||'[]');
+  days = days.includes(i) ? days.filter(d=>d!==i) : [...days, i];
+  hidden.value = JSON.stringify(days);
+  const btn = document.getElementById('bt-day-'+i);
+  if (btn) { const sel=days.includes(i); btn.style.background=sel?'var(--accent-bg)':'transparent'; btn.style.color=sel?'var(--accent-soft)':'var(--text-muted)'; }
+}
+
 function saveBoxType(editIdx) {
   const name = document.getElementById('bt-name')?.value.trim();
-  const type = document.getElementById('bt-type')?.value || 'uvasket';
+  const weekdays = JSON.parse(document.getElementById('bt-days-val')?.value||'[]');
+  const startWeek = +document.getElementById('bt-week-start')?.value || null;
+  const endWeek = +document.getElementById('bt-week-end')?.value || null;
+  const frequency = document.getElementById('bt-freq')?.value || 'weekly';
   if (!name) return;
   snapshotLev();
   if (editIdx !== undefined) {
-    boxTypes[editIdx] = {...boxTypes[editIdx], name, type};
+    boxTypes[editIdx] = {...boxTypes[editIdx], name, weekdays, startWeek, endWeek, frequency};
   } else {
-    boxTypes.push({id: Date.now(), name, type, items:[]});
+    boxTypes.push({id: Date.now(), name, weekdays, startWeek, endWeek, frequency, baseItems:[]});
   }
   saveLevering();
   document.getElementById('box-type-modal')?.remove();
@@ -5695,48 +5691,272 @@ function saveBoxType(editIdx) {
   openKasseOppsett();
 }
 
-function renderLevKasse(el) {
-  const totalBoxes = deliveryCustomers.reduce((s,c) => s+c.boxes, 0);
-  const boxValue = calcBoxValue(deliveryBox);
-  const totalValue = boxValue * totalBoxes;
 
-  el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div>
-        <div style="font-size:15px;color:var(--text-head)">Kasse</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${totalBoxes} kasser · kr ${boxValue.toFixed(0)} per kasse = kr ${totalValue.toFixed(0)} totalt</div>
-      </div>
-      <button onclick="openKasseOppsett()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">⚙ Oppsett</button>
-    </div>
-    ${deliveryBox.length === 0
-      ? `<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Tom kasse. Legg til vekster.</p>`
-      : deliveryBox.map((item,i) => {
-          const cr = crops.find(c => c.id === item.cropId);
-          if (!cr) return '';
-          const itemVal = calcItemValue(cr, item.qty, item.unit);
-          const needed = item.qty * totalBoxes;
-          return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
-            <span style="font-size:22px">${cr.emoji}</span>
-            <div style="flex:1">
-              <div style="font-size:14px;color:var(--text-head)">${cr.family||cr.name}</div>
-              <div style="font-size:12px;color:var(--text-muted)">${item.qty} ${item.unit} per kasse · trenger ${needed} ${item.unit} totalt</div>
-              <div style="font-size:12px;color:var(--accent-soft)">kr ${itemVal.toFixed(0)} per kasse</div>
-            </div>
-            <div style="display:flex;gap:6px">
-              <button onclick="openEditBoxItem(${i})" style="padding:4px 9px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
-              <button onclick="removeBoxItem(${i})" style="padding:4px 9px;border-radius:7px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px;font-family:inherit">×</button>
-            </div>
-          </div>`;
-        }).join('')
-    }
-    ${deliveryCustomers.filter(cu => cu.custom && Object.keys(cu.custom).length > 0).length > 0 ? `
-      <div style="margin-top:16px;font-size:12px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Tilpasninger per kunde</div>
-      ${deliveryCustomers.map((cu,ci) => {
-        if (!cu.custom || Object.keys(cu.custom).length === 0) return '';
-        return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:13px;color:var(--text-head)">${cu.name}: ${Object.entries(cu.custom).map(([cid,v])=>{const cr2=crops.find(c=>c.id==cid);return cr2?`${cr2.emoji} ${v.qty}${v.unit}`:''}).filter(Boolean).join(', ')}</div>`;
-      }).join('')}
-    ` : ''}`;
+function getValidDeliveryWeeks(bt, year) {
+  if (!bt || !bt.startWeek || !bt.endWeek) return [];
+  const weeks = [];
+  const step = bt.frequency === 'biweekly' ? 2 : bt.frequency === 'monthly' ? 4 : 1;
+  for (let w = bt.startWeek; w <= bt.endWeek; w += step) {
+    weeks.push(w);
+  }
+  return weeks;
 }
+
+function getISOWeek(date) {
+  const d = new Date(date);
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + 3 - (d.getDay()+6)%7);
+  const week1 = new Date(d.getFullYear(),0,4);
+  return 1 + Math.round(((d-week1)/86400000 - 3 + (week1.getDay()+6)%7)/7);
+}
+
+function getCurrentWeek() { return getISOWeek(new Date()); }
+function getCurrentYear() { return new Date().getFullYear(); }
+
+function getOrCreateBoxWeek(boxTypeId, week, year) {
+  let bw = boxWeeks.find(b => String(b.boxTypeId)==String(boxTypeId) && +b.week===+week && +b.year===+year);
+  if (!bw) {
+    const bt = boxTypes.find(t => t.id==boxTypeId);
+    bw = { id: 'bw_'+String(boxTypeId)+'_w'+String(week)+'_y'+String(year), boxTypeId: boxTypeId, week: +week, year: +year,
+      items: JSON.parse(JSON.stringify(bt?.baseItems||[])),
+      count: 0, customerAdj: {} };
+    boxWeeks.push(bw);
+    saveLevering(); // persist immediately
+  }
+  return bw;
+}
+
+let kasseViewWeek = getCurrentWeek();
+let kasseViewYear = getCurrentYear();
+let kasseViewTypeId = null;
+
+function renderLevKasse(el) {
+  // Init selected type
+  if (!kasseViewTypeId && boxTypes.length) kasseViewTypeId = boxTypes[0].id;
+  // Ensure kasseViewTypeId matches actual boxType (type coercion safe)
+  if (kasseViewTypeId && !boxTypes.find(t=>t.id==kasseViewTypeId)) kasseViewTypeId = boxTypes[0]?.id;
+
+  const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const FREQ = {weekly:'Ukentlig', biweekly:'Annenhver uke', monthly:'Månedlig'};
+
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    + '<div style="font-size:15px;color:var(--text-head)">Kasse</div>'
+    + '<button onclick="openKasseOppsett()" style="padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">⚙ Oppsett</button>'
+    + '</div>';
+
+  if (!boxTypes.length) {
+    html += '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen kassetyper ennå.<br>Gå til ⚙ Oppsett for å legge til.</p>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Kassetype selector
+  html += '<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:14px;padding-bottom:2px">';
+  boxTypes.forEach(bt => {
+    const sel = String(kasseViewTypeId) == String(bt.id);
+    html += '<button onclick="kasseViewTypeId='+bt.id+';kasseViewWeek=getCurrentWeek();kasseViewYear=getCurrentYear();renderLevKasse(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
+      + ' style="padding:7px 14px;border-radius:20px;border:2px solid '+(sel?'var(--accent)':'var(--border)')
+      + ';background:'+(sel?'var(--accent-bg)':'transparent')
+      + ';color:'+(sel?'var(--accent-soft)':'var(--text-muted)')
+      + ';cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;flex-shrink:0">'
+      + bt.name+'</button>';
+  });
+  html += '</div>';
+
+  const bt = boxTypes.find(t => t.id == kasseViewTypeId);
+  if (!bt) { el.innerHTML = html; return; }
+
+  // Delivery info
+  const dayStr = (bt.weekdays||[]).map(d=>DAYS[d]).join(', ');
+  const weekStr = bt.startWeek && bt.endWeek ? 'Uke '+bt.startWeek+'–'+bt.endWeek : '';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">'
+    + (bt.type==='vasket'?'Vasket':'Uvasket')
+    + (dayStr?' · '+dayStr:'') + (weekStr?' · '+weekStr:'')
+    + (bt.frequency?' · '+(FREQ[bt.frequency]||bt.frequency):'')
+    + '</div>';
+
+  // Week navigator — only valid delivery weeks
+  const validWeeks = getValidDeliveryWeeks(bt, kasseViewYear);
+  if (!validWeeks.length) {
+    html += '<p style="color:var(--text-muted);font-size:13px;padding:10px 0">Ingen leveringsuker definert. Sett ukeplan i ⚙ Oppsett.</p>';
+    el.innerHTML = html; return;
+  }
+  if (!validWeeks.includes(kasseViewWeek)) kasseViewWeek = validWeeks[0];
+  const _vIdx = validWeeks.indexOf(kasseViewWeek);
+  const _prevW = _vIdx > 0 ? validWeeks[_vIdx-1] : null;
+  const _nextW = _vIdx < validWeeks.length-1 ? validWeeks[_vIdx+1] : null;
+  const _rl = "document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content')";
+
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+    + '<button '+(_prevW?'onclick="kasseViewWeek='+_prevW+';renderLevKasse('+_rl+')"':'disabled')
+    + ' style="padding:4px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;opacity:'+(_prevW?1:0.3)+'">‹</button>'
+    + '<div style="flex:1;text-align:center;font-size:14px;color:var(--text-head)">Uke '+kasseViewWeek+' · '+kasseViewYear+' ('+(_vIdx+1)+'/'+validWeeks.length+')</div>'
+    + '<button '+(_nextW?'onclick="kasseViewWeek='+_nextW+';renderLevKasse('+_rl+')"':'disabled')
+    + ' style="padding:4px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;opacity:'+(_nextW?1:0.3)+'">›</button>'
+    + '</div>';
+
+  const bw = getOrCreateBoxWeek(kasseViewTypeId, kasseViewWeek, kasseViewYear);
+
+  // Count + total
+  const totalBoxes = bw.count || 0;
+  const boxVal = (bw.items||[]).reduce((s,item) => { const cr=crops.find(c=>c.id===item.cropId); return s+calcItemValue(cr,item.qty||0,item.unit); }, 0);
+  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    + '<label style="font-size:13px;color:var(--text-muted);white-space:nowrap">Antall kasser:</label>'
+    + '<input type="number" min="0" value="'+totalBoxes+'" onchange="updateBoxWeekCount(\''+bw.id+'\',+this.value)"'
+    + ' style="width:70px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
+    + '<div id="kasse-total-'+bw.id+'" style="flex:1;text-align:right;font-size:13px;color:var(--accent-soft)">kr '+(boxVal*totalBoxes).toFixed(0)+' totalt</div>'
+    + '</div>';
+
+  // Crop grid (collapsible)
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Innhold denne uken</div>'
+    + '<button id="kasse-grid-toggle" onclick="toggleKasseGrid()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-muted);font-family:inherit;padding:0">Velg vekster ▲</button>'
+    + '<div style="display:flex;gap:6px">';
+  if (bt.baseItems && bt.baseItems.length) {
+    html += '<button onclick="importBaseItems(\''+bw.id+'\')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">↓ Basis</button>';
+  }
+  html += '<button onclick="openDuplicateWeek(\''+bt.id+'\','+kasseViewWeek+','+kasseViewYear+')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">⧉ Kopier</button>'
+    + '</div></div>';
+
+  const selIds = new Set((bw.items||[]).map(i=>i.cropId));
+  html += '<div id="kasse-crop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:14px">';
+  crops.forEach(cr => {
+    const sel = selIds.has(cr.id);
+    html += '<button onclick="toggleKasseCrop(\''+bw.id+'\','+cr.id+')" data-cropid="'+cr.id+'"'
+      + ' style="padding:8px 4px;border-radius:10px;border:2px solid '+(sel?'var(--accent)':'var(--border)')
+      + ';background:'+(sel?'var(--accent-bg)':'transparent')
+      + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px'
+      + ';color:'+(sel?'var(--accent-soft)':'var(--text-muted)')+';font-family:inherit">'
+      + '<span style="font-size:22px">'+cr.emoji+'</span>'
+      + '<span style="font-size:10px;text-align:center;line-height:1.2">'+(cr.family||cr.name)+'</span>'
+      + '</button>';
+  });
+  html += '</div>';
+
+  // Item amounts + totals
+  if ((bw.items||[]).length) {
+    html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Mengde per kasse</div>';
+    (bw.items||[]).forEach((item,ii) => {
+      const cr = crops.find(c=>c.id===item.cropId);
+      if (!cr) return;
+      const perKasse = calcItemValue(cr,item.qty||0,item.unit);
+      const totalNeeded = (item.qty||0) * totalBoxes;
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'
+        + '<span style="font-size:18px">'+cr.emoji+'</span>'
+        + '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)">'+(cr.family||cr.name)+'</div>'
+        + '<div id="kasse-need-'+bw.id+'-'+ii+'" style="font-size:11px;color:var(--text-muted)">Totalt: '+(totalBoxes?totalNeeded+' '+item.unit:'–')+'</div></div>'
+        + '<input type="number" min="0" step="0.1" value="'+(item.qty||'')+'" placeholder="Mengde"'
+        + ' oninput="updateKasseItem(\''+bw.id+'\','+ii+',\'qty\',+this.value)"'
+        + ' style="width:65px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+        + '<select onchange="updateKasseItem(\''+bw.id+'\','+ii+',\'unit\',this.value)"'
+        + ' style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+        + ['stk','kg','bunt','boks'].map(u=>'<option value="'+u+'"'+(item.unit===u?' selected':'')+'>'+u+'</option>').join('')
+        + '</select>'
+        + '<span style="font-size:11px;color:var(--accent-soft);min-width:40px;text-align:right">kr '+perKasse.toFixed(0)+'</span>'
+        + '<button onclick="removeKasseItem(\''+bw.id+'\','+ii+')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px">×</button>'
+        + '</div>';
+    });
+
+    // Auto-harvest button
+    html += '<button onclick="openKasseChecklist(&quot;'+bw.id+'&quot;)" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">☑ Sjekkliste for uke '+kasseViewWeek+'</button>';
+    html += '<button id="kasse-harvest-btn-'+bw.id+'" onclick="autoHarvestBoxWeek(\'' + bw.id + '\')" style="width:100%;margin-top:12px;padding:10px;border-radius:10px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:13px;font-family:inherit">✓ Logg '+totalBoxes+' kasser som høstet</button>';
+  }
+
+  el.innerHTML = html;
+}
+
+function toggleKasseGrid() {
+  const grid = document.getElementById('kasse-crop-grid');
+  const btn = document.getElementById('kasse-grid-toggle');
+  if (!grid) return;
+  const hiding = grid.style.display !== 'none';
+  grid.style.display = hiding ? 'none' : 'grid';
+  if (btn) btn.textContent = 'Velg vekster ' + (hiding ? '▼' : '▲');
+}
+
+function openKasseChecklist(bwId) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw || !bw.items || !bw.items.length) { alert('Ingen vekster i kassen denne uken.'); return; }
+  if (!bw.checklist) bw.checklist = {};
+  const bt = boxTypes.find(t => t.id == bw.boxTypeId);
+  const totalBoxes = bw.count || 0;
+
+  const existing = document.getElementById('kasse-checklist-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'kasse-checklist-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:var(--bg-main);z-index:6000;display:flex;flex-direction:column;overflow:hidden';
+
+  function renderCL() {
+    const doneCount = bw.items.filter((_, ii) => bw.checklist[ii]).length;
+    let h = '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
+      + '<button onclick="closeKasseChecklist()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:15px;color:var(--text-head)">' + (bt ? bt.name : 'Kasse') + ' · Uke ' + bw.week + '</div>'
+      + '<div style="font-size:12px;color:var(--text-muted)">' + totalBoxes + ' kasser · ' + doneCount + '/' + bw.items.length + ' klare</div>'
+      + '</div></div>'
+      + '<div style="flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch">';
+    bw.items.forEach((item, ii) => {
+      const cr = crops.find(c => c.id === item.cropId);
+      if (!cr) return;
+      const done = !!bw.checklist[ii];
+      const tot = (item.qty || 0) * totalBoxes;
+      const boxColor = done ? 'var(--accent)' : 'var(--border)';
+      const boxBg = done ? 'var(--accent)' : 'transparent';
+      h += '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">'
+        + '<div data-bwid="' + bwId + '" data-ii="' + ii + '" onclick="doKasseCheck(this)" style="width:26px;height:26px;border-radius:7px;border:2px solid ' + boxColor + ';background:' + boxBg + ';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--bg-main);flex-shrink:0">' + (done ? '✓' : '') + '</div>'
+        + '<span style="font-size:22px;flex-shrink:0">' + cr.emoji + '</span>'
+        + '<div style="flex:1">'
+        + '<div style="font-size:14px;color:var(--text-head);' + (done ? 'text-decoration:line-through;opacity:0.5' : '') + '">' + (cr.family || cr.name) + '</div>'
+        + '<div style="font-size:12px;color:var(--text-muted)">' + tot + ' ' + item.unit + (totalBoxes ? ' · ' + item.qty + ' × ' + totalBoxes : '') + '</div>'
+        + '</div></div>';
+    });
+    h += '</div>';
+    modal.innerHTML = h;
+  }
+  modal._renderCL = renderCL;
+  renderCL();
+  document.body.appendChild(modal);
+}
+
+function closeKasseChecklist() {
+  document.getElementById('kasse-checklist-modal')?.remove();
+}
+
+function doKasseCheck(el) {
+  const bwId = el.dataset.bwid;
+  const ii = +el.dataset.ii;
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  if (!bw.checklist) bw.checklist = {};
+  bw.checklist[ii] = !bw.checklist[ii];
+  saveLevering();
+  const modal = document.getElementById('kasse-checklist-modal');
+  if (modal && modal._renderCL) modal._renderCL();
+}
+
+
+function autoHarvestBoxWeek(bwId) {
+  const bw = boxWeeks.find(b=>b.id==bwId);
+  if (!bw || !bw.count || !bw.items?.length) { alert('Sett antall kasser og legg til vekster først.'); return; }
+  snapshotLev();
+  const today = new Date().toISOString().split('T')[0];
+  const bt = boxTypes.find(t=>t.id==bw.boxTypeId);
+  bw.items.forEach(item => {
+    if (!item.qty) return;
+    harvestLog.unshift({id:Date.now()+Math.random(), date:today,
+      cropId:item.cropId, bedId:null,
+      qty: item.qty * bw.count,
+      unit:item.unit,
+      dest:'kasse',
+      note:(bt?.name||'Kasse')+' uke '+bw.week});
+  });
+  saveLevering();
+  alert('Logget '+bw.count+' kasser til Høstelogg!');
+}
+
+
 
 function calcBoxValue(box) {
   return box.reduce((sum, item) => {
@@ -5747,9 +5967,10 @@ function calcBoxValue(box) {
 
 function calcItemValue(cr, qty, unit) {
   if (!cr) return 0;
-  if (unit === 'stk') return qty * (cr.pricePerUnit || 0);
+  if (unit === 'stk') return qty * (cr.pricePerUnit || cr.pricePerPiece || 0);
   if (unit === 'kg')  return qty * (cr.pricePerKg  || 0);
   if (unit === 'g')   return (qty/1000) * (cr.pricePerKg || 0);
+  if (unit === 'bunt' || unit === 'boks') return qty * (cr.pricePerUnit || cr.pricePerPiece || 0);
   return 0;
 }
 
@@ -5757,7 +5978,7 @@ function openAddBoxItem(editIdx) {
   const item = editIdx !== undefined ? deliveryBox[editIdx] : {cropId:null, qty:1, unit:'stk'};
   const modal = document.createElement('div');
   modal.id = 'box-item-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:flex-end;justify-content:center';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;display:flex;align-items:flex-end;justify-content:center';
   modal.innerHTML = `
     <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
       <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">${editIdx!==undefined?'Rediger':'Legg til'} vekst i kasse</div>
@@ -5791,7 +6012,7 @@ function saveBoxItem(editIdx) {
   if (!cropId || !qty) return;
   if (editIdx !== undefined) deliveryBox[editIdx] = {cropId, qty, unit};
   else deliveryBox.push({cropId, qty, unit});
-  saveLevering(); document.getElementById('box-item-modal')?.remove(); (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
+  saveLevering(); document.getElementById('box-item-modal')?.remove(); (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) { leveringTab='hoestlogg'; renderLeveringInto(_rl); }})();
 }
 function removeBoxItem(i) {
   snapshotLev(); deliveryBox.splice(i,1); saveLevering(); const _el2=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_el2) renderLevKasse(_el2); }
@@ -6195,6 +6416,99 @@ function saveMarketItem() {} // legacy stub
 function removeMarketItem(i) { deliveryMarket.splice(i,1); saveLevering(); const _elm=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_elm) renderLevMarked(_elm); }
 
 // ── Høst ─────────────────────────────────────────────────────────
+function renderLevHoestLogg(el) {
+  const today = new Date().toISOString().split('T')[0];
+  const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+
+  // Header with Ny registrering button
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    + '<div style="font-size:15px;color:var(--text-head)">Høstelogg</div>'
+    + '<button onclick="openNyRegistrering()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Ny registrering</button>'
+    + '</div>';
+
+  if (!harvestLog.length) {
+    html += '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen høsting registrert ennå.</p>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Totals
+  const totalValue = harvestLog.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+  html += '<div style="background:var(--accent-bg);border:1px solid var(--border-accent);border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">'
+    + '<div style="font-size:12px;color:var(--text-muted)">' + harvestLog.length + ' registreringer</div>'
+    + '<div style="font-size:18px;color:var(--accent-soft);font-weight:300">kr ' + totalValue.toFixed(0) + '</div>'
+    + '</div>';
+
+  // Per day - newest first
+  const byDate = {};
+  harvestLog.forEach(h => { if (!byDate[h.date]) byDate[h.date] = []; byDate[h.date].push(h); });
+
+  Object.entries(byDate).sort(([a],[b]) => b.localeCompare(a)).forEach(([date, entries]) => {
+    const [y,m,d] = date.split('-');
+    const dayVal = entries.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+    const isToday = date === today;
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.05em;margin-bottom:6px;display:flex;justify-content:space-between">'
+      + '<span style="color:' + (isToday?'var(--accent-soft)':'var(--text-muted)') + '">' + (isToday ? 'I dag · ' + (+d) + '. ' + MONTHS[+m-1] + ' ' + y : (+d) + '. ' + MONTHS[+m-1] + ' ' + y) + '</span>'
+      + '<span style="color:var(--accent-soft)">kr ' + dayVal.toFixed(0) + '</span>'
+      + '</div>';
+    entries.forEach(h => {
+      const cr = crops.find(c => c.id === h.cropId);
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:9px;margin-bottom:4px">'
+        + '<span style="font-size:18px">' + (cr?.emoji||'🌱') + '</span>'
+        + '<div style="flex:1">'
+        + '<div style="font-size:13px;color:var(--text-head)">' + (cr?cr.family||cr.name:'') + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">' + h.qty + ' ' + h.unit + (h.bedId?' · '+h.bedId:'') + (h.dest?' · '+h.dest:'') + (h.note?' · '+h.note:'') + '</div>'
+        + '</div>'
+        + '<span style="font-size:12px;color:var(--accent-soft)">kr ' + calcItemValue(cr,h.qty,h.unit).toFixed(0) + '</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+function openNyRegistrering() {
+  const modal = document.createElement('div');
+  modal.id = 'ny-reg-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
+      <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Registrer høsting</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <select id="hoest-crop" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          ${crops.map(c => '<option value="'+c.id+'">'+c.emoji+' '+(c.family||c.name)+'</option>').join('')}
+        </select>
+        <select id="hoest-bed" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <option value="">Velg seng (valgfritt)</option>
+          ${BED_IDS.map(b => '<option value="'+b+'">'+b+'</option>').join('')}
+        </select>
+        <div style="display:flex;gap:8px">
+          <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <select id="hoest-unit" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+            <option value="stk">stk</option>
+            <option value="kg">kg</option>
+            <option value="bunt">bunt</option>
+            <option value="boks">boks</option>
+          </select>
+        </div>
+        <select id="hoest-dest" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <option value="kasse">Grønnsakskasse</option>
+          <option value="marked">Marked</option>
+          <option value="annet">Annet</option>
+        </select>
+        <input id="hoest-note" placeholder="Notat (valgfritt)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="document.getElementById('ny-reg-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="saveHarvest()" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Registrer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
 function renderLevHoest(el) {
   const today = new Date().toISOString().split('T')[0];
   el.innerHTML = `
@@ -6250,9 +6564,8 @@ function saveHarvest() {
   const today = new Date().toISOString().split('T')[0];
   harvestLog.unshift({id:Date.now(), date:today, cropId, bedId, qty, unit, dest, note});
   saveLevering();
-  document.getElementById('hoest-qty').value = '';
-  document.getElementById('hoest-note').value = '';
-  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
+  document.getElementById('ny-reg-modal')?.remove();
+  const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) { leveringTab='hoestlogg'; renderLeveringInto(_rl); };
 }
 
 // ── Logg ─────────────────────────────────────────────────────────
@@ -6337,7 +6650,7 @@ function redoLev() {
 
 function snapshotLev() {
   const snap = JSON.parse(JSON.stringify({
-    customers: deliveryCustomers, box: deliveryBox, boxTypes,
+    customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks,
     market: deliveryMarket, harvest: harvestLog,
   }));
   levHistory = levHistory.slice(0, levHistoryIndex + 1);
@@ -6351,6 +6664,7 @@ function restoreLevSnapshot(s) {
   deliveryCustomers = JSON.parse(JSON.stringify(s.customers));
   deliveryBox       = JSON.parse(JSON.stringify(s.box));
   boxTypes          = JSON.parse(JSON.stringify(s.boxTypes||[]));
+  boxWeeks          = JSON.parse(JSON.stringify(s.boxWeeks||[]));
   deliveryMarket    = JSON.parse(JSON.stringify(s.market));
   harvestLog        = JSON.parse(JSON.stringify(s.harvest));
   // Save without snapshot to avoid corrupting redo stack
@@ -6383,6 +6697,7 @@ function saveLevering() {
       customers: deliveryCustomers,
       box: deliveryBox,
       boxTypes,
+      boxWeeks,
       market: deliveryMarket,
       harvest: harvestLog,
     }));
@@ -6400,6 +6715,7 @@ function loadLevering() {
     if (d.market)    deliveryMarket    = d.market;
     if (d.harvest)   harvestLog        = d.harvest;
     if (d.boxTypes)  boxTypes          = d.boxTypes;
+    if (d.boxWeeks)  boxWeeks          = d.boxWeeks;
   } catch(e) {}
 }
 
