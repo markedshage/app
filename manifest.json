@@ -1,9 +1,9 @@
 {
-  "name": "Markedshage",
+  "name": "Markedshage Assistenten",
   "short_name": "Markedshage",
   "description": "Planleggingsverktøy for markedshage",
-  "start_url": "/markedshage/",
-  "scope": "/markedshage/",
+  "start_url": "/app/",
+  "scope": "/app/",
   "display": "standalone",
   "background_color": "#0d1a0e",
   "theme_color": "#0d1a0e",
@@ -11,13 +11,13 @@
   "lang": "no",
   "icons": [
     {
-      "src": "/markedshage/icon-192.png",
+      "src": "/app/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/markedshage/icon-512.png",
+      "src": "/app/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

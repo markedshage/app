@@ -37,7 +37,19 @@
     --task-bg: rgba(255,255,255,0.05);
     --task-border: rgba(255,255,255,0.07);
   }
-  body.light {
+  body.harvest {
+    --accent: #c2410c;
+    --accent-soft: #ea580c;
+    --accent-bg: rgba(194,65,12,0.08);
+    --border-accent: rgba(194,65,12,0.25);
+  }
+  body.harvest.light {
+    --accent: #9a3412;
+    --accent-soft: #c2410c;
+    --accent-bg: rgba(154,52,18,0.08);
+  }
+
+    body.light {
     --bg-main: #f5f0e8;
     --bg-grad: linear-gradient(135deg, #f5f0e8 0%, #faf7f2 50%, #f5f0e8 100%);
     --bg-header: rgba(245,240,232,0.98);
@@ -147,6 +159,13 @@
     border: 1px solid rgba(52,211,153,0.25);
     border-radius: 12px; padding: 16px;
   }
+  body.light .cal-popup { border-color: var(--border-accent) !important; }
+  body.light .cal-popup .cal-dow { color: var(--text-muted); }
+  body.light .cal-popup .cal-day { color: var(--text-head); }
+  body.light .cal-clear { color: var(--accent-soft); }
+  body.light .cal-nav { color: var(--accent-soft); }
+  body.light .cal-month-label { color: var(--text-head); }
+
   body.light .bed-detail {
     background: var(--bg-card);
     border-color: var(--border);
@@ -248,7 +267,7 @@
   .date-display:focus { outline: none; border-color: rgba(52,211,153,0.4); }
   .date-display.empty { color: #6b7280; }
   .cal-popup {
-    position: fixed; z-index: 1000; background: #1a2e1b;
+    position: fixed; z-index: 9999; background: var(--bg-modal);
     border: 1px solid rgba(52,211,153,0.35); border-radius: 16px;
     padding: 16px; width: 300px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
   }
@@ -279,7 +298,8 @@
   <div class="header-top">
     <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:10px">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:42px;height:42px;border-radius:10px;flex-shrink:0">
+        <button onclick="toggleHarvestMode()" title="Åpne Innhøsting" style="background:none;border:none;cursor:pointer;padding:0;line-height:0;flex-shrink:0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:42px;height:42px;border-radius:10px;display:block">
           <rect width="512" height="512" rx="110" fill="#1a1005"/>
           <ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9"/>
           <ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(45 256 256)"/>
@@ -298,18 +318,27 @@
           <circle cx="236" cy="262" r="6" fill="#c9a84c" opacity="0.5"/>
           <circle cx="236" cy="238" r="6" fill="#c9a84c" opacity="0.5"/>
         </svg>
+        </button>
         <div>
           <div class="header-eyebrow" style="font-size:9px;color:var(--text-muted);letter-spacing:0.3em">MARKEDSHAGE</div>
           <h1 style="font-size:16px;font-weight:600;color:var(--text-main);letter-spacing:0.02em;margin:0">Assistenten</h1>
         </div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;position:relative">
-        <button onclick="syncConnected ? gistShowMenu() : gistSetup()" id="gist-btn" title="JSONBin synkronisering" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding-top:6px">☁</button>
+      <div style="display:flex;gap:5px;align-items:center;position:relative">
         <button id="undo-btn" onclick="undo()" title="Angre (Ctrl+Z)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
         <button id="redo-btn" onclick="redo()" title="Gjør om (Ctrl+Y)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
         <button onclick="toggleGearMenu()" id="gear-btn" title="Innstillinger" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">⚙</button>
-        <div id="gear-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:190px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
+        <button id="harvest-toggle-btn" onclick="toggleHarvestMode()" title="Innhøsting"
+          style="padding:4px 8px;padding-top:6px;border-radius:8px;border:1px solid var(--border);
+          background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;
+          font-family:inherit;line-height:1;display:inline-flex;align-items:center;
+          justify-content:center;transition:all 0.2s">
+          🌾
+        </button>
+        <div id="gear-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:200px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
           <button onclick="toggleTheme();closeGearMenu()" id="theme-menu-btn" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-head);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.1)'" onmouseout="this.style.background='transparent'">☀ Lyst tema</button>
+          <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 0"></div>
+          <button onclick="syncConnected?gistShowMenu():gistSetup();closeGearMenu()" id="gist-gear-btn" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-muted);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.1)'" onmouseout="this.style.background='transparent'">☁ Sky-synkronisering</button>
           <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 0"></div>
           <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:#60a5fa;font-family:inherit" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">⬆ Importer fra Excel<input type="file" accept=".xlsx" onchange="importFromExcel(event);closeGearMenu()" style="display:none"></label>
           <button onclick="exportToExcel();closeGearMenu()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--accent-soft);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">⬇ Eksporter til Excel</button>
@@ -326,6 +355,7 @@
   <div id="tab-senger" style="display:none"></div>
   <div id="tab-vekster" style="display:none"></div>
   <div id="tab-oppgaver" style="display:none"></div>
+  <div id="tab-levering" style="display:none"></div>
   <div id="tab-kalender" style="display:none"></div>
 </main>
 
@@ -509,6 +539,14 @@ let cropSearch = "";
 let expandedCrops = new Set();
 let focusTaskIds  = new Set();   // tasks pinned to focus modal
 let taskHistory   = [];           // completed tasks history
+let deliveryCustomers = [];
+let deliveryBox = [];              // standard box (legacy, kept for compat)
+let boxTypes = [];                 // [{id, name, type:'vasket'|'uvasket', items:[{cropId,qty,unit}]}]
+let deliveryMarket = [];           // [{id, cropId, qty, unit}]
+let harvestLog = [];
+let levHistory = [];
+let levHistoryIndex = -1;
+const MAX_LEV_HISTORY = 30;               // [{id, date, cropId, bedId, qty, unit, dest, note}]
 let taskOrder     = {};          // priority -> [id, id, ...] custom order
 let currentTheme  = (localStorage.getItem('mh_theme') || 'light');
 let gardenMap     = null;        // { elements: [...] } for garden map
@@ -556,20 +594,18 @@ function restoreSnapshot(s) {
   BED_IDS  = [...s.bedIDs];
   updateUndoRedoBtns();
   render();
+  // If Innhøsting overlay is open, refresh its content too
+  const levContent = document.getElementById('lev-overlay-content');
+  if (levContent) renderLeveringInto(levContent);
 }
 
 function updateUndoRedoBtns() {
-  const ub = document.getElementById('undo-btn');
-  const rb = document.getElementById('redo-btn');
-  if (!ub || !rb) return;
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
-  ub.disabled = !canUndo;
-  rb.disabled = !canRedo;
-  ub.style.color    = canUndo ? 'var(--text-head)' : 'var(--text-dim)';
-  ub.style.borderColor = canUndo ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)';
-  rb.style.color    = canRedo ? 'var(--text-head)' : 'var(--text-dim)';
-  rb.style.borderColor = canRedo ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)';
+  const ub = document.getElementById('undo-btn');
+  const rb = document.getElementById('redo-btn');
+  if (ub) ub.disabled = !canUndo;
+  if (rb) rb.disabled = !canRedo;
 }
 
 // Keyboard shortcuts
@@ -596,12 +632,50 @@ document.addEventListener('keydown', e => {
   }
 });
 
-function toggleGearMenu() {
+function toggleGearMenu(btn) {
+  // Close any existing floating gear menu
+  const existing = document.getElementById('gear-menu-float');
+  if (existing) { existing.remove(); return; }
+  // Use floating menu if overlay is visible, else use inline gear-menu
+  const overlay = document.getElementById('lev-overlay');
+  if (overlay) {
+    showFloatingGearMenu(btn);
+    return;
+  }
   const m = document.getElementById('gear-menu');
-  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+  if (m) { m.style.display = m.style.display === 'none' ? 'block' : 'none'; }
 }
 function closeGearMenu() {
-  document.getElementById('gear-menu').style.display = 'none';
+  const m = document.getElementById('gear-menu');
+  if (m) m.style.display = 'none';
+  document.getElementById('gear-menu-float')?.remove();
+}
+function showFloatingGearMenu(triggerBtn) {
+  const float = document.createElement('div');
+  float.id = 'gear-menu-float';
+  float.style.cssText = 'position:fixed;right:12px;top:70px;background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:200px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
+  const BTN = (label, color, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = `display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;color:${color};font-family:inherit;text-align:left`;
+    b.onmouseover = () => b.style.background = 'rgba(128,128,128,0.1)';
+    b.onmouseout  = () => b.style.background = 'transparent';
+    b.onclick = () => { fn(); float.remove(); };
+    return b;
+  };
+  const sep = () => { const d=document.createElement('div'); d.style.cssText='height:1px;background:rgba(255,255,255,0.08);margin:4px 0'; return d; };
+  float.appendChild(BTN('☀ Lyst tema', 'var(--text-head)', () => { toggleTheme(); }));
+  float.appendChild(sep());
+  float.appendChild(BTN('☁ Sky-synkronisering', 'var(--text-muted)', () => { syncConnected?gistShowMenu():gistSetup(); }));
+  float.appendChild(sep());
+  float.appendChild(BTN('⬆ Importer fra Excel', '#60a5fa', () => { document.getElementById('excel-import-input')?.click(); }));
+  float.appendChild(BTN('⬇ Eksporter til Excel', 'var(--accent-soft)', () => { exportToExcel(); }));
+  float.appendChild(sep());
+  float.appendChild(BTN('🗑 Nullstill', '#f87171', () => { nullstill(); }));
+  document.body.appendChild(float);
+  setTimeout(() => document.addEventListener('click', function handler(e) {
+    if (!float.contains(e.target)) { float.remove(); document.removeEventListener('click', handler); }
+  }), 10);
 }
 document.addEventListener('click', e => {
   const gearBtn = document.getElementById('gear-btn');
@@ -631,9 +705,9 @@ function showTab(name) {
   try { localStorage.setItem('mh_tab', name); } catch(e) {}
   expandedCrops = new Set(); // reset expanded state on tab switch
   document.querySelectorAll('#bottom-nav .tab-btn').forEach((b,i) => {
-    b.classList.toggle('active', ['oversikt','senger','vekster','oppgaver','kalender'][i] === name);
+    b.classList.toggle('active', ['oversikt','senger','vekster','oppgaver','kalender','levering'][i] === name);
   });
-  ['oversikt','senger','vekster','oppgaver','kalender'].forEach(t => {
+  ['oversikt','senger','vekster','oppgaver','kalender','levering'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t === name ? '' : 'none';
   });
   render();
@@ -644,8 +718,8 @@ function syncCropTasks() {
 
   crops.forEach(crop => {
     [
-      { type: 'saa',   dateField: crop.sownDate,    logField: crop.sowLog,   label: `Så ${crop.emoji} ${crop.name}` },
-      { type: 'plant', dateField: crop.plantedDate, logField: crop.plantLog, label: `Plant ${crop.emoji} ${crop.name}` },
+      { type: 'saa',   dateField: crop.sownDate,    logField: crop.sowLog,   label: `Så ${crop.emoji} ${crop.family||crop.name}` },
+      { type: 'plant', dateField: crop.plantedDate, logField: crop.plantLog, label: `Plant ${crop.emoji} ${crop.family||crop.name}` },
     ].forEach(({ type, dateField, logField, label }) => {
       const taskId = `crop-${crop.id}-${type}`; // stable string id for auto-tasks
       const existing = tasks.find(t => t.id === taskId);
@@ -699,6 +773,8 @@ function render() {
   if (currentTab === 'vekster')   renderVekster();
   if (currentTab === 'oppgaver')  renderOppgaver();
   if (currentTab === 'kalender')  renderKalender();
+  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
+  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
 }
 
 // ── Segment helpers ──────────────────────────────────────────────────────────
@@ -822,7 +898,7 @@ function renderOversikt() {
         <div class="list-row">
           <span style="font-size:22px">${c.emoji}</span>
           <div style="flex:1">
-            <div style="font-size:13px;color:var(--text-head)">${c.name}</div>
+            <div style="font-size:13px;color:var(--text-head)">${c.family||c.name}</div>
             <div style="font-size:12px;color:var(--text-muted)">Seng: ${c.beds.join(', ')}</div>
           </div>
           ${badge(c.status)}
@@ -1036,6 +1112,7 @@ function getFieldSizeM(letter) {
 // ── Map state ──────────────────────────────────────────────────
 let mapOpen = false;
 let mapLocked = true; // beds locked by default
+let harvestMode = false; // harvest/delivery mode
 let drawMode = false;
 let drawColor = '#1c1410';
 let lastDrawColor = '#1c1410'; // remembered before eraser
@@ -1600,7 +1677,8 @@ function showBedPopup(bedId) {
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <span style="font-size:20px">${c.emoji}</span>
             <div>
-              <div style="font-size:13px;color:var(--text-head);font-weight:400">${c.name}</div>
+              <div style="font-size:13px;color:var(--text-head);font-weight:400">${c.family || c.name}</div>
+              ${c.family ? `<div style="font-size:11px;color:var(--text-muted)">${c.name}</div>` : ''}
               <div style="font-size:12px;color:var(--text-muted)">${status}</div>
             </div>
           </div>
@@ -2808,7 +2886,7 @@ function renderSenger() {
               const g = calcGang(o.crop, o.spec);
               const segLen = o.end - o.start + 1;
               const hasSegment = parseBedSpec(o.spec).start !== null;
-              return `<div style="padding:12px;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);margin-bottom:8px">
+              return `<div style="padding:12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border);margin-bottom:8px">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
                   <span style="font-size:24px">${o.crop.emoji}</span>
                   <div style="flex:1">
@@ -2837,7 +2915,7 @@ function renderSenger() {
               </div>`
             ).join('');
 
-            detailHtml = `<div style="grid-column:1/-1;padding:14px;border-radius:12px;background:rgba(0,0,0,0.2);border:1px solid var(--border-accent);margin-bottom:4px">
+            detailHtml = `<div style="grid-column:1/-1;padding:14px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);margin-bottom:4px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                 <div style="font-size:13px;color:var(--accent-soft)">Seng ${bed} — ${bs.length}m × ${bs.width}m</div>
                 <div style="display:flex;gap:8px;align-items:center">
@@ -3089,15 +3167,23 @@ function renderCal() {
       <button class="cal-clear" style="flex:1" onclick="clearDate('${btnId}','${valId}')">Fjern dato</button>
     </div>`;
 
-  // Position near button
+  // Position near button or center of screen
   document.body.appendChild(popup);
-  const rect = btn.getBoundingClientRect();
-  const popW = 300, popH = 280;
-  let top = rect.bottom + 6, left = rect.left;
-  if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-  if (top + popH > window.innerHeight - 8) top = rect.top - popH - 6;
-  popup.style.top = top + 'px';
-  popup.style.left = left + 'px';
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    const popW = 300, popH = 280;
+    let top = rect.bottom + 6, left = rect.left;
+    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+    if (top + popH > window.innerHeight - 8) top = rect.top - popH - 6;
+    if (top < 8) top = 8;
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+  } else {
+    // fallback: center
+    popup.style.top = '50%';
+    popup.style.left = '50%';
+    popup.style.transform = 'translate(-50%, -50%)';
+  }
 }
 
 function calNav(dir, event) {
@@ -3165,7 +3251,7 @@ document.addEventListener('click', e => {
   if (!popup) return;
   if (popup.contains(e.target)) return;
   // Don't close if clicking a button that opens the calendar
-  if (e.target.closest && e.target.closest('[onclick*="openCal"], [onclick*="openModus"], [onclick*="startEditTaskDate"]')) return;
+  if (e.target.closest && e.target.closest('[onclick*="openCal"], [onclick*="openModus"], [onclick*="startEditTaskDate"], [onclick*="DatePicker"]')) return;
   popup.remove();
 });
 function setCropFilter(f) { cropFilter = f; renderVekster(); }
@@ -3561,12 +3647,10 @@ function toggleFocusTask(id) {
 
 function openFocusModal() {
   const focused = tasks.filter(t => focusTaskIds.has(t.id));
-  const modal = document.createElement('div');
-  modal.id = 'focus-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
   const pColors = {høy:'#f87171',middels:'#fbbf24',lav:'#6ee7b7'};
   const MONTHS_SHORT = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-  modal.innerHTML = `
+
+  const buildInner = () => `
     <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px;padding:24px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div style="font-size:16px;color:var(--accent-soft);font-weight:400">🎯 Fokus</div>
@@ -3577,10 +3661,10 @@ function openFocusModal() {
         : focused.map(t => {
             const tid = typeof t.id === 'string' ? `'${t.id}'` : t.id;
             const dateDisplay = t.date ? (() => { const [d,m] = t.date.split('-'); return `${+d}. ${MONTHS_SHORT[+m-1]}`; })() : '';
-            return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--task-bg);border:1px solid ${pColors[t.priority]||'#fbbf24'}44;border-radius:12px;margin-bottom:10px">
-              <button onclick="toggleTask(${tid});document.getElementById('focus-modal').remove();openFocusModal()" style="width:24px;height:24px;border-radius:6px;border:2px solid ${pColors[t.priority]||'#fbbf24'};background:transparent;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">${t.done?'✓':''}</button>
+            return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--task-bg);border:1px solid ${pColors[t.priority]||'#fbbf24'}44;border-radius:12px;margin-bottom:10px;${t.done?'opacity:0.6':''}">
+              <button onclick="toggleTask(${tid});openFocusModal()" style="width:24px;height:24px;border-radius:6px;border:2px solid ${pColors[t.priority]||'#fbbf24'};background:${t.done?(pColors[t.priority]||'#fbbf24'):'transparent'};cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">${t.done?'✓':''}</button>
               <div style="flex:1">
-                <div style="font-size:15px;color:var(--text-head)">${t.text}</div>
+                <div style="font-size:15px;color:var(--text-head);${t.done?'text-decoration:line-through':''}">${t.text}</div>
                 ${dateDisplay ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">📅 ${dateDisplay}</div>` : ''}
               </div>
               <div style="width:10px;height:10px;border-radius:50%;background:${pColors[t.priority]||'#fbbf24'};flex-shrink:0"></div>
@@ -3588,9 +3672,17 @@ function openFocusModal() {
           }).join('')
       }
     </div>`;
+
+  // Re-render in place if already open
+  const existing = document.getElementById('focus-modal');
+  if (existing) { existing.innerHTML = buildInner(); return; }
+
+  const modal = document.createElement('div');
+  modal.id = 'focus-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = buildInner();
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-  setTimeout(initCompassWheel, 0);
 }
 
 
@@ -3689,8 +3781,8 @@ function renderOppgaver() {
 
   document.getElementById('tab-oppgaver').innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="add-btn" style="margin-bottom:0;flex:1" onclick="document.getElementById('modal-task').style.display='flex'">+ Ny oppgave</button>
       <button onclick="openFocusModal()" style="padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:${focusCount>0?'#fbbf24':'var(--text-muted)'};cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Fokus">🎯${focusCount>0?` ${focusCount}`:''}</button>
+      <button class="add-btn" style="margin-bottom:0;flex:1" onclick="document.getElementById('modal-task').style.display='flex'">+ Ny oppgave</button>
       <button onclick="openHistoryModal()" style="padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Historikk">📋</button>
     </div>
     ${priorities.map(p => {
@@ -3939,11 +4031,11 @@ function getCalEvents() {
     map[k].push({ label, emoji, color, ...extra });
   };
   crops.forEach(c => {
-    if (c.sownDate && !c.sowLog) add(c.sownDate, 'Sådato: '+c.name, c.emoji, '#60a5fa');
+    if (c.sownDate && !c.sowLog) add(c.sownDate, 'Sådato: '+(c.family||c.name), c.emoji, '#60a5fa');
     if (c.plantedDate && !c.plantLog) {
       const segSpecs = c.beds.filter(s => parseBedSpec(s).start !== null);
       const segLabel = segSpecs.length > 0 ? ` (${segSpecs.join(', ')})` : '';
-      add(c.plantedDate, 'Plantedato: '+c.name+segLabel, c.emoji, '#34d399');
+      add(c.plantedDate, 'Plantedato: '+(c.family||c.name)+segLabel, c.emoji, '#34d399');
     }
   });
   const pColors = {høy:'#f87171', middels:'#fbbf24', lav:'#6ee7b7'};
@@ -4814,6 +4906,112 @@ let syncBinId     = null;  // JSONBin Bin ID
 let syncConnected = false;
 let syncTimer     = null;
 
+function toggleHarvestMode() {
+  harvestMode = !harvestMode;
+  document.body.classList.toggle('harvest', harvestMode);
+  const btn = document.getElementById('harvest-toggle-btn');
+  if (btn) {
+    btn.style.background = harvestMode ? 'var(--accent-bg)' : 'transparent';
+    btn.style.color = harvestMode ? 'var(--accent-soft)' : 'var(--text-muted)';
+    btn.style.borderColor = harvestMode ? 'var(--accent-soft)' : 'var(--border)';
+    btn.title = harvestMode ? 'Avslutt Innhøsting' : 'Innhøsting';
+  }
+  if (harvestMode) {
+    // Switch to Levering view
+    showLeveringOverlay();
+  } else {
+    closeLeveringOverlay();
+  }
+}
+
+function showLeveringOverlay() {
+  document.getElementById('lev-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'lev-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:4000;display:flex;flex-direction:column;background:var(--bg-main);overflow:hidden';
+
+  overlay.innerHTML = `
+    <div style="flex-shrink:0;padding:14px 16px 14px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="toggleHarvestMode()" title="Tilbake til vanlig modus" style="background:none;border:none;cursor:pointer;padding:0;line-height:0;flex-shrink:0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:42px;height:42px;border-radius:10px;display:block">
+              <rect width="512" height="512" rx="110" fill="#1a1005"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(45 256 256)"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(90 256 256)"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(135 256 256)"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(180 256 256)"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(225 256 256)"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(270 256 256)"/>
+              <ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(315 256 256)"/>
+              <circle cx="256" cy="256" r="72" fill="#6b3d11"/>
+              <circle cx="256" cy="256" r="55" fill="#4a2a08"/>
+              <circle cx="256" cy="225" r="6" fill="#c9a84c" opacity="0.5"/>
+              <circle cx="276" cy="238" r="6" fill="#c9a84c" opacity="0.5"/>
+              <circle cx="276" cy="262" r="6" fill="#c9a84c" opacity="0.5"/>
+              <circle cx="256" cy="275" r="6" fill="#c9a84c" opacity="0.5"/>
+              <circle cx="236" cy="262" r="6" fill="#c9a84c" opacity="0.5"/>
+              <circle cx="236" cy="238" r="6" fill="#c9a84c" opacity="0.5"/>
+            </svg>
+          </button>
+          <div>
+            <div class="header-eyebrow" style="font-size:9px;color:var(--text-muted);letter-spacing:0.42em">Innhøsting</div>
+            <h1 style="font-size:16px;font-weight:600;color:var(--text-main);letter-spacing:0.02em;margin:0">Assistenten</h1>
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center">
+          <button onclick="undoLev()" id="lev-undo-btn" title="Angre" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
+          <button onclick="redoLev()" id="lev-redo-btn" title="Gjør om" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
+          <button onclick="toggleGearMenu(this)" title="Innstillinger" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">⚙</button>
+          <button onclick="toggleHarvestMode()" title="Tilbake til vanlig modus" style="padding:0;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;overflow:hidden"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:100%;height:100%;display:block;border-radius:7px"><rect width="512" height="512" rx="110" fill="#1a1005"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(45 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(90 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(135 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(180 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(225 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(270 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(315 256 256)"/><circle cx="256" cy="256" r="72" fill="#6b3d11"/><circle cx="256" cy="256" r="55" fill="#4a2a08"/><circle cx="256" cy="225" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="276" cy="238" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="276" cy="262" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="256" cy="275" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="236" cy="262" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="236" cy="238" r="6" fill="#c9a84c" opacity="0.5"/></svg></button>
+        </div>
+      </div>
+    </div>
+        <div style="flex:1;overflow-y:auto;padding:14px;padding-bottom:90px;-webkit-overflow-scrolling:touch">
+      <div id="lev-overlay-content"></div>
+    </div>
+    <nav style="position:fixed;bottom:0;left:0;right:0;z-index:4100;
+      background:var(--bg-nav);backdrop-filter:blur(12px);
+      border-top:1px solid var(--border-accent);display:flex;
+      padding-bottom:env(safe-area-inset-bottom)">
+      ${['kasse','marked','hoest','logg'].map((t,i) => {
+        const labels = ['Kasse','Marked','Høst','Logg'];
+        return `<button onclick="leveringTab='${t}';renderLeveringInto(document.getElementById('lev-overlay-content'))"
+          id="lev-tab-${t}"
+          style="flex:1;min-width:0;padding:20px 2px 18px;border:none;background:transparent;
+          color:${leveringTab===t?'var(--accent-soft)':'var(--text-dim)'};
+          font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;
+          border-top:3px solid ${leveringTab===t?'var(--accent)':'transparent'};
+          transition:all 0.2s;letter-spacing:0.04em">${labels[i]}</button>`;
+      }).join('')}
+    </nav>`;
+
+  document.body.appendChild(overlay);
+  renderLeveringInto(document.getElementById('lev-overlay-content'));
+  updateLevUndoRedoBtns(); // update lev-undo/redo-btn now that they're in DOM
+}
+
+function closeLeveringOverlay() {
+  document.getElementById('lev-overlay')?.remove();
+}
+
+function renderLeveringInto(el) {
+  if (!el) return;
+  // Update bottom nav active states
+  ['kunder','kasse','marked','hoest','logg'].forEach(t => {
+    const btn = document.getElementById('lev-tab-' + t);
+    if (!btn) return;
+    btn.style.color = leveringTab===t ? 'var(--accent-soft)' : 'var(--text-dim)';
+    btn.style.borderTopColor = leveringTab===t ? 'var(--accent)' : 'transparent';
+  });
+  if (leveringTab === '_kunder') renderLevKunder(el);
+  else if (leveringTab === 'kasse')  renderLevKasse(el);
+  else if (leveringTab === 'marked') renderLevMarked(el);
+  else if (leveringTab === 'hoest')  renderLevHoest(el);
+  else if (leveringTab === 'logg')   renderLevLogg(el);
+}
+
 function toggleTheme() {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   applyTheme();
@@ -4846,9 +5044,12 @@ function initSync() {
 }
 
 function renderSyncBtn() {
-  const btn = document.getElementById('gist-btn');
-  if (!btn) return;
-  btn.style.color = syncConnected ? (document.body.classList.contains('light') ? '#5a8a4a' : '#34d399') : '#6b7280';
+  const btn = document.getElementById('gist-gear-btn');
+  if (btn) {
+    const connColor = document.body.classList.contains('light') ? '#5a8a4a' : '#34d399';
+    btn.style.color = syncConnected ? connColor : 'var(--text-muted)';
+    btn.textContent = syncConnected ? '☁ Sky-synkronisering ✓' : '☁ Sky-synkronisering';
+  }
   btn.title = syncConnected ? 'JSONBin synkronisering – tilkoblet' : 'Koble til synkronisering';
 }
 
@@ -4959,6 +5160,7 @@ async function syncLoadOnStart() {
       if (remote.bedIDs && remote.bedIDs.length) BED_IDS = remote.bedIDs;
       if (remote.gardenMap) gardenMap = remote.gardenMap;
       if (remote.taskHistory) taskHistory = remote.taskHistory;
+      if (remote.levering) { if(remote.levering.customers) deliveryCustomers=remote.levering.customers; if(remote.levering.box) deliveryBox=remote.levering.box; if(remote.levering.boxTypes) boxTypes=remote.levering.boxTypes; if(remote.levering.market) deliveryMarket=remote.levering.market; if(remote.levering.harvest) harvestLog=remote.levering.harvest; }
       saveToLocal();
       clearTimeout(syncTimer); syncTimer = null;
       render();
@@ -5012,6 +5214,7 @@ async function syncSave() {
     bedIDs: BED_IDS,
     gardenMap: gardenMap || null,
     taskHistory: taskHistory || [],
+    levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, market: deliveryMarket, harvest: harvestLog },
     saved: new Date().toISOString()
   };
   const payloadStr = JSON.stringify(payload);
@@ -5095,17 +5298,8 @@ function gistShowMenu() {
   menu.style.cssText = 'position:fixed;background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:210px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.5)';
 
   const items = [
-    { label: '⬇ Last inn fra JSONBin', fn: () => { syncLoad(false); menu.remove(); } },
-    { label: '⬆ Lagre til JSONBin',   fn: () => { syncSave(); menu.remove(); } },
-    { sep: true },
-    { label: '🔍 Debug synk', fn: async () => {
-        menu.remove();
-        const resp = await fetch(`${JSONBIN_API}/${syncBinId}/latest?t=${Date.now()}`, {headers:{'X-Master-Key':syncKey,'X-Bin-Meta':'false','Cache-Control':'no-store'},cache:'no-store'});
-        const d = await resp.json();
-        const localRaw = localStorage.getItem('mh_data');
-        const localSaved = localRaw ? JSON.parse(localRaw).saved : 'ingen';
-        alert(`LOKAL:\n  Vekster: ${crops.length}\n  Lagret: ${localSaved}\n\nJSONBIN:\n  Vekster: ${d?.crops?.length ?? '?'}\n  Lagret: ${d?.saved ?? '?'}`);
-      }},
+    { label: '⬇ Synkroniser', fn: () => { syncLoad(false); menu.remove(); } },
+    { label: '☁ Skylagring',   fn: () => { syncSave(); menu.remove(); } },
     { sep: true },
     { label: '🔑 Endre API-nøkkel',    fn: () => { gistSetup(); menu.remove(); } },
     { label: '🔓 Koble fra',           fn: () => { syncDisconnect(); menu.remove(); }, color: '#f87171' },
@@ -5163,6 +5357,8 @@ function scheduleGistSave() { scheduleSync(); }
 
 // Init
 loadFromLocal();
+loadLevering();
+snapshotLev();
 snapshot(true);
 showTab(currentTab);
 initSync();
@@ -5174,6 +5370,1041 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW:', e));
   });
 }
+
+// ═══════════════════════════════════════════════════════════════
+// LEVERING
+// ═══════════════════════════════════════════════════════════════
+
+let leveringTab = 'kasse'; // 'kasse' | 'marked' | 'hoest' | 'logg'
+
+function renderLevering() {
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('tab-levering');
+  if (!el) return;
+
+  const TABS = [
+    {id:'kasse',  label:'Kasse'},
+    {id:'marked', label:'Marked'},
+    {id:'hoest',  label:'Høst'},
+    {id:'logg',   label:'Logg'},
+  ];
+
+  el.innerHTML = `
+    <div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
+      ${TABS.map(t => `<button onclick="leveringTab='${t.id}';renderLevering()"
+        style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);
+        background:${leveringTab===t.id?'var(--accent-bg)':'transparent'};
+        color:${leveringTab===t.id?'var(--accent-soft)':'var(--text-muted)'};
+        cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;flex-shrink:0">${t.label}</button>`
+      ).join('')}
+    </div>
+    <div id="lev-content"></div>`;
+
+  const c = document.getElementById('lev-content');
+  if (!c) return;
+  if (leveringTab === '_kunder') renderLevKunder(el);
+  else if (leveringTab === 'kasse')  renderLevKasse(c);
+  else if (leveringTab === 'marked') renderLevMarked(c);
+  else if (leveringTab === 'hoest')  renderLevHoest(c);
+  else if (leveringTab === 'logg')   renderLevLogg(c);
+}
+
+// ── Kunder ──────────────────────────────────────────────────────
+function renderLevKunder(el) {
+  const totalBoxes = deliveryCustomers.reduce((s,c) => s+c.boxes, 0);
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="leveringTab='kasse';renderLeveringInto(document.getElementById('lev-overlay-content'))" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Kasse</button>
+        <div style="font-size:13px;color:var(--text-muted)">${deliveryCustomers.length} kunder · ${totalBoxes} kasser</div>
+      </div>
+      <button onclick="openAddCustomer()" style="padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Legg til</button>
+    </div>
+    ${deliveryCustomers.length === 0
+      ? `<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen kunder ennå.<br>Legg til kunder for å komme i gang.</p>`
+      : deliveryCustomers.map((cu,i) => `
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-size:15px;color:var(--text-head);font-weight:400">${cu.name}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${cu.phone || ''}</div>
+              <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+                <span style="font-size:12px;padding:2px 10px;border-radius:10px;background:var(--accent-bg);color:var(--accent-soft)">${cu.boxes} kasse${cu.boxes!==1?'r':''}</span>
+                <span style="font-size:12px;padding:2px 10px;border-radius:10px;border:1px solid var(--border);color:var(--text-muted)">${cu.type==='vasket'?'Vasket':'Uvasket'}</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button onclick="openEditCustomer(${i})" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
+              <button onclick="deleteCustomer(${i})" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px;font-family:inherit">×</button>
+            </div>
+          </div>
+          ${(cu.custom && Object.keys(cu.custom).length > 0) ? `<div style="margin-top:8px;font-size:11px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px">Tilpasninger: ${Object.entries(cu.custom).map(([cid,v])=>{const cr=crops.find(c=>c.id==cid);return cr?`${cr.emoji} ${cr.family||cr.name}: ${v.qty}${v.unit}`:''}).filter(Boolean).join(', ')}</div>` : ''}
+        </div>`
+      ).join('')
+    }`;
+}
+
+function openAddCustomer(editIdx) {
+  const cu = editIdx !== undefined ? deliveryCustomers[editIdx] : {name:'',phone:'',boxes:1,type:'uvasket',custom:{}};
+  const modal = document.createElement('div');
+  modal.id = 'cust-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:flex-end;justify-content:center';
+  const dp = cu.deliveryPlan || {};
+  const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const FREQ = [['weekly','Ukentlig'],['biweekly','Annenhver uke'],['monthly','Månedlig']];
+  const selDays = dp.weekdays || [];
+  modal.innerHTML = `
+    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto">
+      <div style="font-size:15px;color:var(--accent-soft);margin-bottom:16px">${editIdx!==undefined?'Rediger':'Ny'} kunde</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="cu-name" placeholder="Navn" value="${cu.name}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <input id="cu-phone" placeholder="Telefon" value="${cu.phone||''}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;color:var(--text-muted)">Antall kasser:</label>
+          <input id="cu-boxes" type="number" min="1" max="50" value="${cu.boxes}" style="width:60px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        </div>
+        <select id="cu-boxtype" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <option value="">Velg kassetype...</option>
+          ${boxTypes.map(bt=>`<option value="${bt.id}" ${cu.boxTypeId==bt.id?'selected':''}>${bt.name}</option>`).join('')}
+        </select>
+        <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:4px">Leveringsdager</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${DAYS.map((d,i)=>`<button type="button" onclick="toggleCuDay(${i})" id="cu-day-${i}"
+            style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);
+            background:${selDays.includes(i)?'var(--accent-bg)':'transparent'};
+            color:${selDays.includes(i)?'var(--accent-soft)':'var(--text-muted)'};
+            cursor:pointer;font-size:13px;font-family:inherit">${d}</button>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:13px;color:var(--text-muted);white-space:nowrap">Uke fra–til:</label>
+          <input id="cu-week-start" type="number" min="1" max="52" placeholder="Fra" value="${dp.startWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <input id="cu-week-end" type="number" min="1" max="52" placeholder="Til" value="${dp.endWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        </div>
+        <select id="cu-freq" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          ${FREQ.map(([v,l])=>`<option value="${v}" ${(dp.frequency||'weekly')===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        <div style="display:flex;gap:8px">
+          <button onclick="document.getElementById('cu-type').value='uvasket'" id="btn-uvasket"
+            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${cu.type==='uvasket'?'var(--accent-bg)':'transparent'};color:${cu.type==='uvasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Uvasket</button>
+          <button onclick="document.getElementById('cu-type').value='vasket'" id="btn-vasket"
+            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${cu.type==='vasket'?'var(--accent-bg)':'transparent'};color:${cu.type==='vasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Vasket</button>
+          <input type="hidden" id="cu-type" value="${cu.type}">
+          <input type="hidden" id="cu-days-val" value="${JSON.stringify(selDays)}">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="document.getElementById('cust-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="saveCustomer(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+  // Toggle type buttons visually
+  ['uvasket','vasket'].forEach(t => {
+    const btn = document.getElementById('btn-'+t);
+    if (btn) btn.addEventListener('click', () => {
+      ['uvasket','vasket'].forEach(tt => {
+        const b = document.getElementById('btn-'+tt);
+        if (b) { b.style.background = tt===t?'var(--accent-bg)':'transparent'; b.style.color = tt===t?'var(--accent-soft)':'var(--text-muted)'; }
+      });
+    });
+  });
+}
+function toggleCuDay(i) {
+  const hidden = document.getElementById('cu-days-val');
+  if (!hidden) return;
+  let days = JSON.parse(hidden.value||'[]');
+  if (days.includes(i)) days = days.filter(d=>d!==i);
+  else days.push(i);
+  hidden.value = JSON.stringify(days);
+  const btn = document.getElementById('cu-day-'+i);
+  if (btn) {
+    const sel = days.includes(i);
+    btn.style.background = sel?'var(--accent-bg)':'transparent';
+    btn.style.color = sel?'var(--accent-soft)':'var(--text-muted)';
+  }
+}
+function openEditCustomer(i) { openAddCustomer(i); }
+
+function saveCustomer(editIdx) {
+  snapshotLev();
+  const name = document.getElementById('cu-name')?.value.trim();
+  const phone = document.getElementById('cu-phone')?.value.trim();
+  const boxes = +document.getElementById('cu-boxes')?.value || 1;
+  const type = document.getElementById('cu-type')?.value || 'uvasket';
+  const boxTypeId = document.getElementById('cu-boxtype')?.value || null;
+  const days = JSON.parse(document.getElementById('cu-days-val')?.value||'[]');
+  const startWeek = +document.getElementById('cu-week-start')?.value || null;
+  const endWeek = +document.getElementById('cu-week-end')?.value || null;
+  const frequency = document.getElementById('cu-freq')?.value || 'weekly';
+  const deliveryPlan = { weekdays: days, startWeek, endWeek, frequency };
+  if (!name) return;
+  if (editIdx !== undefined) {
+    deliveryCustomers[editIdx] = {...deliveryCustomers[editIdx], name, phone, boxes, type, boxTypeId, deliveryPlan};
+  } else {
+    deliveryCustomers.push({id: Date.now(), name, phone, boxes, type, boxTypeId, deliveryPlan, custom:{}});
+  }
+  saveLevering();
+  document.getElementById('cust-modal')?.remove();
+  const _elc=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_elc) renderLevKunder(_elc);
+}
+
+function deleteCustomer(i) {
+  snapshotLev();
+  deliveryCustomers.splice(i, 1);
+  saveLevering();
+  const _eld=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_eld) renderLevKunder(_eld);
+}
+
+// ── Kasse ────────────────────────────────────────────────────────
+
+function openKasseOppsett() {
+  const modal = document.createElement('div');
+  modal.id = 'kasse-oppsett-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:var(--bg-main);z-index:6000;display:flex;flex-direction:column;overflow:hidden';
+
+  const renderOppsettContent = () => {
+    const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+    const FREQ_LABELS = {weekly:'Ukentlig', biweekly:'Annenhver uke', monthly:'Månedlig'};
+    let html = '<div style="flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch">';
+
+    // Kassetyper section
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kassetyper</div>'
+      + '<button onclick="openAddBoxType()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny kassetype</button>'
+      + '</div>';
+
+    if (!boxTypes.length) {
+      html += '<p style="font-size:13px;color:var(--text-muted);padding:8px 0 16px">Ingen kassetyper ennå.</p>';
+    } else {
+      boxTypes.forEach((bt,i) => {
+        html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center">'
+          + '<div><div style="font-size:14px;color:var(--text-head)">' + bt.name + '</div>'
+          + '<div style="font-size:12px;color:var(--text-muted)">' + (bt.type==='vasket'?'Vasket':'Uvasket') + ' · ' + (bt.items||[]).length + ' vekster</div></div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button onclick="openEditBoxType(' + i + ')" style="padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
+          + '<button onclick="deleteBoxType(' + i + ')" style="padding:4px 8px;border-radius:7px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px">×</button>'
+          + '</div></div></div>';
+      });
+    }
+
+    // Kunder section
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:10px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kunder</div>'
+      + '<button onclick="openAddCustomer()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny kunde</button>'
+      + '</div>';
+
+    if (!deliveryCustomers.length) {
+      html += '<p style="font-size:13px;color:var(--text-muted);padding:8px 0">Ingen kunder ennå.</p>';
+    } else {
+      deliveryCustomers.forEach((cu, i) => {
+        const bt = boxTypes.find(t => t.id == cu.boxTypeId);
+        const dp = cu.deliveryPlan || {};
+        const dayStr = (dp.weekdays||[]).map(d=>DAYS[d]).join(', ') || '–';
+        const weekStr = dp.startWeek && dp.endWeek ? 'Uke ' + dp.startWeek + '–' + dp.endWeek : '';
+        const freqStr = FREQ_LABELS[dp.frequency] || '';
+        html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+          + '<div>'
+          + '<div style="font-size:14px;color:var(--text-head)">' + cu.name + '</div>'
+          + (cu.phone ? '<div style="font-size:12px;color:var(--text-muted)">' + cu.phone + '</div>' : '')
+          + '<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">'
+          + '<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accent-bg);color:var(--accent-soft)">' + cu.boxes + ' kasse' + (cu.boxes!==1?'r':'') + '</span>'
+          + (bt ? '<span style="font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--border);color:var(--text-muted)">' + bt.name + '</span>' : '')
+          + (dayStr !== '–' ? '<span style="font-size:11px;color:var(--text-muted)">' + dayStr + '</span>' : '')
+          + (weekStr ? '<span style="font-size:11px;color:var(--text-muted)">' + weekStr + '</span>' : '')
+          + (freqStr ? '<span style="font-size:11px;color:var(--text-muted)">' + freqStr + '</span>' : '')
+          + '</div></div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button onclick="openEditCustomer(' + i + ')" style="padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
+          + '<button onclick="deleteCustomer(' + i + ')" style="padding:4px 8px;border-radius:7px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px">×</button>'
+          + '</div></div></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  };
+
+  modal.innerHTML = '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
+    + '<button onclick="closeKasseOppsett()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
+    + '<div style="font-size:15px;color:var(--text-head)">Oppsett</div>'
+    + '</div>'
+    + renderOppsettContent();
+
+  document.body.appendChild(modal);
+}
+
+function closeKasseOppsett() { document.getElementById("kasse-oppsett-modal")?.remove(); }
+function deleteBoxType(i) {
+  const bt = boxTypes[i];
+  if (bt) {
+    const inUse = deliveryCustomers.some(c => c.boxTypeId == bt.id);
+    if (inUse) { alert('Denne kassetypen er i bruk av en eller flere kunder.'); return; }
+  }
+  snapshotLev(); boxTypes.splice(i,1); saveLevering();
+  document.getElementById('kasse-oppsett-modal')?.remove();
+  openKasseOppsett();
+}
+
+function openAddBoxType(editIdx) {
+  const bt = editIdx !== undefined ? boxTypes[editIdx] : {name:'', type:'uvasket', items:[]};
+  const modal = document.createElement('div');
+  modal.id = 'box-type-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto">
+      <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">${editIdx!==undefined?'Rediger':'Ny'} kassetype</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="bt-name" placeholder="Navn (f.eks. Stor kasse)" value="${bt.name}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <div style="display:flex;gap:8px">
+          <button onclick="document.getElementById('bt-type').value='uvasket';this.style.background='var(--accent-bg)';this.style.color='var(--accent-soft)';this.nextElementSibling.style.background='transparent';this.nextElementSibling.style.color='var(--text-muted)'"
+            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${bt.type==='uvasket'?'var(--accent-bg)':'transparent'};color:${bt.type==='uvasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Uvasket</button>
+          <button onclick="document.getElementById('bt-type').value='vasket';this.style.background='var(--accent-bg)';this.style.color='var(--accent-soft)';this.previousElementSibling.style.background='transparent';this.previousElementSibling.style.color='var(--text-muted)'"
+            style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:${bt.type==='vasket'?'var(--accent-bg)':'transparent'};color:${bt.type==='vasket'?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:13px;font-family:inherit">Vasket</button>
+          <input type="hidden" id="bt-type" value="${bt.type}">
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Innhold (vekster) legges til etter opprettelse ved å trykke Rediger.</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="document.getElementById('box-type-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="saveBoxType(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function openEditBoxType(i) {
+  openAddBoxType(i);
+  // After save, open box type item editor
+}
+
+function saveBoxType(editIdx) {
+  const name = document.getElementById('bt-name')?.value.trim();
+  const type = document.getElementById('bt-type')?.value || 'uvasket';
+  if (!name) return;
+  snapshotLev();
+  if (editIdx !== undefined) {
+    boxTypes[editIdx] = {...boxTypes[editIdx], name, type};
+  } else {
+    boxTypes.push({id: Date.now(), name, type, items:[]});
+  }
+  saveLevering();
+  document.getElementById('box-type-modal')?.remove();
+  document.getElementById('kasse-oppsett-modal')?.remove();
+  openKasseOppsett();
+}
+
+function renderLevKasse(el) {
+  const totalBoxes = deliveryCustomers.reduce((s,c) => s+c.boxes, 0);
+  const boxValue = calcBoxValue(deliveryBox);
+  const totalValue = boxValue * totalBoxes;
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div style="font-size:15px;color:var(--text-head)">Kasse</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${totalBoxes} kasser · kr ${boxValue.toFixed(0)} per kasse = kr ${totalValue.toFixed(0)} totalt</div>
+      </div>
+      <button onclick="openKasseOppsett()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">⚙ Oppsett</button>
+    </div>
+    ${deliveryBox.length === 0
+      ? `<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Tom kasse. Legg til vekster.</p>`
+      : deliveryBox.map((item,i) => {
+          const cr = crops.find(c => c.id === item.cropId);
+          if (!cr) return '';
+          const itemVal = calcItemValue(cr, item.qty, item.unit);
+          const needed = item.qty * totalBoxes;
+          return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
+            <span style="font-size:22px">${cr.emoji}</span>
+            <div style="flex:1">
+              <div style="font-size:14px;color:var(--text-head)">${cr.family||cr.name}</div>
+              <div style="font-size:12px;color:var(--text-muted)">${item.qty} ${item.unit} per kasse · trenger ${needed} ${item.unit} totalt</div>
+              <div style="font-size:12px;color:var(--accent-soft)">kr ${itemVal.toFixed(0)} per kasse</div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button onclick="openEditBoxItem(${i})" style="padding:4px 9px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
+              <button onclick="removeBoxItem(${i})" style="padding:4px 9px;border-radius:7px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px;font-family:inherit">×</button>
+            </div>
+          </div>`;
+        }).join('')
+    }
+    ${deliveryCustomers.filter(cu => cu.custom && Object.keys(cu.custom).length > 0).length > 0 ? `
+      <div style="margin-top:16px;font-size:12px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Tilpasninger per kunde</div>
+      ${deliveryCustomers.map((cu,ci) => {
+        if (!cu.custom || Object.keys(cu.custom).length === 0) return '';
+        return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:13px;color:var(--text-head)">${cu.name}: ${Object.entries(cu.custom).map(([cid,v])=>{const cr2=crops.find(c=>c.id==cid);return cr2?`${cr2.emoji} ${v.qty}${v.unit}`:''}).filter(Boolean).join(', ')}</div>`;
+      }).join('')}
+    ` : ''}`;
+}
+
+function calcBoxValue(box) {
+  return box.reduce((sum, item) => {
+    const cr = crops.find(c => c.id === item.cropId);
+    return sum + calcItemValue(cr, item.qty, item.unit);
+  }, 0);
+}
+
+function calcItemValue(cr, qty, unit) {
+  if (!cr) return 0;
+  if (unit === 'stk') return qty * (cr.pricePerUnit || 0);
+  if (unit === 'kg')  return qty * (cr.pricePerKg  || 0);
+  if (unit === 'g')   return (qty/1000) * (cr.pricePerKg || 0);
+  return 0;
+}
+
+function openAddBoxItem(editIdx) {
+  const item = editIdx !== undefined ? deliveryBox[editIdx] : {cropId:null, qty:1, unit:'stk'};
+  const modal = document.createElement('div');
+  modal.id = 'box-item-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
+      <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">${editIdx!==undefined?'Rediger':'Legg til'} vekst i kasse</div>
+      <select id="bi-crop" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;margin-bottom:10px">
+        ${crops.map(c => `<option value="${c.id}" ${item.cropId===c.id?'selected':''}>${c.emoji} ${c.family||c.name}</option>`).join('')}
+      </select>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <label style="font-size:13px;color:var(--text-muted)">Mengde:</label>
+        <input id="bi-qty" type="number" min="0.1" step="0.1" value="${item.qty}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="bi-unit" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <option value="stk" ${item.unit==='stk'?'selected':''}>stk</option>
+          <option value="kg"  ${item.unit==='kg'?'selected':''}>kg</option>
+          <option value="g"   ${item.unit==='g'?'selected':''}>g</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('box-item-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="saveBoxItem(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+function openEditBoxItem(i) { openAddBoxItem(i); }
+
+function saveBoxItem(editIdx) {
+  snapshotLev();
+  const cropId = +document.getElementById('bi-crop')?.value;
+  const qty = +document.getElementById('bi-qty')?.value;
+  const unit = document.getElementById('bi-unit')?.value;
+  if (!cropId || !qty) return;
+  if (editIdx !== undefined) deliveryBox[editIdx] = {cropId, qty, unit};
+  else deliveryBox.push({cropId, qty, unit});
+  saveLevering(); document.getElementById('box-item-modal')?.remove(); (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
+}
+function removeBoxItem(i) {
+  snapshotLev(); deliveryBox.splice(i,1); saveLevering(); const _el2=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_el2) renderLevKasse(_el2); }
+
+// ── Marked ──────────────────────────────────────────────────────
+function renderLevMarked(el) {
+  const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  function fmtDate(d) {
+    if (!d) return '';
+    const [day,m,y] = d.split('-');
+    return day + '. ' + (MONTHS[+m-1]||'') + ' ' + y;
+  }
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    + '<div style="font-size:13px;color:var(--text-muted)">' + deliveryMarket.length + ' marked' + (deliveryMarket.length!==1?'er':'') + '</div>'
+    + '<button onclick="openNewMarket()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Nytt marked</button>'
+    + '</div>';
+
+  const sortedMarkets = [...deliveryMarket].map((m,i)=>({...m,_idx:i})).sort((a,b)=>{
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1; if (!b.date) return -1;
+    const da=a.date.split('-').reverse().join('-'), db=b.date.split('-').reverse().join('-');
+    return da.localeCompare(db);
+  });
+  const pastMarkets = sortedMarkets.filter(m=>m.done);
+  const upcomingMarkets = sortedMarkets.filter(m=>!m.done);
+  if (!upcomingMarkets.length && !pastMarkets.length) {
+    html += '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen markeder ennå.</p>';
+  } else {
+    if (upcomingMarkets.length) upcomingMarkets.forEach(mkt => { const i = mkt._idx;
+      const n = (mkt.items||[]).length;
+      const totalVal = (mkt.items||[]).reduce((s,item) => {
+        const cr = crops.find(c => c.id === item.cropId);
+        return s + calcItemValue(cr, item.planned||0, item.unit);
+      }, 0);
+      html += '<div onclick="openMarketDetail(' + i + ')" data-market-idx="' + i + '" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center">'
+        + '<div>'
+        + '<div style="font-size:15px;color:var(--text-head)">' + (mkt.name||'Marked') + '</div>'
+        + (mkt.date ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📅 ' + fmtDate(mkt.date) + '</div>' : '')
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px">'
+        + (n > 0 ? '<span style="font-size:12px;color:var(--accent-soft)">kr ' + totalVal.toFixed(0) + '</span>' : '')
+
+        + '</div>'
+        + '</div>'
+        + (n > 0 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">' + n + ' vekst' + (n!==1?'er':'') + '</div>' : '')
+        + '</div>';
+    });
+    if (pastMarkets.length) {
+      html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:20px 0 10px">Historikk</div>';
+      pastMarkets.forEach(mkt => { const i = mkt._idx;
+      const n = (mkt.items||[]).length;
+      const totalVal = (mkt.items||[]).reduce((s,item) => { const cr = crops.find(c => c.id === item.cropId); return s + calcItemValue(cr, item.qty||0, item.unit); }, 0);
+      html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;opacity:0.6">'
+        + '<div style="font-size:14px;color:var(--text-muted)">'+( mkt.name||'Marked')+'</div>'
+        + (mkt.date ? '<div style="font-size:11px;color:var(--text-muted)">'+fmtDate(mkt.date)+'</div>' : '')
+        + '</div>';
+      });
+    }
+  }
+  el.innerHTML = html;
+}
+
+function openNewMarketDatePicker(btn) {
+  openCal('mkt-date-btn', 'mkt-date-val');
+}
+function openMarketDatePicker() {
+  const b = document.getElementById('mkt-edit-date-btn');
+  const v = document.getElementById('mkt-edit-date-val');
+  if (b && v) openCal('mkt-edit-date-btn', 'mkt-edit-date-val');
+}
+
+function openNewMarket() {
+  const modal = document.createElement('div');
+  modal.id = 'new-market-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
+      <div style="font-size:15px;color:var(--accent-soft);margin-bottom:16px">Nytt marked</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="mkt-name" placeholder="Navn på marked (f.eks. Bondens marked)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <div style="position:relative">
+          <button type="button" id="mkt-date-btn" onclick="event.stopPropagation();openNewMarketDatePicker(this)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer;width:100%">Velg dato 📅</button>
+          <input type="hidden" id="mkt-date-val">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="document.getElementById('new-market-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="saveNewMarket()" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Opprett</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function saveNewMarket() {
+  snapshotLev();
+  const name = document.getElementById('mkt-name')?.value.trim() || 'Marked';
+  const date = document.getElementById('mkt-date-val')?.value || '';
+  const mkt = { id: Date.now(), name, date, items: [] };
+  deliveryMarket.push(mkt);
+  saveLevering();
+  document.getElementById('new-market-modal')?.remove();
+  // Add to calendar tasks
+  if (mkt.date) {
+    const taskId = 'market-' + mkt.id;
+    tasks.push({ id: taskId, text: '🛒 Marked: ' + mkt.name, date: mkt.date, priority: 'middels', done: false });
+    saveToLocal();
+  }
+  // Re-render list first so card exists in DOM, then open detail
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) {
+    renderLevMarked(el);
+    openMarketDetail(deliveryMarket.length - 1);
+  }
+}
+
+function deleteMarket(i) {
+  snapshotLev();
+  deliveryMarket.splice(i, 1);
+  saveLevering();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevMarked(el);
+}
+
+function openMarketDetail(mktIdx) {
+  // Toggle inline expand in the market list
+  const existing = document.getElementById('market-expand-' + mktIdx);
+  if (existing) { existing.remove(); return; }
+  // Close any other open markets
+  document.querySelectorAll('[id^="market-expand-"]').forEach(el => el.remove());
+
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+
+  const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  function fmtDate(d) { if (!d) return ''; const [day,m,y] = d.split('-'); return day+'. '+(MONTHS[+m-1]||'')+' '+y; }
+
+  const card = document.querySelector('[data-market-idx="' + mktIdx + '"]');
+  if (!card) return;
+
+  const expand = document.createElement('div');
+  expand.id = 'market-expand-' + mktIdx;
+  expand.style.cssText = 'background:var(--bg-card);border:1px solid var(--accent);border-top:none;border-radius:0 0 12px 12px;padding:12px 14px;margin-top:-10px;margin-bottom:10px';
+
+  let html = '';
+
+  // Crop rows — read-only with checkboxes
+  if ((mkt.items||[]).length > 0) {
+    (mkt.items||[]).forEach((item, ii) => {
+      const cr = crops.find(c => c.id === item.cropId);
+      if (!cr) return;
+      const val = calcItemValue(cr, item.qty||0, item.unit);
+      const done = item.harvested;
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)'+(done?';opacity:0.5':'')+'">'
+        + '<button onclick="event.stopPropagation();toggleMarketItemHarvest('+mktIdx+','+ii+')" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(done?'var(--accent)':'var(--border)')
+        + ';background:'+(done?'var(--accent)':'transparent')+';cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">'
+        + (done?'✓':'') + '</button>'
+        + '<span style="font-size:18px;flex-shrink:0">'+cr.emoji+'</span>'
+        + '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)'+(done?';text-decoration:line-through':'')+'">'+(cr.family||cr.name)+'</div>'
+        + (item.qty ? '<div style="font-size:11px;color:var(--text-muted)">'+item.qty+' '+item.unit+(val>0?' · kr '+val.toFixed(0):'')+'</div>' : '')
+        + '</div></div>';
+    });
+
+    const totalVal = (mkt.items||[]).reduce((s,item) => {
+      const cr = crops.find(c => c.id === item.cropId);
+      return s + calcItemValue(cr, item.qty||0, item.unit);
+    }, 0);
+    if (totalVal > 0) html += '<div style="font-size:12px;color:var(--accent-soft);padding-top:8px;text-align:right">Totalverdi: kr '+totalVal.toFixed(0)+'</div>';
+  } else {
+    html += '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">Ingen vekster lagt til ennå.</div>';
+  }
+
+  // Edit button
+  html += '<div style="display:flex;gap:8px;margin-top:12px">'
+    + '<button onclick="event.stopPropagation();openMarketEdit('+mktIdx+')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
+    + '</div>';
+
+  expand.innerHTML = html;
+  card.after(expand);
+}
+
+function toggleMarketItemHarvest(mktIdx, itemIdx) {
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt?.items?.[itemIdx]) return;
+  mkt.items[itemIdx].harvested = !mkt.items[itemIdx].harvested;
+  // If all done, log to harvestLog
+  const allDone = mkt.items.every(i => i.harvested);
+  if (allDone && !mkt.done) {
+    const today = new Date().toISOString().split('T')[0];
+    mkt.items.forEach(item => {
+      if (!item.qty) return;
+      harvestLog.unshift({ id: Date.now()+Math.random(), date: today, cropId: item.cropId, bedId: null, qty: item.qty, unit: item.unit, dest: 'marked', note: mkt.name });
+    });
+    mkt.done = true;
+  }
+  saveLevering();
+  // Re-render expand in place without toggling
+  const expand = document.getElementById('market-expand-' + mktIdx);
+  if (expand) {
+    document.querySelectorAll('[id^="market-expand-"]').forEach(el => el.remove());
+    // Re-open without toggle
+    _openMarketDetailDirect(mktIdx);
+  }
+}
+
+function _openMarketDetailDirect(mktIdx) {
+  // Same as openMarketDetail but always opens (never toggles)
+  document.querySelectorAll('[id^="market-expand-"]').forEach(el => el.remove());
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  const card = document.querySelector('[data-market-idx="' + mktIdx + '"]');
+  if (!card) return;
+  const expand = document.createElement('div');
+  expand.id = 'market-expand-' + mktIdx;
+  expand.style.cssText = 'background:var(--bg-card);border:1px solid var(--accent);border-top:none;border-radius:0 0 12px 12px;padding:12px 14px;margin-top:-10px;margin-bottom:10px';
+  expand.onclick = e => e.stopPropagation();
+
+  let html = '';
+  if ((mkt.items||[]).length > 0) {
+    (mkt.items||[]).forEach((item, ii) => {
+      const cr = crops.find(c => c.id === item.cropId);
+      if (!cr) return;
+      const val = calcItemValue(cr, item.qty||0, item.unit);
+      const done = item.harvested;
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)'+(done?';opacity:0.5':'')+'">';
+      html += '<button onclick="event.stopPropagation();toggleMarketItemHarvest('+mktIdx+','+ii+')" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(done?'var(--accent)':'var(--border)')+';background:'+(done?'var(--accent)':'transparent')+';cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">'+(done?'✓':'')+'</button>';
+      html += '<span style="font-size:18px;flex-shrink:0">'+cr.emoji+'</span>';
+      html += '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)'+(done?';text-decoration:line-through':'')+'">'+String(cr.family||cr.name)+'</div>';
+      html += (item.qty ? '<div style="font-size:11px;color:var(--text-muted)">'+item.qty+' '+item.unit+(val>0?' · kr '+val.toFixed(0):'')+'</div>' : '');
+      html += '</div></div>';
+    });
+    const totalVal = (mkt.items||[]).reduce((s,item) => { const cr = crops.find(c=>c.id===item.cropId); return s+calcItemValue(cr,item.qty||0,item.unit); },0);
+    if (totalVal > 0) html += '<div style="font-size:12px;color:var(--accent-soft);padding-top:8px;text-align:right">Totalverdi: kr '+totalVal.toFixed(0)+'</div>';
+  } else {
+    html += '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">Ingen vekster lagt til ennå.</div>';
+  }
+  html += '<div style="display:flex;gap:8px;margin-top:12px"><button onclick="event.stopPropagation();openMarketEdit('+mktIdx+')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button></div>';
+  expand.innerHTML = html;
+  card.after(expand);
+}
+
+function closeMarketDetail() { document.getElementById('market-detail-modal')?.remove(); }
+function closeMarketEdit() { document.getElementById('market-edit-modal')?.remove(); }
+function confirmDeleteMarket(i) {
+  // Replace button with inline confirm
+  const btn = event.target;
+  if (btn.dataset.confirmed) {
+    closeMarketEdit();
+    deliveryMarket.splice(i, 1);
+    saveLevering();
+    const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+    if (el) renderLevMarked(el);
+    return;
+  }
+  btn.dataset.confirmed = '1';
+  btn.textContent = 'Bekreft fjerning';
+  btn.style.background = 'rgba(248,113,113,0.15)';
+  setTimeout(() => { if (btn.dataset.confirmed) { btn.dataset.confirmed = ''; btn.textContent = '× Fjern'; btn.style.background = 'transparent'; } }, 3000);
+}
+
+function openMarketEdit(mktIdx) {
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  const modal = document.createElement('div');
+  modal.id = 'market-edit-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:var(--bg-main);z-index:6000;display:flex;flex-direction:column;overflow:hidden';
+
+  let html = '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
+    + '<button onclick="closeMarketEdit()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
+    + '<div style="font-size:15px;color:var(--text-head);flex:1">Rediger marked</div>'
+    + '</div>'
+    + '<div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:14px;-webkit-overflow-scrolling:touch">';
+
+  // Name + date edit
+  html += '<div style="margin-bottom:16px">'
+    + '<input id="mkt-edit-name" value="'+(mkt.name||'')+'" placeholder="Navn" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px">'
+    + '<button type="button" id="mkt-edit-date-btn" onclick="event.stopPropagation();openMarketDatePicker()" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer">'+(mkt.date ? '📅 '+mkt.date : 'Velg dato 📅')+'</button>'
+    + '<input type="hidden" id="mkt-edit-date-val" value="'+(mkt.date||'')+'">'
+    + '</div>';
+
+  // Crop grid (collapsible, shown by default)
+  const selIds = new Set((mkt.items||[]).map(i => i.cropId));
+  html += '<div style="margin-bottom:16px">'
+    + '<button onclick="toggleMarketGrid(this)" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 0;background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;font-family:inherit">'
+    + 'Velg vekster <span id="mkt-grid-arrow">▲</span></button>'
+    + '<div id="mkt-crop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-top:8px">';
+  crops.forEach(cr => {
+    const sel = selIds.has(cr.id);
+    html += '<button onclick="toggleMarketCropInEdit('+mktIdx+','+cr.id+')" data-cropid="'+cr.id+'"'
+      + ' style="padding:8px 4px;border-radius:10px;border:2px solid '+(sel?'var(--accent)':'var(--border)')
+      + ';background:'+(sel?'var(--accent-bg)':'transparent')
+      + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px'
+      + ';color:'+(sel?'var(--accent-soft)':'var(--text-muted)')+';font-family:inherit">'
+      + '<span style="font-size:22px">'+cr.emoji+'</span>'
+      + '<span style="font-size:10px;text-align:center;line-height:1.2">'+(cr.family||cr.name)+'</span>'
+      + '</button>';
+  });
+  html += '</div></div>';
+
+  // Items with qty/unit (below grid)
+  if ((mkt.items||[]).length > 0) {
+    html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Mengde per vekst</div>';
+    (mkt.items||[]).forEach((item, ii) => {
+      const cr = crops.find(c => c.id === item.cropId);
+      if (!cr) return;
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'
+        + '<span style="font-size:18px">'+cr.emoji+'</span>'
+        + '<div style="flex:1;font-size:13px;color:var(--text-head)">'+(cr.family||cr.name)+'</div>'
+        + '<input type="number" min="0" step="0.1" value="'+(item.qty||'')+'" placeholder="Mengde"'
+        + ' oninput="updateMarketItemQty('+mktIdx+','+ii+',+this.value)"'
+        + ' style="width:65px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+        + '<select onchange="updateMarketItemUnit('+mktIdx+','+ii+',this.value)"'
+        + ' style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+        + ['stk','kg','bunt','boks'].map(u => '<option value="'+u+'"'+(item.unit===u?' selected':'')+'>'+u+'</option>').join('')
+        + '</select>'
+        + '<button onclick="removeMarketCrop('+mktIdx+','+ii+')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:4px">×</button>'
+        + '</div>';
+    });
+  }
+
+  html += '<div style="display:flex;gap:8px;margin-top:20px">'
+    + '<button onclick="confirmDeleteMarket('+mktIdx+')" style="padding:12px;border-radius:10px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:14px;font-family:inherit">× Fjern</button>'
+    + '<button onclick="saveMarketEdit('+mktIdx+')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>'
+    + '</div>'
+    + '</div>';
+
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+}
+
+function toggleMarketGrid(btn) {
+  const grid = document.getElementById('mkt-crop-grid');
+  const arrow = document.getElementById('mkt-grid-arrow');
+  if (!grid) return;
+  const hidden = grid.style.display === 'none';
+  grid.style.display = hidden ? 'grid' : 'none';
+  if (arrow) arrow.textContent = hidden ? '▲' : '▼';
+}
+
+function toggleMarketCropInEdit(mktIdx, cropId) {
+  snapshotLev();
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  if (!mkt.items) mkt.items = [];
+  const existing = mkt.items.findIndex(i => i.cropId === cropId);
+  if (existing >= 0) mkt.items.splice(existing, 1);
+  else mkt.items.push({ cropId, qty: 0, unit: 'stk', harvested: false });
+  saveLevering();
+  document.getElementById('market-edit-modal')?.remove();
+  openMarketEdit(mktIdx);
+}
+
+function saveMarketEdit(mktIdx) {
+  snapshotLev();
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  const name = document.getElementById('mkt-edit-name')?.value.trim();
+  const date = document.getElementById('mkt-edit-date-val')?.value;
+  if (name) mkt.name = name;
+  if (date) mkt.date = date;
+  saveLevering();
+  document.getElementById('market-edit-modal')?.remove();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevMarked(el);
+}
+
+function editMarketName(mktIdx) {
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  const name = prompt('Navn på marked:', mkt.name||'');
+  if (name !== null) { mkt.name = name.trim(); saveLevering(); openMarketDetail(mktIdx); }
+}
+
+function markMarketDone(mktIdx) {
+  snapshotLev();
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  const today = new Date().toISOString().split('T')[0];
+  (mkt.items||[]).forEach(item => {
+    if (!item.qty) return;
+    harvestLog.unshift({ id: Date.now()+Math.random(), date: today, cropId: item.cropId, bedId: null, qty: item.qty, unit: item.unit, dest: 'marked', note: mkt.name });
+  });
+  mkt.done = true;
+  saveLevering();
+  document.getElementById('market-detail-modal')?.remove();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevMarked(el);
+  alert('Høsting logget!');
+}
+
+function updateMarketItemQty(mktIdx, itemIdx, val) {
+  if (deliveryMarket[mktIdx]?.items?.[itemIdx]) { deliveryMarket[mktIdx].items[itemIdx].qty = val; saveLevering(); }
+}
+function updateMarketItemUnit(mktIdx, itemIdx, val) {
+  if (deliveryMarket[mktIdx]?.items?.[itemIdx]) { deliveryMarket[mktIdx].items[itemIdx].unit = val; saveLevering(); }
+}
+
+
+function saveMarketItem() {} // legacy stub
+function removeMarketItem(i) { deliveryMarket.splice(i,1); saveLevering(); const _elm=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_elm) renderLevMarked(_elm); }
+
+// ── Høst ─────────────────────────────────────────────────────────
+function renderLevHoest(el) {
+  const today = new Date().toISOString().split('T')[0];
+  el.innerHTML = `
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Registrer høsting</div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <select id="hoest-crop" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          ${crops.map(c => `<option value="${c.id}">${c.emoji} ${c.family||c.name}</option>`).join('')}
+        </select>
+        <select id="hoest-bed" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <option value="">Velg seng (valgfritt)</option>
+          ${BED_IDS.map(b => `<option value="${b}">${b}</option>`).join('')}
+        </select>
+        <div style="display:flex;gap:8px">
+          <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <select id="hoest-unit" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+            <option value="stk">stk</option>
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+          </select>
+        </div>
+        <select id="hoest-dest" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <option value="kasse">Grønnsakskasse</option>
+          <option value="marked">Marked</option>
+          <option value="annet">Annet</option>
+        </select>
+        <input id="hoest-note" placeholder="Notat (valgfritt)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <button onclick="saveHarvest()" style="padding:12px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Registrer høsting</button>
+      </div>
+    </div>
+    ${harvestLog.filter(h => h.date === today).length > 0 ? `
+      <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Høstet i dag</div>
+      ${harvestLog.filter(h => h.date === today).map((h,i) => {
+        const cr = crops.find(c => c.id === h.cropId);
+        return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">${cr?.emoji||'🌱'}</span>
+          <div style="flex:1;font-size:13px;color:var(--text-head)">${cr?cr.family||cr.name:''} · ${h.qty} ${h.unit} · ${h.dest}</div>
+          ${h.bedId ? `<span style="font-size:11px;color:var(--text-muted)">${h.bedId}</span>` : ''}
+        </div>`;
+      }).join('')}
+    ` : ''}`;
+}
+
+function saveHarvest() {
+  snapshotLev();
+  const cropId = +document.getElementById('hoest-crop')?.value;
+  const bedId  = document.getElementById('hoest-bed')?.value || null;
+  const qty    = +document.getElementById('hoest-qty')?.value;
+  const unit   = document.getElementById('hoest-unit')?.value;
+  const dest   = document.getElementById('hoest-dest')?.value;
+  const note   = document.getElementById('hoest-note')?.value.trim();
+  if (!cropId || !qty) { alert('Velg vekst og mengde.'); return; }
+  const today = new Date().toISOString().split('T')[0];
+  harvestLog.unshift({id:Date.now(), date:today, cropId, bedId, qty, unit, dest, note});
+  saveLevering();
+  document.getElementById('hoest-qty').value = '';
+  document.getElementById('hoest-note').value = '';
+  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl);})();
+}
+
+// ── Logg ─────────────────────────────────────────────────────────
+function renderLevLogg(el) {
+  if (!harvestLog.length) {
+    el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen høsting registrert ennå.</p>`;
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  harvestLog.forEach(h => { if (!byDate[h.date]) byDate[h.date] = []; byDate[h.date].push(h); });
+
+  // Totals per crop
+  const byCrop = {};
+  harvestLog.forEach(h => {
+    if (!byCrop[h.cropId]) byCrop[h.cropId] = {};
+    if (!byCrop[h.cropId][h.unit]) byCrop[h.cropId][h.unit] = 0;
+    byCrop[h.cropId][h.unit] += h.qty;
+  });
+
+  const totalValue = harvestLog.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+
+  el.innerHTML = `
+    <div style="background:var(--accent-bg);border:1px solid var(--border-accent);border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Totaloversikt</div>
+      <div style="font-size:20px;color:var(--accent-soft);font-weight:300">kr ${totalValue.toFixed(0)}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${harvestLog.length} høstinger registrert</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Per vekst</div>
+    ${Object.entries(byCrop).map(([cropId, units]) => {
+      const cr = crops.find(c => c.id == cropId);
+      if (!cr) return '';
+      const val = Object.entries(units).reduce((s,[unit,qty]) => s + calcItemValue(cr, qty, unit), 0);
+      const summary = Object.entries(units).map(([u,q]) => `${q} ${u}`).join(', ');
+      return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">${cr.emoji}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;color:var(--text-head)">${cr.family||cr.name}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${summary}</div>
+        </div>
+        <div style="font-size:13px;color:var(--accent-soft)">kr ${val.toFixed(0)}</div>
+      </div>`;
+    }).join('')}
+    <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:16px 0 8px">Per dag</div>
+    ${Object.entries(byDate).sort(([a],[b]) => b.localeCompare(a)).map(([date, entries]) => {
+      const dayVal = entries.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+      const [y,m,d] = date.split('-');
+      const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+      return `<div style="margin-bottom:12px">
+        <div style="font-size:13px;color:var(--text-head);margin-bottom:6px;display:flex;justify-content:space-between">
+          <span>${+d}. ${MONTHS[+m-1]} ${y}</span>
+          <span style="color:var(--accent-soft)">kr ${dayVal.toFixed(0)}</span>
+        </div>
+        ${entries.map(h => {
+          const cr = crops.find(c => c.id === h.cropId);
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;font-size:12px;color:var(--text-muted)">
+            <span style="font-size:16px">${cr?.emoji||'🌱'}</span>
+            <span style="flex:1;color:var(--text-head)">${cr?cr.family||cr.name:''}</span>
+            <span>${h.qty} ${h.unit}</span>
+            ${h.bedId?`<span style="color:var(--text-dim)">${h.bedId}</span>`:''}
+            <span style="color:var(--accent-soft)">kr ${calcItemValue(cr,h.qty,h.unit).toFixed(0)}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}`;
+}
+
+// ── Lagring ──────────────────────────────────────────────────────
+
+function undoLev() {
+  if (levHistoryIndex <= 0) return;
+  levHistoryIndex--;
+  restoreLevSnapshot(levHistory[levHistoryIndex]);
+}
+
+function redoLev() {
+  if (levHistoryIndex >= levHistory.length - 1) return;
+  levHistoryIndex++;
+  restoreLevSnapshot(levHistory[levHistoryIndex]);
+}
+
+function snapshotLev() {
+  const snap = JSON.parse(JSON.stringify({
+    customers: deliveryCustomers, box: deliveryBox, boxTypes,
+    market: deliveryMarket, harvest: harvestLog,
+  }));
+  levHistory = levHistory.slice(0, levHistoryIndex + 1);
+  levHistory.push(snap);
+  if (levHistory.length > MAX_LEV_HISTORY) levHistory.shift();
+  levHistoryIndex = levHistory.length - 1;
+  updateLevUndoRedoBtns();
+}
+
+function restoreLevSnapshot(s) {
+  deliveryCustomers = JSON.parse(JSON.stringify(s.customers));
+  deliveryBox       = JSON.parse(JSON.stringify(s.box));
+  boxTypes          = JSON.parse(JSON.stringify(s.boxTypes||[]));
+  deliveryMarket    = JSON.parse(JSON.stringify(s.market));
+  harvestLog        = JSON.parse(JSON.stringify(s.harvest));
+  // Save without snapshot to avoid corrupting redo stack
+  try {
+    localStorage.setItem('mh_levering', JSON.stringify({
+      customers: deliveryCustomers, box: deliveryBox, boxTypes,
+      market: deliveryMarket, harvest: harvestLog,
+    }));
+  } catch(e) {}
+  updateLevUndoRedoBtns();
+  // Re-render whichever container is visible
+  const el = document.getElementById('lev-overlay-content')
+          || document.getElementById('lev-tab-content')
+          || document.getElementById('tab-levering');
+  if (el) renderLeveringInto(el);
+}
+
+function updateLevUndoRedoBtns() {
+  const canUndo = levHistoryIndex > 0;
+  const canRedo = levHistoryIndex < levHistory.length - 1;
+  const ub = document.getElementById('lev-undo-btn');
+  const rb = document.getElementById('lev-redo-btn');
+  if (ub) ub.disabled = !canUndo;
+  if (rb) rb.disabled = !canRedo;
+}
+
+function saveLevering() {
+  try {
+    localStorage.setItem('mh_levering', JSON.stringify({
+      customers: deliveryCustomers,
+      box: deliveryBox,
+      boxTypes,
+      market: deliveryMarket,
+      harvest: harvestLog,
+    }));
+  } catch(e) {}
+  scheduleSync();
+}
+
+function loadLevering() {
+  try {
+    const raw = localStorage.getItem('mh_levering');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d.customers) deliveryCustomers = d.customers;
+    if (d.box)       deliveryBox       = d.box;
+    if (d.market)    deliveryMarket    = d.market;
+    if (d.harvest)   harvestLog        = d.harvest;
+    if (d.boxTypes)  boxTypes          = d.boxTypes;
+  } catch(e) {}
+}
+
+
 </script>
+<input type="file" id="excel-import-input" accept=".xlsx" onchange="importFromExcel(event)" style="display:none">
 </body>
 </html>

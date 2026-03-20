@@ -1,12 +1,12 @@
-const CACHE = 'markedshage-v132';
+const CACHE = 'markedshage-v186';
 const ASSETS = [
-  '/markedshage/',
-  '/markedshage/index.html',
-  '/markedshage/manifest.json',
-  '/markedshage/icon-192.png',
-  '/markedshage/icon-512.png',
-  '/markedshage/favicon.svg',
-  '/markedshage/favicon-32.png',
+  '/app/',
+  '/app/index.html',
+  '/app/manifest.json',
+  '/app/icon-192.png',
+  '/app/icon-512.png',
+  '/app/favicon.svg',
+  '/app/favicon-32.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 ];
 
@@ -38,7 +38,7 @@ self.addEventListener('fetch', e => {
         return resp;
       }).catch(() => {
         if (e.request.mode === 'navigate') {
-          return caches.match('/markedshage/index.html');
+          return caches.match('/app/index.html');
         }
       });
     })
