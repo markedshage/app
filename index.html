@@ -296,7 +296,7 @@
 
 <header>
   <div class="header-top">
-    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
       <div style="display:flex;align-items:center;gap:10px">
         <button onclick="toggleHarvestMode()" title="Åpne Innhøsting" style="background:none;border:none;cursor:pointer;padding:0;line-height:0;flex-shrink:0">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:42px;height:42px;border-radius:10px;display:block">
@@ -327,18 +327,11 @@
       <div style="display:flex;gap:5px;align-items:center;position:relative">
         <button id="undo-btn" onclick="undo()" title="Angre (Ctrl+Z)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
         <button id="redo-btn" onclick="redo()" title="Gjør om (Ctrl+Y)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
+        <button id="gist-btn" onclick="syncConnected?gistShowMenu():gistSetup()" title="Sky-synkronisering" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">☁</button>
         <button onclick="toggleGearMenu()" id="gear-btn" title="Innstillinger" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">⚙</button>
-        <button id="harvest-toggle-btn" onclick="toggleHarvestMode()" title="Innhøsting"
-          style="padding:4px 8px;padding-top:6px;border-radius:8px;border:1px solid var(--border);
-          background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;
-          font-family:inherit;line-height:1;display:inline-flex;align-items:center;
-          justify-content:center;transition:all 0.2s">
-          🌾
-        </button>
         <div id="gear-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:200px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
           <button onclick="toggleTheme();closeGearMenu()" id="theme-menu-btn" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-head);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.1)'" onmouseout="this.style.background='transparent'">☀ Lyst tema</button>
-          <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 0"></div>
-          <button onclick="syncConnected?gistShowMenu():gistSetup();closeGearMenu()" id="gist-gear-btn" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-muted);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.1)'" onmouseout="this.style.background='transparent'">☁ Sky-synkronisering</button>
+          
           <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 0"></div>
           <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:#60a5fa;font-family:inherit" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">⬆ Importer fra Excel<input type="file" accept=".xlsx" onchange="importFromExcel(event);closeGearMenu()" style="display:none"></label>
           <button onclick="exportToExcel();closeGearMenu()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--accent-soft);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">⬇ Eksporter til Excel</button>
@@ -349,6 +342,7 @@
     </div>
   </div>
 </header>
+<script>document.addEventListener('DOMContentLoaded',()=>{const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--header-h',h.offsetHeight+'px');});</script>
 
 <main>
   <div id="tab-oversikt"></div>
@@ -380,8 +374,9 @@
       <div><label class="field-label">Planteavstand (cm)</label><input class="field-input" id="c-plantspacing" type="number" value="20"></div>
       <div><label class="field-label">Rader (per bed)</label><input class="field-input" id="c-rows" type="number" value="2"></div>
       <div><label class="field-label">Frø per klynge</label><input class="field-input" id="c-seedspercluster" type="number" value="1" min="1"></div>
-      <div><label class="field-label">Pris pr/kg (kr)</label><input class="field-input" id="c-pricepkg" type="number" step="0.5" value="0" min="0"></div>
-      <div><label class="field-label">Vekt per enhet (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0"></div>
+      <div><label class="field-label">Pris pr/kg (kr)</label><input class="field-input" id="c-pricepkg" type="number" step="0.5" value="0" min="0" oninput="recalcPricePerUnit()"></div>
+      <div><label class="field-label">Vekt per enhet (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0" oninput="recalcPricePerUnit()"></div>
+      <div style="position:relative"><label class="field-label">Pris per stk/bunt (kr) <span id="c-priceunit-auto" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span></label><input class="field-input" id="c-priceunit" type="number" step="0.5" value="0" min="0" oninput="this.dataset.custom='1'" placeholder="Auto fra kg×vekt"></div>
     </div>
     <div class="form-grid">
       <div><label class="field-label">Sådato</label><button type="button" class="date-display empty" id="c-sown-btn" onclick="openCal('c-sown-btn','c-sown-val')">Velg dato 📅</button><input type="hidden" id="c-sown-val"></div>
@@ -3453,6 +3448,20 @@ function calcGang(crop, bedSpec) {
   return Math.round(gang * 10) / 10;
 }
 
+function recalcPricePerUnit() {
+  const pkg = parseFloat(document.getElementById('c-pricepkg')?.value) || 0;
+  const wg  = parseFloat(document.getElementById('c-weightg')?.value) || 0;
+  const field = document.getElementById('c-priceunit');
+  const label = document.getElementById('c-priceunit-auto');
+  if (!field || field.dataset.custom) {
+    if (label) label.textContent = field?.dataset.custom ? '(egendefinert)' : '';
+    return;
+  }
+  const calc = pkg && wg ? Math.round(pkg * wg / 1000 * 100) / 100 : 0;
+  field.value = calc || '';
+  if (label) label.textContent = calc > 0 ? '(beregnet)' : '';
+}
+
 function openEditCrop(id) {
   editingCropId = id;
   const c = crops.find(x => x.id === id);
@@ -3473,6 +3482,8 @@ function openEditCrop(id) {
   document.getElementById('c-status').value = c.status;
   document.getElementById('c-pricepkg').value = c.pricePerKg || 0;
   document.getElementById('c-weightg').value = c.weightG || 0;
+  const puField = document.getElementById('c-priceunit');
+  if (puField) { puField.value = c.pricePerUnit || 0; puField.dataset.custom = c.pricePerUnitCustom ? '1' : ''; recalcPricePerUnit(); }
   document.getElementById('c-notes').value = c.notes;
   document.getElementById('modal-crop-delete-wrap').style.display = 'block';
   document.getElementById('modal-crop').style.display = 'flex';
@@ -3497,6 +3508,7 @@ function openAddCrop() {
   document.getElementById('c-status').value = 'planlagt';
   document.getElementById('c-pricepkg').value = 0;
   document.getElementById('c-weightg').value = 0;
+  const puF = document.getElementById('c-priceunit'); if (puF) { puF.value = 0; delete puF.dataset.custom; }
   document.getElementById('c-notes').value = '';
   document.getElementById('modal-crop-delete-wrap').style.display = 'none';
   document.getElementById('modal-crop').style.display = 'flex';
@@ -3559,6 +3571,8 @@ function saveCrop() {
     status: document.getElementById('c-status').value,
     pricePerKg: parseFloat(document.getElementById('c-pricepkg').value) || 0,
     weightG: parseFloat(document.getElementById('c-weightg').value) || 0,
+    pricePerUnit: parseFloat(document.getElementById('c-priceunit')?.value) || 0,
+    pricePerUnitCustom: !!document.getElementById('c-priceunit')?.dataset.custom,
     notes: document.getElementById('c-notes').value,
   };
   const existingCrop = editingCropId !== null ? crops.find(c => c.id === editingCropId) : null;
@@ -4942,8 +4956,8 @@ function showLeveringOverlay() {
   overlay.style.cssText = 'position:fixed;inset:0;z-index:4000;display:flex;flex-direction:column;background:var(--bg-main);overflow:hidden';
 
   overlay.innerHTML = `
-    <div style="flex-shrink:0;padding:14px 16px 14px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">
-      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
+    <div style="flex-shrink:0;padding:14px 16px;background:var(--bg-header)">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
         <div style="display:flex;align-items:center;gap:10px">
           <button onclick="toggleHarvestMode()" title="Tilbake til vanlig modus" style="background:none;border:none;cursor:pointer;padding:0;line-height:0;flex-shrink:0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:42px;height:42px;border-radius:10px;display:block">
@@ -4974,20 +4988,20 @@ function showLeveringOverlay() {
         <div style="display:flex;gap:5px;align-items:center">
           <button onclick="undoLev()" id="lev-undo-btn" title="Angre" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
           <button onclick="redoLev()" id="lev-redo-btn" title="Gjør om" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
+          <button id="lev-gist-btn" onclick="syncConnected?gistShowMenu():gistSetup()" title="Sky-synkronisering" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">☁</button>
           <button onclick="toggleGearMenu(this)" title="Innstillinger" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">⚙</button>
-          <button onclick="toggleHarvestMode()" title="Tilbake til vanlig modus" style="padding:0;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;overflow:hidden"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:100%;height:100%;display:block;border-radius:7px"><rect width="512" height="512" rx="110" fill="#1a1005"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(45 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(90 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(135 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(180 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(225 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#d4954a" opacity="0.85" transform="rotate(270 256 256)"/><ellipse cx="256" cy="148" rx="28" ry="58" fill="#c9a84c" opacity="0.9" transform="rotate(315 256 256)"/><circle cx="256" cy="256" r="72" fill="#6b3d11"/><circle cx="256" cy="256" r="55" fill="#4a2a08"/><circle cx="256" cy="225" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="276" cy="238" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="276" cy="262" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="256" cy="275" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="236" cy="262" r="6" fill="#c9a84c" opacity="0.5"/><circle cx="236" cy="238" r="6" fill="#c9a84c" opacity="0.5"/></svg></button>
         </div>
       </div>
     </div>
-        <div style="flex:1;overflow-y:auto;padding:14px;padding-bottom:90px;-webkit-overflow-scrolling:touch">
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch"><div style="max-width:600px;margin:0 auto;padding:16px;">
       <div id="lev-overlay-content"></div>
-    </div>
-    <nav style="position:fixed;bottom:0;left:0;right:0;z-index:4100;
+    </div></div>
+    <nav style="position:sticky;bottom:0;z-index:4100;
       background:var(--bg-nav);backdrop-filter:blur(12px);
       border-top:1px solid var(--border-accent);display:flex;
-      padding-bottom:env(safe-area-inset-bottom)">
+      padding-bottom:env(safe-area-inset-bottom);flex-shrink:0">
       ${['kasse','marked','hoestlogg'].map((t,i) => {
-        const labels = ['Kasse','Marked','Høstelogg'];
+        const labels = ['Grønnsakskasser','Marked','Høstelogg'];
         return `<button onclick="leveringTab='${t}';renderLeveringInto(document.getElementById('lev-overlay-content'))"
           id="lev-tab-${t}"
           style="flex:1;min-width:0;padding:20px 2px 18px;border:none;background:transparent;
@@ -4999,8 +5013,15 @@ function showLeveringOverlay() {
     </nav>`;
 
   document.body.appendChild(overlay);
+  // Set header height CSS var for child modals
+  setTimeout(() => {
+    const hdr = overlay.querySelector('[style*="bg-header"]');
+    if (hdr) document.documentElement.style.setProperty('--header-h', hdr.offsetHeight+'px');
+  }, 0);
   renderLeveringInto(document.getElementById('lev-overlay-content'));
-  updateLevUndoRedoBtns(); // update lev-undo/redo-btn now that they're in DOM
+  updateLevUndoRedoBtns();
+  // Sync cloud button color
+  const gb=document.getElementById('gist-btn'); const lgb=document.getElementById('lev-gist-btn'); if(gb&&lgb){lgb.style.color=gb.style.color||'var(--text-muted)';}
 }
 
 function closeLeveringOverlay() {
@@ -5054,13 +5075,19 @@ function initSync() {
 }
 
 function renderSyncBtn() {
-  const btn = document.getElementById('gist-gear-btn');
-  if (btn) {
-    const connColor = document.body.classList.contains('light') ? '#5a8a4a' : '#34d399';
+  const connColor = document.body.classList.contains('light') ? '#5a8a4a' : '#34d399';
+  ['gist-btn','lev-gist-btn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
     btn.style.color = syncConnected ? connColor : 'var(--text-muted)';
-    btn.textContent = syncConnected ? '☁ Sky-synkronisering ✓' : '☁ Sky-synkronisering';
+    btn.title = syncConnected ? 'JSONBin synkronisering – tilkoblet' : 'Koble til synkronisering';
+  });
+  // Also update gear menu label
+  const gearBtn = document.getElementById('gist-gear-btn');
+  if (gearBtn) {
+    gearBtn.style.color = syncConnected ? connColor : 'var(--text-muted)';
+    gearBtn.textContent = syncConnected ? '☁ Sky-synkronisering ✓' : '☁ Sky-synkronisering';
   }
-  btn.title = syncConnected ? 'JSONBin synkronisering – tilkoblet' : 'Koble til synkronisering';
 }
 
 // Called when user enters API key
@@ -5252,8 +5279,7 @@ async function syncSave() {
     }
     if (resp && resp.ok) {
       syncTimer = null;
-      const btn = document.getElementById('gist-btn');
-      if (btn) { btn.style.color = '#34d399'; btn.title = 'JSONBin synkronisering – tilkoblet'; }
+      renderSyncBtn();
           } else {
       const errText = resp ? await resp.text() : 'ingen respons';
       console.error('JSONBin save failed:', resp?.status, errText);
@@ -5270,8 +5296,7 @@ function scheduleSync() {
   if (!syncConnected) return;
   saveToLocal();
   clearTimeout(syncTimer);
-  const btn = document.getElementById('gist-btn');
-  if (btn) { btn.style.color = '#fbbf24'; btn.title = 'Ulagrede endringer – lagrer snart...'; }
+  ['gist-btn','lev-gist-btn'].forEach(id=>{const b=document.getElementById(id);if(b){b.style.color='#fbbf24';b.title='Ulagrede endringer – lagrer snart...';b.textContent='☁';}})
   syncTimer = setTimeout(syncSave, 3000);
 }
 
@@ -5308,8 +5333,8 @@ function gistShowMenu() {
   menu.style.cssText = 'position:fixed;background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:210px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.5)';
 
   const items = [
-    { label: '⬇ Synkroniser', fn: () => { syncLoad(false); menu.remove(); } },
-    { label: '☁ Skylagring',   fn: () => { syncSave(); menu.remove(); } },
+    { label: '⬇ Last inn fra sky', fn: () => { syncLoad(false); menu.remove(); } },
+    { label: '☁ Lagre til sky',   fn: () => { syncSave(); menu.remove(); } },
     { sep: true },
     { label: '🔑 Endre API-nøkkel',    fn: () => { gistSetup(); menu.remove(); } },
     { label: '🔓 Koble fra',           fn: () => { syncDisconnect(); menu.remove(); }, color: '#f87171' },
@@ -5332,7 +5357,9 @@ function gistShowMenu() {
   });
 
   document.body.appendChild(menu);
-  const gistBtn = document.getElementById('gist-btn');
+  const gistBtn = document.getElementById('lev-gist-btn') && document.getElementById('lev-overlay') ? 
+    document.getElementById('lev-gist-btn') : document.getElementById('gist-btn');
+  if (!gistBtn) return;
   const rect = gistBtn.getBoundingClientRect();
   menu.style.top   = (rect.bottom + 4) + 'px';
   menu.style.right = (window.innerWidth - rect.right) + 'px';
@@ -5392,7 +5419,7 @@ function renderLevering() {
   if (!el) return;
 
   const TABS = [
-    {id:'kasse',  label:'Kasse'},
+    {id:'kasse',  label:'Grønnsakskasser'},
     {id:'marked', label:'Marked'},
     {id:'hoestlogg', label:'Høstelogg'},
   ];
@@ -5531,7 +5558,7 @@ function deleteCustomer(i) {
 function openKasseOppsett() {
   const modal = document.createElement('div');
   modal.id = 'kasse-oppsett-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:var(--bg-main);z-index:6000;display:flex;flex-direction:column;overflow:hidden';
+  modal.style.cssText = 'position:fixed;top:var(--header-h,0px);left:0;right:0;bottom:0;background:var(--bg-main);z-index:5999;display:flex;justify-content:center';
 
   const renderOppsettContent = () => {
     const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
@@ -5596,11 +5623,13 @@ function openKasseOppsett() {
     return html;
   };
 
-  modal.innerHTML = '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
+  modal.innerHTML = '<div style="display:flex;flex-direction:column;width:100%;max-width:600px;height:100vh;overflow:hidden">'
+    + '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
     + '<button onclick="closeKasseOppsett()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
     + '<div style="font-size:15px;color:var(--text-head)">Oppsett</div>'
     + '</div>'
-    + renderOppsettContent();
+    + renderOppsettContent()
+    + '</div>';
 
   document.body.appendChild(modal);
 }
@@ -5802,7 +5831,7 @@ function renderLevKasse(el) {
   const boxVal = (bw.items||[]).reduce((s,item) => { const cr=crops.find(c=>c.id===item.cropId); return s+calcItemValue(cr,item.qty||0,item.unit); }, 0);
   html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
     + '<label style="font-size:13px;color:var(--text-muted);white-space:nowrap">Antall kasser:</label>'
-    + '<input type="number" min="0" value="'+totalBoxes+'" onchange="updateBoxWeekCount(\''+bw.id+'\',+this.value)"'
+    + '<input type="number" min="0" value="'+totalBoxes+'" oninput="updateBoxWeekCount(\''+bw.id+'\',+this.value)"'
     + ' style="width:70px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
     + '<div id="kasse-total-'+bw.id+'" style="flex:1;text-align:right;font-size:13px;color:var(--accent-soft)">kr '+(boxVal*totalBoxes).toFixed(0)+' totalt</div>'
     + '</div>';
@@ -5810,14 +5839,13 @@ function renderLevKasse(el) {
   // Crop grid (collapsible)
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
     + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Innhold denne uken</div>'
-    + '<button id="kasse-grid-toggle" onclick="toggleKasseGrid()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-muted);font-family:inherit;padding:0">Velg vekster ▲</button>'
-    + '<div style="display:flex;gap:6px">';
+    + '<div style="display:flex;gap:4px;align-items:center">';
   if (bt.baseItems && bt.baseItems.length) {
     html += '<button onclick="importBaseItems(\''+bw.id+'\')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">↓ Basis</button>';
   }
   html += '<button onclick="openDuplicateWeek(\''+bt.id+'\','+kasseViewWeek+','+kasseViewYear+')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">⧉ Kopier</button>'
+    + '<button id="kasse-grid-toggle" onclick="toggleKasseGrid()" style="padding:4px 8px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;line-height:1">▲</button>'
     + '</div></div>';
-
   const selIds = new Set((bw.items||[]).map(i=>i.cropId));
   html += '<div id="kasse-crop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:14px">';
   crops.forEach(cr => {
@@ -5837,7 +5865,7 @@ function renderLevKasse(el) {
   if ((bw.items||[]).length) {
     html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Mengde per kasse</div>';
     (bw.items||[]).forEach((item,ii) => {
-      const cr = crops.find(c=>c.id===item.cropId);
+      const cr = crops.find(c=>c.id==item.cropId);
       if (!cr) return;
       const perKasse = calcItemValue(cr,item.qty||0,item.unit);
       const totalNeeded = (item.qty||0) * totalBoxes;
@@ -5845,14 +5873,14 @@ function renderLevKasse(el) {
         + '<span style="font-size:18px">'+cr.emoji+'</span>'
         + '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)">'+(cr.family||cr.name)+'</div>'
         + '<div id="kasse-need-'+bw.id+'-'+ii+'" style="font-size:11px;color:var(--text-muted)">Totalt: '+(totalBoxes?totalNeeded+' '+item.unit:'–')+'</div></div>'
-        + '<input type="number" min="0" step="0.1" value="'+(item.qty||'')+'" placeholder="Mengde"'
+        + '<input type="number" min="0" step="1" value="'+(item.qty||'')+'" placeholder="Mengde"'
         + ' oninput="updateKasseItem(\''+bw.id+'\','+ii+',\'qty\',+this.value)"'
         + ' style="width:65px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
         + '<select onchange="updateKasseItem(\''+bw.id+'\','+ii+',\'unit\',this.value)"'
         + ' style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
         + ['stk','kg','bunt','boks'].map(u=>'<option value="'+u+'"'+(item.unit===u?' selected':'')+'>'+u+'</option>').join('')
         + '</select>'
-        + '<span style="font-size:11px;color:var(--accent-soft);min-width:40px;text-align:right">kr '+perKasse.toFixed(0)+'</span>'
+        + '<span id="kasse-price-'+bw.id+'-'+ii+'" style="font-size:11px;color:var(--accent-soft);min-width:40px;text-align:right">kr '+perKasse.toFixed(0)+'</span>'
         + '<button onclick="removeKasseItem(\''+bw.id+'\','+ii+')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px">×</button>'
         + '</div>';
     });
@@ -5865,13 +5893,121 @@ function renderLevKasse(el) {
   el.innerHTML = html;
 }
 
+function updateBoxWeekCount(bwId, val) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  bw.count = +val;
+  saveLevering();
+  const boxVal = (bw.items||[]).reduce((s,item) => {
+    const cr = crops.find(c => c.id === item.cropId);
+    return s + calcItemValue(cr, item.qty||0, item.unit);
+  }, 0);
+  const totalEl = document.getElementById('kasse-total-'+bwId);
+  if (totalEl) totalEl.textContent = 'kr ' + (boxVal * bw.count).toFixed(0) + ' totalt';
+  const hBtn = document.getElementById('kasse-harvest-btn-'+bwId);
+  if (hBtn) hBtn.textContent = '\u2713 Logg ' + bw.count + ' kasser som h\u00f8stet';
+  (bw.items||[]).forEach((item, ii) => {
+    const el = document.getElementById('kasse-need-'+bwId+'-'+ii);
+    if (el) el.textContent = 'Totalt: ' + (bw.count ? (item.qty||0)*bw.count+' '+item.unit : '\u2013');
+  });
+}
+
+function updateKasseItem(bwId, idx, field, val) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw?.items?.[idx]) return;
+  bw.items[idx][field] = field==='qty' ? +val : val;
+  saveLevering();
+  // Update price display inline
+  const item = bw.items[idx];
+  const cr = crops.find(c => c.id == item.cropId);
+  const priceEl = document.getElementById('kasse-price-'+bwId+'-'+idx);
+  if (priceEl && cr) priceEl.textContent = 'kr ' + calcItemValue(cr, item.qty||0, item.unit).toFixed(0);
+  // Update total
+  const boxVal = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id==it.cropId), it.qty||0, it.unit), 0);
+  const totalEl = document.getElementById('kasse-total-'+bwId);
+  if (totalEl) totalEl.textContent = 'kr ' + (boxVal * (bw.count||0)).toFixed(0) + ' totalt';
+}
+
+function removeKasseItem(bwId, idx) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  snapshotLev();
+  bw.items.splice(idx, 1);
+  saveLevering();
+  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function toggleKasseCrop(bwId, cropId) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  snapshotLev();
+  const idx = bw.items.findIndex(i => i.cropId == +cropId);
+  if (idx >= 0) bw.items.splice(idx, 1);
+  else bw.items.push({cropId: +cropId, qty: 0, unit: 'kg'});
+  saveLevering();
+  const btn = document.querySelector('[data-cropid="'+cropId+'"]');
+  const sel = bw.items.some(i => i.cropId == +cropId);
+  if (btn) {
+    btn.style.borderColor = sel ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = sel ? 'var(--accent-bg)' : 'transparent';
+    btn.style.color       = sel ? 'var(--accent-soft)' : 'var(--text-muted)';
+  }
+  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function importBaseItems(bwId) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  const bt = boxTypes.find(t => t.id == bw.boxTypeId);
+  if (!bt?.baseItems?.length) return;
+  snapshotLev();
+  bw.items = JSON.parse(JSON.stringify(bt.baseItems));
+  saveLevering();
+  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function openDuplicateWeek(boxTypeId, currentWeek, currentYear) {
+  const others = boxWeeks.filter(b => b.boxTypeId==boxTypeId && !(b.week==currentWeek && b.year==currentYear) && b.items && b.items.length);
+  if (!others.length) { alert('Ingen tidligere uker \u00e5 kopiere fra.'); return; }
+  const modal = document.createElement('div');
+  modal.id = 'dup-week-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:center;justify-content:center;padding:20px';
+  let html = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:16px;padding:20px;max-width:360px;width:100%"><div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Kopier fra uke</div>';
+  [...others].sort((a,b) => b.year-a.year||b.week-a.week).forEach(bw => {
+    html += '<button onclick="doDuplicateWeek(\'' + bw.id + '\',' + boxTypeId + ',' + currentWeek + ',' + currentYear + ')" style="display:block;width:100%;padding:10px 12px;margin-bottom:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">Uke ' + bw.week + ' \u00b7 ' + bw.year + ' (' + bw.items.length + ' vekster)</button>';
+  });
+  html += '<button onclick="document.getElementById(\'dup-week-modal\').remove()" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">Avbryt</button></div>';
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function doDuplicateWeek(sourceBwId, boxTypeId, targetWeek, targetYear) {
+  const src = boxWeeks.find(b => b.id==sourceBwId);
+  if (!src) return;
+  snapshotLev();
+  let target = boxWeeks.find(b => b.boxTypeId==boxTypeId && b.week==targetWeek && b.year==targetYear);
+  if (!target) {
+    target = {id:String(boxTypeId)+'_w'+targetWeek+'_y'+targetYear, boxTypeId, week:targetWeek, year:targetYear, items:[], count:0, customerAdj:{}};
+    boxWeeks.push(target);
+  }
+  target.items = JSON.parse(JSON.stringify(src.items));
+  saveLevering();
+  document.getElementById('dup-week-modal')?.remove();
+  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
 function toggleKasseGrid() {
   const grid = document.getElementById('kasse-crop-grid');
   const btn = document.getElementById('kasse-grid-toggle');
   if (!grid) return;
   const hiding = grid.style.display !== 'none';
   grid.style.display = hiding ? 'none' : 'grid';
-  if (btn) btn.textContent = 'Velg vekster ' + (hiding ? '▼' : '▲');
+  if (btn) btn.textContent = hiding ? '▼' : '▲';
 }
 
 function openKasseChecklist(bwId) {
@@ -5886,7 +6022,7 @@ function openKasseChecklist(bwId) {
 
   const modal = document.createElement('div');
   modal.id = 'kasse-checklist-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:var(--bg-main);z-index:6000;display:flex;flex-direction:column;overflow:hidden';
+  modal.style.cssText = 'position:fixed;top:var(--header-h,0px);left:0;right:0;bottom:0;background:var(--bg-main);z-index:5999;display:flex;flex-direction:column;overflow:hidden';
 
   function renderCL() {
     const doneCount = bw.items.filter((_, ii) => bw.checklist[ii]).length;
@@ -5966,11 +6102,15 @@ function calcBoxValue(box) {
 }
 
 function calcItemValue(cr, qty, unit) {
-  if (!cr) return 0;
-  if (unit === 'stk') return qty * (cr.pricePerUnit || cr.pricePerPiece || 0);
-  if (unit === 'kg')  return qty * (cr.pricePerKg  || 0);
-  if (unit === 'g')   return (qty/1000) * (cr.pricePerKg || 0);
-  if (unit === 'bunt' || unit === 'boks') return qty * (cr.pricePerUnit || cr.pricePerPiece || 0);
+  if (!cr || !qty) return 0;
+  const pkg = cr.pricePerKg || 0;
+  // pricePerUnit: stored or auto-calc from kg*weightG
+  const ppu = cr.pricePerUnit || (pkg && cr.weightG ? +(pkg * cr.weightG / 1000).toFixed(2) : pkg);
+  if (unit === 'kg')   return qty * pkg;
+  if (unit === 'g')    return (qty / 1000) * pkg;
+  if (unit === 'stk')  return qty * ppu;
+  if (unit === 'bunt') return qty * ppu;
+  if (unit === 'boks') return qty * ppu;
   return 0;
 }
 
@@ -6242,7 +6382,7 @@ function _openMarketDetailDirect(mktIdx) {
       html += '<button onclick="event.stopPropagation();toggleMarketItemHarvest('+mktIdx+','+ii+')" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(done?'var(--accent)':'var(--border)')+';background:'+(done?'var(--accent)':'transparent')+';cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">'+(done?'✓':'')+'</button>';
       html += '<span style="font-size:18px;flex-shrink:0">'+cr.emoji+'</span>';
       html += '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)'+(done?';text-decoration:line-through':'')+'">'+String(cr.family||cr.name)+'</div>';
-      html += (item.qty ? '<div style="font-size:11px;color:var(--text-muted)">'+item.qty+' '+item.unit+(val>0?' · kr '+val.toFixed(0):'')+'</div>' : '');
+      html += '<div style="font-size:11px;color:var(--text-muted)">'+(item.qty?item.qty+' '+item.unit:'Ingen mengde')+(val>0?' · <span style="color:var(--accent-soft)">kr '+val.toFixed(0)+'</span>':'')+'</div>';
       html += '</div></div>';
     });
     const totalVal = (mkt.items||[]).reduce((s,item) => { const cr = crops.find(c=>c.id===item.cropId); return s+calcItemValue(cr,item.qty||0,item.unit); },0);
@@ -6279,7 +6419,7 @@ function openMarketEdit(mktIdx) {
   if (!mkt) return;
   const modal = document.createElement('div');
   modal.id = 'market-edit-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:var(--bg-main);z-index:6000;display:flex;flex-direction:column;overflow:hidden';
+  modal.style.cssText = 'position:fixed;top:var(--header-h,0px);left:0;right:0;bottom:0;background:var(--bg-main);z-index:5999;display:flex;flex-direction:column;overflow:hidden';
 
   let html = '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
     + '<button onclick="closeMarketEdit()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
@@ -6322,7 +6462,7 @@ function openMarketEdit(mktIdx) {
       html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'
         + '<span style="font-size:18px">'+cr.emoji+'</span>'
         + '<div style="flex:1;font-size:13px;color:var(--text-head)">'+(cr.family||cr.name)+'</div>'
-        + '<input type="number" min="0" step="0.1" value="'+(item.qty||'')+'" placeholder="Mengde"'
+        + '<input type="number" min="0" step="1" value="'+(item.qty||'')+'" placeholder="Mengde"'
         + ' oninput="updateMarketItemQty('+mktIdx+','+ii+',+this.value)"'
         + ' style="width:65px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
         + '<select onchange="updateMarketItemUnit('+mktIdx+','+ii+',this.value)"'
