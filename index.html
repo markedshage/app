@@ -662,8 +662,6 @@ function showFloatingGearMenu(triggerBtn) {
   const sep = () => { const d=document.createElement('div'); d.style.cssText='height:1px;background:rgba(255,255,255,0.08);margin:4px 0'; return d; };
   float.appendChild(BTN('☀ Lyst tema', 'var(--text-head)', () => { toggleTheme(); }));
   float.appendChild(sep());
-  float.appendChild(BTN('☁ Sky-synkronisering', 'var(--text-muted)', () => { syncConnected?gistShowMenu():gistSetup(); }));
-  float.appendChild(sep());
   float.appendChild(BTN('⬆ Importer fra Excel', '#60a5fa', () => { document.getElementById('excel-import-input')?.click(); }));
   float.appendChild(BTN('⬇ Eksporter til Excel', 'var(--accent-soft)', () => { exportToExcel(); }));
   float.appendChild(sep());
@@ -710,6 +708,7 @@ function showTab(name) {
 }
 
 function syncCropTasks() {
+  return; // Disabled: auto-tasks from crop dates removed
   const today = new Date(); today.setHours(0,0,0,0);
 
   crops.forEach(crop => {
@@ -2793,14 +2792,8 @@ function renderSenger() {
   const visibleBeds = bedFieldFilter === 'alle' ? BED_IDS : BED_IDS.filter(id => (id.match(/^([A-Za-z]+)/)?.[1] || '') === bedFieldFilter);
 
   document.getElementById('tab-senger').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">
-      <h2 style="font-size:16px;font-weight:400;color:var(--text-head);margin:0;white-space:nowrap">Senger (${BED_IDS.length})</h2>
-      <div style="display:flex;gap:8px">
-        <button onclick="openGardenMap()" style="padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Oversiktskart</button>
-        <button onclick="openAddBed()" style="padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Legg til seng</button>
-      </div>
-    </div>
-    <div class="filter-bar" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <div class="filter-bar" style="margin:0;flex-wrap:wrap">
       ${fields.map(f => `<button class="filter-btn ${bedFieldFilter===f?'active':''}" onclick="setBedField('${f}')">${f==='alle'?'Alle':f}</button>`).join('')}
     </div>
     <div class="bed-grid">
@@ -4679,6 +4672,8 @@ function loadFromLocal() {
     const hr = localStorage.getItem('mh_task_history');
     if (hr) taskHistory = JSON.parse(hr);
   } catch(e) {}
+  // Remove auto-generated crop tasks
+  try { tasks = tasks.filter(t => !String(t.id).startsWith('crop-')); } catch(e) {}
   try {
     const raw = localStorage.getItem('mh_data');
     if (!raw) return false;
@@ -4993,7 +4988,7 @@ function showLeveringOverlay() {
         </div>
       </div>
     </div>
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch"><div style="max-width:600px;margin:0 auto;padding:16px;">
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg-main)"><div style="max-width:600px;margin:0 auto;padding:16px;">
       <div id="lev-overlay-content"></div>
     </div></div>
     <nav style="position:sticky;bottom:0;z-index:4100;
@@ -5464,7 +5459,7 @@ function renderLevKunder(el) {
               <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${cu.phone || ''}</div>
               <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
                 <span style="font-size:12px;padding:2px 10px;border-radius:10px;background:var(--accent-bg);color:var(--accent-soft)">${cu.boxes} kasse${cu.boxes!==1?'r':''}</span>
-                <span style="font-size:12px;padding:2px 10px;border-radius:10px;border:1px solid var(--border);color:var(--text-muted)">${cu.type==='vasket'?'Vasket':'Uvasket'}</span>
+                <span style="font-size:12px;padding:2px 10px;border-radius:10px;border:1px solid var(--border);color:var(--text-muted)"></span>
               </div>
             </div>
             <div style="display:flex;gap:6px">
@@ -5578,7 +5573,7 @@ function openKasseOppsett() {
         html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">'
           + '<div style="display:flex;justify-content:space-between;align-items:center">'
           + '<div><div style="font-size:14px;color:var(--text-head)">' + bt.name + '</div>'
-          + '<div style="font-size:12px;color:var(--text-muted)">' + (bt.type==='vasket'?'Vasket':'Uvasket') + ' · ' + (bt.items||[]).length + ' vekster</div></div>'
+          + '<div style="font-size:12px;color:var(--text-muted)">' + (bt.items||[]).length + ' vekster</div></div>'
           + '<div style="display:flex;gap:6px">'
           + '<button onclick="openEditBoxType(' + i + ')" style="padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
           + '<button onclick="deleteBoxType(' + i + ')" style="padding:4px 8px;border-radius:7px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px">×</button>'
@@ -5769,7 +5764,6 @@ function renderLevKasse(el) {
   const FREQ = {weekly:'Ukentlig', biweekly:'Annenhver uke', monthly:'Månedlig'};
 
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    + '<div style="font-size:15px;color:var(--text-head)">Kasse</div>'
     + '<button onclick="openKasseOppsett()" style="padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">⚙ Oppsett</button>'
     + '</div>';
 
@@ -6561,8 +6555,7 @@ function renderLevHoestLogg(el) {
   const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
 
   // Header with Ny registrering button
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    + '<div style="font-size:15px;color:var(--text-head)">Høstelogg</div>'
+  let html = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
     + '<button onclick="openNyRegistrering()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Ny registrering</button>'
     + '</div>';
 
