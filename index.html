@@ -4056,11 +4056,11 @@ function getCalEvents() {
     map[k].push({ label, emoji, color, ...extra });
   };
   crops.forEach(c => {
-    if (c.sownDate && !c.sowLog) add(c.sownDate, 'Sådato: '+(c.family||c.name), c.emoji, '#60a5fa');
+    if (c.sownDate && !c.sowLog) add(c.sownDate, 'Sådato: '+(c.family||c.name), c.emoji, '#60a5fa', { cropId: c.id });
     if (c.plantedDate && !c.plantLog) {
       const segSpecs = c.beds.filter(s => parseBedSpec(s).start !== null);
       const segLabel = segSpecs.length > 0 ? ` (${segSpecs.join(', ')})` : '';
-      add(c.plantedDate, 'Plantedato: '+(c.family||c.name)+segLabel, c.emoji, '#34d399');
+      add(c.plantedDate, 'Plantedato: '+(c.family||c.name)+segLabel, c.emoji, '#34d399', { cropId: c.id });
     }
   });
   const pColors = {høy:'#f87171', middels:'#fbbf24', lav:'#6ee7b7'};
@@ -4146,11 +4146,11 @@ function renderKalender() {
       +ev.map(e => {
         const isSow   = e.color === '#60a5fa';
         const isPlant = e.color === '#34d399';
-        // Find crop id for action buttons
-        let cropId = '';
-        if (isSow || isPlant) {
+        // Use cropId stored directly on event, fallback to name lookup
+        let cropId = e.cropId || '';
+        if (!cropId && (isSow || isPlant)) {
           const cropName = e.label.replace(/^(Sådato|Plantedato): /, '');
-          const found = crops.find(c => c.name === cropName);
+          const found = crops.find(c => c.name === cropName || c.family === cropName);
           if (found) cropId = found.id;
         }
         const actionBtn = cropId && isSow
