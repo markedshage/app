@@ -4811,7 +4811,47 @@ function importFileObject(file, skipSave = false) {
         }
       }
 
-      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks, customers: newCustomers };
+      // ── Parse Kassetyper (JSON sheet) ──
+      let newBoxTypes = null;
+      const wsKt = wb.Sheets['Kassetyper'];
+      if (wsKt) {
+        try {
+          const raw = XLSX.utils.sheet_to_json(wsKt, { header: 1 });
+          if (raw[1] && raw[1][0]) newBoxTypes = JSON.parse(String(raw[1][0]));
+        } catch(e) { console.warn('Kassetyper parse error:', e); }
+      }
+
+      // ── Parse Kasseuker (JSON sheet) ──
+      let newBoxWeeks = null;
+      const wsKu2 = wb.Sheets['Kasseuker'];
+      if (wsKu2) {
+        try {
+          const raw = XLSX.utils.sheet_to_json(wsKu2, { header: 1 });
+          if (raw[1] && raw[1][0]) newBoxWeeks = JSON.parse(String(raw[1][0]));
+        } catch(e) { console.warn('Kasseuker parse error:', e); }
+      }
+
+      // ── Parse Markeder (JSON sheet) ──
+      let newMarket = null;
+      const wsMkt = wb.Sheets['Markeder'];
+      if (wsMkt) {
+        try {
+          const raw = XLSX.utils.sheet_to_json(wsMkt, { header: 1 });
+          if (raw[1] && raw[1][0]) newMarket = JSON.parse(String(raw[1][0]));
+        } catch(e) { console.warn('Markeder parse error:', e); }
+      }
+
+      // ── Parse Høstelogg (JSON sheet) ──
+      let newHarvestLog = null;
+      const wsHl = wb.Sheets['Høstelogg'];
+      if (wsHl) {
+        try {
+          const raw = XLSX.utils.sheet_to_json(wsHl, { header: 1 });
+          if (raw[1] && raw[1][0]) newHarvestLog = JSON.parse(String(raw[1][0]));
+        } catch(e) { console.warn('Høstelogg parse error:', e); }
+      }
+
+      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks, customers: newCustomers, boxTypes: newBoxTypes, boxWeeks: newBoxWeeks, market: newMarket, harvestLog: newHarvestLog };
       confirmImport(skipSave);
       resolve();
     } catch(err) {
@@ -4833,8 +4873,12 @@ function confirmImport(skipSave = false) {
   tasks    = pendingImport.tasks;
   if (pendingImport.customers && pendingImport.customers.length) {
     deliveryCustomers = pendingImport.customers;
-    saveLevering();
   }
+  if (pendingImport.boxTypes) boxTypes = pendingImport.boxTypes;
+  if (pendingImport.boxWeeks) boxWeeks = pendingImport.boxWeeks;
+  if (pendingImport.market)   deliveryMarket = pendingImport.market;
+  if (pendingImport.harvestLog) harvestLog = pendingImport.harvestLog;
+  saveLevering();
   pendingImport = null;
   selectedBed = null;
   saveToLocal(); // always save — data is now correct regardless of source
@@ -4928,6 +4972,38 @@ function buildWorkbook() {
   wsKunder['!cols'] = [{wch:24},{wch:16},{wch:20},{wch:20}];
   styleHeaderRow(wsKunder, customerHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsKunder, 'Kunder');
+
+  // ── Sheet 5: Kassetyper (JSON) ────────────────────────────────
+  const wsKassetyper = XLSX.utils.aoa_to_sheet([
+    ['Data (ikke rediger)'],
+    [JSON.stringify(boxTypes)]
+  ]);
+  wsKassetyper['!cols'] = [{wch:120}];
+  XLSX.utils.book_append_sheet(wb, wsKassetyper, 'Kassetyper');
+
+  // ── Sheet 6: Kasseuker (JSON) ─────────────────────────────────
+  const wsKasseuker = XLSX.utils.aoa_to_sheet([
+    ['Data (ikke rediger)'],
+    [JSON.stringify(boxWeeks)]
+  ]);
+  wsKasseuker['!cols'] = [{wch:120}];
+  XLSX.utils.book_append_sheet(wb, wsKasseuker, 'Kasseuker');
+
+  // ── Sheet 7: Markeder (JSON) ──────────────────────────────────
+  const wsMarkeder = XLSX.utils.aoa_to_sheet([
+    ['Data (ikke rediger)'],
+    [JSON.stringify(deliveryMarket)]
+  ]);
+  wsMarkeder['!cols'] = [{wch:120}];
+  XLSX.utils.book_append_sheet(wb, wsMarkeder, 'Markeder');
+
+  // ── Sheet 8: Høstelogg (JSON) ─────────────────────────────────
+  const wsHoest = XLSX.utils.aoa_to_sheet([
+    ['Data (ikke rediger)'],
+    [JSON.stringify(harvestLog)]
+  ]);
+  wsHoest['!cols'] = [{wch:120}];
+  XLSX.utils.book_append_sheet(wb, wsHoest, 'Høstelogg');
 
   // ── Download ──────────────────────────────────────────────────
   const date = new Date();
