@@ -6087,10 +6087,16 @@ function renderLevKasse(el) {
     const activeCustomers = btCustomersForPlan.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
     const totalKasser = activeCustomers.length + (bw.extraBoxes || 0);
     const boxVal2 = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
+    const contentPerBox = boxVal2; // value of content in ONE box
+    const salePerBox = bt.salePrice || null;
     const contentTotal = boxVal2 * totalKasser;
-    const saleTotal = bt.salePrice ? bt.salePrice * totalKasser : null;
-    const delta = saleTotal !== null ? contentTotal - saleTotal : null;
-    html += '<button data-bwid="' + bw.id + '" onclick="openKassekundePanel(this.dataset.bwid)" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px;cursor:pointer;text-align:left;font-family:inherit">'
+    const saleTotal = salePerBox ? salePerBox * totalKasser : null;
+    const deltaPerBox = salePerBox !== null ? contentPerBox - salePerBox : null;
+    const deltaColor = deltaPerBox === null ? '' : deltaPerBox >= 0 ? '#34d399' : '#f87171';
+    const isLight2 = isLight;
+
+    // ── Antall kasser button (clean — no value clutter) ──
+    html += '<button data-bwid="' + bw.id + '" onclick="openKassekundePanel(this.dataset.bwid)" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:' + (salePerBox !== null ? '8' : '16') + 'px;cursor:pointer;text-align:left;font-family:inherit">'
       + '<div style="display:flex;align-items:center;gap:12px">'
       + '<div style="font-size:22px">📦</div>'
       + '<div>'
@@ -6102,14 +6108,48 @@ function renderLevKasse(el) {
       + (bw.extraBoxes ? ' + ' + bw.extraBoxes + ' ekstra' : '')
       + '</div></div></div></div>'
       + '<div style="text-align:right">'
-      + (saleTotal !== null
-        ? '<div style="font-size:13px;color:var(--accent-soft);font-weight:400">kr ' + contentTotal.toFixed(0) + ' <span style="color:var(--text-muted);font-size:11px">/ kr ' + saleTotal.toFixed(0) + '</span></div>'
-          + (delta !== 0 ? '<div style="font-size:12px;color:' + (delta >= 0 ? '#34d399' : '#f87171') + ';font-weight:600;margin-top:1px">' + (delta >= 0 ? '+' : '') + 'kr ' + Math.abs(delta).toFixed(0) + '</div>' : '')
-          + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-top:1px">innhold / pris</div>'
-        : '<div style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + contentTotal.toFixed(0) + '</div>'
-          + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">totalt</div>'
-      )
+      + '<div id="kasse-btn-total-' + bw.id + '" style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + contentTotal.toFixed(0) + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">totalt innhold</div>'
       + '</div></button>';
+
+    // ── Pris vs innhold kort (kun hvis kassepris er satt) ──
+    if (salePerBox !== null) {
+      const pct = salePerBox > 0 ? Math.min(100, Math.round((contentPerBox / salePerBox) * 100)) : 100;
+      const barColor = deltaPerBox >= 0 ? '#34d399' : '#f87171';
+      const bgTrack = isLight2 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+
+      html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:16px">'
+        // Header row
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">'
+        + '<div style="flex:1;text-align:center">'
+        + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px">Innhold</div>'
+        + '<div id="kasse-card-content-' + bw.id + '" style="font-size:22px;font-weight:300;color:var(--accent-soft)">kr ' + contentPerBox.toFixed(0) + '</div>'
+        + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">per kasse</div>'
+        + '</div>'
+        // Delta center
+        + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 12px;min-width:56px">'
+        + (deltaPerBox === 0
+          ? '<div style="font-size:12px;color:var(--text-muted)">= 0</div>'
+          : '<div style="font-size:15px;font-weight:700;color:' + barColor + '">'
+            + (deltaPerBox > 0 ? '+' : '−') + 'kr ' + Math.abs(deltaPerBox).toFixed(0)
+            + '</div>'
+        )
+        + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">' + (deltaPerBox >= 0 ? 'overskudd' : 'underskudd') + '</div>'
+        + '</div>'
+        // Sale price right
+        + '<div style="flex:1;text-align:center">'
+        + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px">Kassepris</div>'
+        + '<div style="font-size:22px;font-weight:300;color:var(--text-head)">kr ' + salePerBox.toFixed(0) + '</div>'
+        + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">per kasse</div>'
+        + '</div>'
+        + '</div>'
+        // Progress bar
+        + '<div style="height:5px;border-radius:3px;background:' + bgTrack + ';overflow:hidden">'
+        + '<div id="kasse-card-bar-' + bw.id + '" style="height:100%;border-radius:3px;background:' + barColor + ';width:' + pct + '%;transition:width 0.4s"></div>'
+        + '</div>'
+        + '</div>';
+    }
+
     // Vekst-innhold header
     const selCount = (bw.items||[]).length;
     html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
@@ -6156,7 +6196,8 @@ function renderLevKasse(el) {
           + '<div style="display:flex;gap:8px;align-items:center;margin-top:2px">'
           + '<div id="kasse-need-' + bw.id + '-' + ii + '" style="font-size:11px;color:var(--text-muted)">'
           + (totalCount2 ? totalNeeded + ' ' + item.unit + ' totalt' : '–') + '</div>'
-          + (perKasse > 0 ? '<div style="font-size:11px;color:var(--accent-soft)">kr ' + perKasse.toFixed(0) + ' per kasse</div>' : '')
+          + '<div id="kasse-price-' + bw.id + '-' + ii + '" style="font-size:11px;color:var(--accent-soft)">'
+          + (perKasse > 0 ? 'kr ' + perKasse.toFixed(0) + ' per kasse' : '') + '</div>'
           + '</div>'
           + '</div>'
           + '<input type="number" min="0" step="1" value="' + (item.qty||'') + '" placeholder="0"'
@@ -6275,33 +6316,33 @@ function renderLevKasse(el) {
       + totalBoxes + ' kasser · Uke ' + kasseViewWeek
       + '</div>';
 
-    if (!activeCuLev.length) {
-      html += '<div style="text-align:center;padding:30px 16px;color:var(--text-muted);font-size:13px">'
-        + 'Ingen aktive kunder denne uken for <strong style="color:var(--text-head)">' + bt.name + '</strong>.<br>'
-        + '<button onclick="openKasseOppsett()" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">⚙ Oppsett → kunder</button>'
-        + '</div>';
+    // Init delivery state
+    if (!bw.deliveryCheck) bw.deliveryCheck = {};
+    if (!bw.extraCheck) bw.extraCheck = {};
+
+    const doneCuCount = activeCuLev.filter(cu => bw.deliveryCheck[cu.id || cu.name]).length;
+    const doneExtraCount = Array.from({length: bw.extraBoxes||0}, (_,i) => i).filter(i => bw.extraCheck[i]).length;
+    const doneCount = doneCuCount + doneExtraCount;
+    const allDelivered = totalBoxes > 0 && doneCount === totalBoxes;
+
+    // Progress bar
+    const pct = totalBoxes ? Math.round((doneCount / totalBoxes) * 100) : 0;
+    html += '<div style="background:var(--bg-card);border:1px solid ' + (allDelivered ? 'rgba(52,211,153,0.4)' : 'var(--border)') + ';border-radius:16px;padding:14px 16px;margin-bottom:20px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      + '<div>'
+      + '<div style="font-size:28px;font-weight:300;color:' + (allDelivered ? '#34d399' : 'var(--accent-soft)') + ';line-height:1">' + doneCount + '<span style="font-size:16px;color:var(--text-muted)">/' + totalBoxes + '</span></div>'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">levert</div>'
+      + '</div>'
+      + (allDelivered ? '<div style="font-size:22px">🎉</div>' : '<div style="font-size:13px;color:var(--text-muted)">' + (totalBoxes - doneCount) + ' gjenstår</div>')
+      + '</div>'
+      + '<div style="height:6px;border-radius:3px;background:' + (isLight2 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') + ';overflow:hidden">'
+      + '<div style="height:100%;border-radius:3px;background:' + (allDelivered ? '#34d399' : 'var(--accent)') + ';width:' + pct + '%;transition:width 0.3s"></div>'
+      + '</div></div>';
+
+    // Customer rows
+    if (activeCuLev.length === 0) {
+      html += '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:10px 0 6px">Ingen kunder denne uken</div>';
     } else {
-      // Init delivery checklist for this week
-      if (!bw.deliveryCheck) bw.deliveryCheck = {};
-      const doneCount = activeCuLev.filter(cu => bw.deliveryCheck[cu.id || cu.name]).length;
-      const allDelivered = doneCount === activeCuLev.length;
-
-      // Progress
-      const pct = activeCuLev.length ? Math.round((doneCount / activeCuLev.length) * 100) : 100;
-      html += '<div style="background:var(--bg-card);border:1px solid ' + (allDelivered ? 'rgba(52,211,153,0.4)' : 'var(--border)') + ';border-radius:16px;padding:14px 16px;margin-bottom:20px">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
-        + '<div>'
-        + '<div style="font-size:28px;font-weight:300;color:' + (allDelivered ? '#34d399' : 'var(--accent-soft)') + ';line-height:1">' + doneCount + '<span style="font-size:16px;color:var(--text-muted)">/' + activeCuLev.length + '</span></div>'
-        + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">levert</div>'
-        + '</div>'
-        + (allDelivered ? '<div style="font-size:22px">🎉</div>' : '<div style="font-size:13px;color:var(--text-muted)">' + (activeCuLev.length - doneCount) + ' gjenstår</div>')
-        + '</div>'
-        + '<div style="height:6px;border-radius:3px;background:' + (isLight2 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') + ';overflow:hidden">'
-        + '<div style="height:100%;border-radius:3px;background:' + (allDelivered ? '#34d399' : 'var(--accent)') + ';width:' + pct + '%;transition:width 0.3s"></div>'
-        + '</div>'
-        + '</div>';
-
-      // Customer list — use data attributes + event delegation to avoid quoting issues
       activeCuLev.forEach((cu, cuIdx) => {
         const delivered = !!bw.deliveryCheck[cu.id || cu.name];
         const bg = delivered ? (isLight2 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
@@ -6325,10 +6366,44 @@ function renderLevKasse(el) {
           + (delivered ? '<div style="font-size:12px;color:var(--accent-soft);flex-shrink:0">Levert ✓</div>' : '')
           + '</div>';
       });
+    }
 
-      if (allDelivered) {
-        html += '<div style="text-align:center;padding:16px 0;font-size:13px;color:var(--accent-soft)">Alle kasser levert denne uken! 🌿</div>';
-      }
+    // Extra box rows — always shown with +/- control
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin:' + (activeCuLev.length > 0 ? '12' : '0') + 'px 0 8px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">Ekstra kasser</div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,-1)" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">−</button>'
+      + '<span style="font-size:14px;color:var(--text-head);min-width:20px;text-align:center">' + (bw.extraBoxes||0) + '</span>'
+      + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,1)" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">+</button>'
+      + '</div></div>';
+    for (let xi = 0; xi < (bw.extraBoxes||0); xi++) {
+      const delivered = !!bw.extraCheck[xi];
+      const bg = delivered ? (isLight2 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
+      const bd = delivered ? (isLight2 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') : 'var(--border)';
+      const cbBg = delivered ? 'var(--accent)' : 'transparent';
+      const cbBd = delivered ? 'var(--accent)' : (isLight2 ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)');
+      html += '<div data-lev-bwid="' + bw.id + '" data-lev-extra="' + xi + '" onclick="kasseLeveringCheckExtra(this)"'
+        + ' style="display:flex;align-items:center;gap:14px;padding:14px 14px;'
+        + 'background:' + bg + ';border:2px solid ' + bd + ';'
+        + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;'
+        + 'transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
+        + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
+        + 'background:' + cbBg + ';border:2px solid ' + cbBd + ';'
+        + 'color:' + (isLight2 ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
+        + (delivered ? '✓' : '') + '</div>'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + (isLight2 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;' + (delivered ? 'opacity:0.4' : '') + '">📦</div>'
+        + '<div style="flex:1;' + (delivered ? 'opacity:0.45' : '') + '">'
+        + '<div style="font-size:16px;color:var(--text-head);' + (delivered ? 'text-decoration:line-through' : '') + '">Ekstra kasse ' + (xi + 1) + '</div>'
+        + '</div>'
+        + (delivered ? '<div style="font-size:12px;color:var(--accent-soft);flex-shrink:0">Levert ✓</div>' : '')
+        + '</div>';
+    }
+    if (!(bw.extraBoxes > 0)) {
+      html += '<div style="font-size:12px;color:var(--text-muted);padding:6px 0 4px;text-align:center">Ingen ekstra kasser denne uken</div>';
+    }
+
+    if (allDelivered) {
+      html += '<div style="text-align:center;padding:16px 0;font-size:13px;color:var(--accent-soft)">Alle kasser levert denne uken! 🌿</div>';
     }
   }
 
@@ -6417,8 +6492,84 @@ function toggleKassekundePlan(el) {
   saveLevering();
   const panel = document.getElementById('kassekunde-panel');
   if (panel?._renderPanel) panel._renderPanel();
-  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-  if (cont) renderLevKasse(cont);
+  // Update need/price rows inline without full re-render (no scroll jump)
+  refreshKasseNeedRows(bwId);
+  // Also update the antall kasser button count display
+  const btCuForCount = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const activeCuForCount = btCuForCount.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const newTotal = activeCuForCount.length + (bw.extraBoxes || 0);
+  const countBtn = document.querySelector('[data-bwid="' + bwId + '"]');
+  if (countBtn) {
+    const countEl = countBtn.querySelector('div[style*="font-size:26px"]');
+    if (countEl) countEl.textContent = newTotal;
+    const descEl = countBtn.querySelector('div[style*="font-size:12px"][style*="text-muted"]');
+    if (descEl) {
+      descEl.textContent =
+        (activeCuForCount.length ? activeCuForCount.length + ' kunde' + (activeCuForCount.length !== 1 ? 'r' : '') : 'ingen kunder')
+        + (bw.extraBoxes ? ' + ' + bw.extraBoxes + ' ekstra' : '');
+    }
+    const boxVal = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
+    const totalEl = countBtn.querySelector('[style*="accent-soft"]');
+    if (totalEl) totalEl.textContent = 'kr ' + (boxVal * newTotal).toFixed(0);
+  }
+}
+
+function refreshKassePriceCard(bwId) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  const bt = boxTypes.find(t => t.id == bw.boxTypeId);
+  if (!bt) return;
+  const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const totalKasser = activeCu.length + (bw.extraBoxes || 0);
+  const boxVal = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
+  const contentPerBox = boxVal;
+  const contentTotal = boxVal * totalKasser;
+  const salePerBox = bt.salePrice || null;
+  const deltaPerBox = salePerBox !== null ? contentPerBox - salePerBox : null;
+  const barColor = deltaPerBox !== null ? (deltaPerBox >= 0 ? '#34d399' : '#f87171') : 'var(--accent)';
+  const pct = salePerBox > 0 ? Math.min(100, Math.round((contentPerBox / salePerBox) * 100)) : 100;
+
+  // Update button total
+  const btnTotal = document.getElementById('kasse-btn-total-' + bwId);
+  if (btnTotal) btnTotal.textContent = 'kr ' + contentTotal.toFixed(0);
+
+  // Update card elements (only exist if salePrice set)
+  const cardContent = document.getElementById('kasse-card-content-' + bwId);
+  if (cardContent) cardContent.textContent = 'kr ' + contentPerBox.toFixed(0);
+
+  const cardDelta = document.getElementById('kasse-card-delta-' + bwId);
+  if (cardDelta && deltaPerBox !== null) {
+    cardDelta.textContent = (deltaPerBox > 0 ? '+' : '−') + 'kr ' + Math.abs(deltaPerBox).toFixed(0);
+    cardDelta.style.color = barColor;
+  }
+  const cardDeltaLbl = document.getElementById('kasse-card-delta-lbl-' + bwId);
+  if (cardDeltaLbl && deltaPerBox !== null) {
+    cardDeltaLbl.textContent = deltaPerBox >= 0 ? 'overskudd' : 'underskudd';
+  }
+  const cardBar = document.getElementById('kasse-card-bar-' + bwId);
+  if (cardBar) {
+    cardBar.style.width = pct + '%';
+    cardBar.style.background = barColor;
+  }
+}
+
+function refreshKasseNeedRows(bwId) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const totalCount = activeCu.length + (bw.extraBoxes || 0);
+  (bw.items||[]).forEach((item, ii) => {
+    const cr = crops.find(c => c.id == item.cropId);
+    const needEl = document.getElementById('kasse-need-' + bwId + '-' + ii);
+    if (needEl) needEl.textContent = totalCount ? (item.qty||0) * totalCount + ' ' + item.unit + ' totalt' : '–';
+    const priceEl = document.getElementById('kasse-price-' + bwId + '-' + ii);
+    if (priceEl && cr) {
+      const perKasse = calcItemValue(cr, item.qty||0, item.unit);
+      priceEl.textContent = perKasse > 0 ? 'kr ' + perKasse.toFixed(0) + ' per kasse' : '';
+    }
+  });
 }
 
 function adjustExtraBoxes(bwId, delta) {
@@ -6426,17 +6577,13 @@ function adjustExtraBoxes(bwId, delta) {
   if (!bw) return;
   bw.extraBoxes = Math.max(0, (bw.extraBoxes || 0) + delta);
   saveLevering();
-  // Update counter display in panel without re-rendering whole tab
   const disp = document.getElementById('extra-boxes-disp-' + bwId);
   if (disp) disp.textContent = bw.extraBoxes;
-  // Update the kasse-panel if open
   const panel = document.getElementById('kassekunde-panel');
   if (panel?._renderPanel) panel._renderPanel();
-  // Update the Plan-modus antall kasser button display (without full re-render)
   const btCuForCount = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
   const activeCuForCount = btCuForCount.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
   const newTotal = activeCuForCount.length + (bw.extraBoxes || 0);
-  // Try to update the button text inline
   const countBtn = document.querySelector('[data-bwid="' + bwId + '"]');
   if (countBtn) {
     const countEl = countBtn.querySelector('div[style*="font-size:26px"]');
@@ -6447,11 +6594,11 @@ function adjustExtraBoxes(bwId, delta) {
         (activeCuForCount.length ? activeCuForCount.length + ' kunde' + (activeCuForCount.length !== 1 ? 'r' : '') : 'ingen kunder')
         + (bw.extraBoxes ? ' + ' + bw.extraBoxes + ' ekstra' : '');
     }
-    // Update total kr
     const boxVal = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
     const totalEl = countBtn.querySelector('[style*="accent-soft"]');
     if (totalEl) totalEl.textContent = 'kr ' + (boxVal * newTotal).toFixed(0);
   }
+  refreshKasseNeedRows(bwId);
 }
 
 function kasseSetType(typeId) {
@@ -6516,11 +6663,24 @@ function kasseLeveringCheckByIdx(el) {
   const bt = boxTypes.find(t => t.id == bw.boxTypeId);
   if (!bt) return;
   const btCustomers = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const cu = btCustomers[cuIdx];
+  const activeCu = btCustomers.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const cu = activeCu[cuIdx];
   if (!cu) return;
   const cuKey = cu.id || cu.name;
   if (!bw.deliveryCheck) bw.deliveryCheck = {};
   bw.deliveryCheck[cuKey] = !bw.deliveryCheck[cuKey];
+  saveLevering();
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderLevKasse(cont);
+}
+
+function kasseLeveringCheckExtra(el) {
+  const bwId = el.dataset.levBwid;
+  const xi = +el.dataset.levExtra;
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  if (!bw.extraCheck) bw.extraCheck = {};
+  bw.extraCheck[xi] = !bw.extraCheck[xi];
   saveLevering();
   const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
   if (cont) renderLevKasse(cont);
@@ -6586,8 +6746,21 @@ function updateKasseItem(bwId, idx, field, val) {
   }
   saveLevering();
   const item = bw.items[idx];
+  const cr = crops.find(c => c.id == item.cropId);
+  // Update totals display
+  const btCuForNeed = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const activeCuForNeed = btCuForNeed.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const totalCount2 = activeCuForNeed.length + (bw.extraBoxes || 0);
+  const totalNeeded = (item.qty||0) * totalCount2;
   const needEl = document.getElementById('kasse-need-' + bwId + '-' + idx);
-  if (needEl) needEl.textContent = 'Totalt: ' + (bw.count ? (item.qty||0)*bw.count+' '+item.unit : '–');
+  if (needEl) needEl.textContent = totalCount2 ? totalNeeded + ' ' + item.unit + ' totalt' : '–';
+  const priceEl = document.getElementById('kasse-price-' + bwId + '-' + idx);
+  if (priceEl && cr) {
+    const perKasse = calcItemValue(cr, item.qty||0, item.unit);
+    priceEl.textContent = perKasse > 0 ? 'kr ' + perKasse.toFixed(0) + ' per kasse' : '';
+  }
+  // Always refresh the total and pris/innhold card
+  refreshKassePriceCard(bwId);
 }
 
 function removeKasseItem(bwId, idx) {
@@ -7319,25 +7492,86 @@ function renderLevOversikt(el) {
   }
   const maxTrend = Math.max(...weekTrend.map(w => w.value), 1);
 
+  // ── Planlagte grønnsakskasser: kassepris × planlagte uker ──
+  // When no customers: each planned week = max(1, extraBoxes for that week)
+  const yr = new Date().getFullYear();
+  const totalBoxesAllSeasons = boxTypes.reduce((total, bt) => {
+    const weeks = getValidDeliveryWeeks(bt, yr);
+    if (!weeks.length) return total;
+    const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bt.id));
+    if (btCu.length > 0) {
+      return total + btCu.length * weeks.length;
+    }
+    // No customers — use extraBoxes per week or default 1
+    return total + weeks.reduce((s, w) => {
+      const bw = boxWeeks.find(b => String(b.boxTypeId) == String(bt.id) && +b.week === w && +b.year === yr);
+      return s + Math.max(1, bw?.extraBoxes || 0);
+    }, 0);
+  }, 0);
+
+  const plannedSaleValue = boxTypes.reduce((total, bt) => {
+    if (!bt.salePrice) return total;
+    const weeks = getValidDeliveryWeeks(bt, yr);
+    if (!weeks.length) return total;
+    const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bt.id));
+    if (btCu.length > 0) {
+      return total + btCu.length * weeks.length * bt.salePrice;
+    }
+    const boxCount = weeks.reduce((s, w) => {
+      const bw = boxWeeks.find(b => String(b.boxTypeId) == String(bt.id) && +b.week === w && +b.year === yr);
+      return s + Math.max(1, bw?.extraBoxes || 0);
+    }, 0);
+    return total + boxCount * bt.salePrice;
+  }, 0);
+
+  // Kasseprogresjon: avkrysset i Levering (deliveryCheck + extraCheck)
+  const harvestedBoxes = boxWeeks.reduce((s, bw) => {
+    const doneCu = Object.values(bw.deliveryCheck || {}).filter(v => v === true).length;
+    const doneExtra = Object.values(bw.extraCheck || {}).filter(v => v === true).length;
+    return s + doneCu + doneExtra;
+  }, 0);
+
+  // Grønnsaker høstet
+  const loggedQty = harvestLog.reduce((s, h) => s + (h.qty || 0), 0);
+  const plannedQty = crops.reduce((s, c) => s + calcPlants(c), 0);
+
+
   let html = '';
 
   // ── Stat cards ──
-  const statCard = (icon, val, label, color) =>
+  const statCard = (icon, val, label, sublabel, color) =>
     '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px">'
     + '<div style="font-size:20px;margin-bottom:6px">' + icon + '</div>'
-    + '<div style="font-size:28px;font-weight:300;line-height:1;color:' + color + '">' + val + '</div>'
+    + '<div style="font-size:26px;font-weight:300;line-height:1;color:' + color + '">' + val + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);margin-top:4px;letter-spacing:0.08em;text-transform:uppercase">' + label + '</div>'
+    + (sublabel ? '<div style="font-size:11px;color:var(--text-dim);margin-top:3px">' + sublabel + '</div>' : '')
     + '</div>';
 
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
-    + statCard('💰', 'kr ' + Math.round(totalValue).toLocaleString('nb-NO'), 'Totalverdi', '#f472b6')
-    + statCard('📦', levBoxes, 'Kasser levert', 'var(--accent-soft)')
-    + statCard('📅', 'kr ' + Math.round(weekValue).toLocaleString('nb-NO'), 'Denne uken', '#60a5fa')
-    + statCard('🗓', 'kr ' + Math.round(monthValue).toLocaleString('nb-NO'), 'Denne måneden', '#fbbf24')
+    + statCard('💰', plannedSaleValue > 0 ? 'kr ' + Math.round(plannedSaleValue).toLocaleString('nb-NO') : '–',
+        'Planlagte grønnsakskasser',
+        totalBoxesAllSeasons ? totalBoxesAllSeasons + ' kasser · sesongen' : 'Sett opp kunder og leveringsplan', '#fbbf24')
+    + statCard('📦', harvestedBoxes + ' / ' + totalBoxesAllSeasons,
+        'Kasseprogresjon',
+        totalBoxesAllSeasons ? Math.round((harvestedBoxes / totalBoxesAllSeasons) * 100) + '% levert' : 'Sett opp leveringsplan', 'var(--accent-soft)')
+    + statCard('💚', totalValue > 0 ? 'kr ' + Math.round(totalValue).toLocaleString('nb-NO') : '–',
+        'Gjennomførte salg',
+        harvestLog.length ? harvestLog.length + ' registreringer' : 'Ingen logget ennå', '#f472b6')
+    + statCard('🥬', Math.round(loggedQty) + ' / ' + plannedQty,
+        'Grønnsaker høstet',
+        plannedQty ? Math.round((loggedQty / plannedQty) * 100) + '% av planlagt' : 'Legg til vekster for å spore', '#34d399')
     + '</div>';
 
-  // ── Ukentlig trend (sparkline) ──
+  if (!harvestLog.length) {
+    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:14px">'
+      + '🌱 Ingen høsting logget ennå.<br><span style="font-size:12px">Logg kasser og markeder for å se statistikk.</span>'
+      + '</div>';
+  }
+
+  // ── Ukentlig trend ──
+  // ── Ukentlig trend ──
   if (weekTrend.some(w => w.value > 0)) {
+
     html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">Ukentlig trend</div>'
       + '<div style="display:flex;align-items:flex-end;gap:4px;height:56px">';
@@ -7392,12 +7626,6 @@ function renderLevOversikt(el) {
         + '</div>';
     });
     html += '</div>';
-  }
-
-  if (!harvestLog.length) {
-    html = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px">'
-      + '🌱<br><br>Ingen høsting registrert ennå.<br>Statistikk vises her etter hvert som du logger.'
-      + '</div>';
   }
 
   el.innerHTML = html;
