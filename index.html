@@ -6011,12 +6011,19 @@ function renderLevKasse(el) {
         const cr = crops.find(c => c.id == item.cropId);
         if (!cr) return;
         const perKasse = calcItemValue(cr, item.qty||0, item.unit);
-        const totalNeeded = (item.qty||0) * (bw.count||0);
+        const btCuForNeed = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
+        const activeCuForNeed = btCuForNeed.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+        const totalCount2 = activeCuForNeed.length + (bw.extraBoxes || 0);
+        const totalNeeded = (item.qty||0) * totalCount2;
         html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">'
           + '<span style="font-size:20px">' + cr.emoji + '</span>'
           + '<div style="flex:1">'
           + '<div style="font-size:13px;color:var(--text-head)">' + (cr.family||cr.name) + '</div>'
-          + '<div id="kasse-need-' + bw.id + '-' + ii + '" style="font-size:11px;color:var(--text-muted)">Totalt: ' + (bw.count ? totalNeeded + ' ' + item.unit : '–') + '</div>'
+          + '<div style="display:flex;gap:8px;align-items:center;margin-top:2px">'
+          + '<div id="kasse-need-' + bw.id + '-' + ii + '" style="font-size:11px;color:var(--text-muted)">'
+          + (totalCount2 ? totalNeeded + ' ' + item.unit + ' totalt' : '–') + '</div>'
+          + (perKasse > 0 ? '<div style="font-size:11px;color:var(--accent-soft)">kr ' + perKasse.toFixed(0) + ' per kasse</div>' : '')
+          + '</div>'
           + '</div>'
           + '<input type="number" min="0" step="1" value="' + (item.qty||'') + '" placeholder="0"'
           + ' oninput="updateKasseItem(\'' + bw.id + '\',' + ii + ',\'qty\',+this.value)"'
@@ -6105,11 +6112,17 @@ function renderLevKasse(el) {
           + '</div>';
       });
 
+
       // Logg-knapp
-      if (allDone) {
-        html += '<button onclick="autoHarvestBoxWeek(\'' + bw.id + '\')" style="width:100%;margin-top:8px;padding:16px;border-radius:14px;border:none;background:var(--accent);color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';cursor:pointer;font-size:15px;font-family:inherit;font-weight:600">✓ Logg ' + totalBoxes + ' kasser som høstet</button>';
+      const hasNewDelta = bwHasUnloggedDelta(bw);
+      const wasLogged = bw.harvested && !hasNewDelta;
+      if (wasLogged) {
+        html += '<button id="kasse-log-btn-' + bw.id + '" disabled style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:default;font-size:14px;font-family:inherit;opacity:0.5">✓ Ferdiglogget</button>';
+      } else if (hasNewDelta) {
+        // Has unlogged changes — show active "Logg endringer" button
+        html += '<button id="kasse-log-btn-' + bw.id + '" data-bwid="' + bw.id + '" onclick="autoHarvestBoxWeek(this.dataset.bwid)" style="width:100%;margin-top:8px;padding:16px;border-radius:14px;border:none;background:var(--accent);color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';cursor:pointer;font-size:15px;font-family:inherit;font-weight:600">' + (bw.harvested ? '↑ Logg endringer' : '✓ Logg ' + totalBoxes + ' kasser som høstet') + '</button>';
       } else {
-        html += '<button onclick="autoHarvestBoxWeek(\'' + bw.id + '\')" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
+        html += '<button id="kasse-log-btn-' + bw.id + '" data-bwid="' + bw.id + '" onclick="autoHarvestBoxWeek(this.dataset.bwid)" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
       }
     }
   } else if (isLevering) {
@@ -6279,12 +6292,32 @@ function adjustExtraBoxes(bwId, delta) {
   if (!bw) return;
   bw.extraBoxes = Math.max(0, (bw.extraBoxes || 0) + delta);
   saveLevering();
+  // Update counter display in panel without re-rendering whole tab
   const disp = document.getElementById('extra-boxes-disp-' + bwId);
   if (disp) disp.textContent = bw.extraBoxes;
+  // Update the kasse-panel if open
   const panel = document.getElementById('kassekunde-panel');
   if (panel?._renderPanel) panel._renderPanel();
-  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-  if (cont) renderLevKasse(cont);
+  // Update the Plan-modus antall kasser button display (without full re-render)
+  const btCuForCount = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const activeCuForCount = btCuForCount.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const newTotal = activeCuForCount.length + (bw.extraBoxes || 0);
+  // Try to update the button text inline
+  const countBtn = document.querySelector('[data-bwid="' + bwId + '"]');
+  if (countBtn) {
+    const countEl = countBtn.querySelector('div[style*="font-size:26px"]');
+    if (countEl) countEl.textContent = newTotal;
+    const descEl = countBtn.querySelector('div[style*="font-size:12px"]');
+    if (descEl) {
+      descEl.textContent =
+        (activeCuForCount.length ? activeCuForCount.length + ' kunde' + (activeCuForCount.length !== 1 ? 'r' : '') : 'ingen kunder')
+        + (bw.extraBoxes ? ' + ' + bw.extraBoxes + ' ekstra' : '');
+    }
+    // Update total kr
+    const boxVal = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
+    const totalEl = countBtn.querySelector('[style*="accent-soft"]');
+    if (totalEl) totalEl.textContent = 'kr ' + (boxVal * newTotal).toFixed(0);
+  }
 }
 
 function kasseSetType(typeId) {
@@ -6388,28 +6421,51 @@ function updateBoxWeekCount(bwId, val) {
   kasseDeltaCount(bwId, 0); // refresh displays
 }
 
+// Returns true if bw has items whose current total > what's been logged
+function bwHasUnloggedDelta(bw) {
+  if (!bw?.items?.length) return false;
+  if (!bw.loggedQtys) return true; // never logged at all
+  const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const totalCount = activeCu.length + (bw.extraBoxes || 0);
+  return bw.items.some(item => {
+    if (!item.qty) return false;
+    const totalQty = item.qty * totalCount;
+    return totalQty > (bw.loggedQtys[item.cropId] || 0);
+  });
+}
+
 function updateKasseItem(bwId, idx, field, val) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw?.items?.[idx]) return;
   bw.items[idx][field] = field === 'qty' ? +val : val;
+  // If there's now unlogged delta, re-enable the log button
+  if (bw.harvested && bwHasUnloggedDelta(bw)) {
+    bw.harvested = false;
+    const logBtn = document.getElementById('kasse-log-btn-' + bwId);
+    if (logBtn) {
+      logBtn.textContent = 'Logg endringer';
+      logBtn.disabled = false;
+      logBtn.style.opacity = '';
+      logBtn.style.cursor = 'pointer';
+    }
+  }
   saveLevering();
-  // Update totals
   const item = bw.items[idx];
-  const cr = crops.find(c => c.id == item.cropId);
   const needEl = document.getElementById('kasse-need-' + bwId + '-' + idx);
   if (needEl) needEl.textContent = 'Totalt: ' + (bw.count ? (item.qty||0)*bw.count+' '+item.unit : '–');
-  const totalEl = document.getElementById('kasse-total-' + bwId);
-  if (totalEl) {
-    const bv = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
-    totalEl.innerHTML = '<div style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + (bv * (bw.count||0)).toFixed(0) + '</div><div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">totalt</div>';
-  }
 }
 
 function removeKasseItem(bwId, idx) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw) return;
   snapshotLev();
+  const removedCropId = bw.items[idx]?.cropId;
   bw.items.splice(idx, 1);
+  // If the removed item had logged qty, clear that log entry (can't un-log, but reset marker)
+  if (removedCropId && bw.loggedQtys?.[removedCropId]) {
+    delete bw.loggedQtys[removedCropId];
+  }
   saveLevering();
   const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
   if (el) renderLevKasse(el);
@@ -6420,8 +6476,15 @@ function toggleKasseCrop(bwId, cropId) {
   if (!bw) return;
   snapshotLev();
   const idx = bw.items.findIndex(i => i.cropId == +cropId);
-  if (idx >= 0) bw.items.splice(idx, 1);
-  else bw.items.push({cropId: +cropId, qty: 1, unit: 'stk'});
+  if (idx >= 0) {
+    // Removing — clear logged qty
+    if (bw.loggedQtys?.[+cropId]) delete bw.loggedQtys[+cropId];
+    bw.items.splice(idx, 1);
+  } else {
+    bw.items.push({cropId: +cropId, qty: 1, unit: 'stk'});
+    // New item has unlogged delta — re-enable button if previously harvested
+    if (bw.harvested) bw.harvested = false;
+  }
   saveLevering();
   const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
   if (el) renderLevKasse(el);
@@ -6440,19 +6503,97 @@ function importBaseItems(bwId) {
 }
 
 function openDuplicateWeek(boxTypeId, currentWeek, currentYear) {
-  const others = boxWeeks.filter(b => b.boxTypeId==boxTypeId && !(b.week==currentWeek && b.year==currentYear) && b.items && b.items.length);
-  if (!others.length) { showSyncToast('Ingen tidligere uker å kopiere fra'); return; }
+  // All boxWeeks with items, except current week of current type
+  const others = boxWeeks.filter(b => b.items && b.items.length &&
+    !(String(b.boxTypeId) == String(boxTypeId) && b.week == currentWeek && b.year == currentYear));
+
+  // Also include baseItems from all box types as copy sources
+  const baseItemSources = boxTypes.filter(bt => bt.baseItems && bt.baseItems.length > 0);
+
+  if (!others.length && !baseItemSources.length) {
+    showSyncToast('Ingen oppsett å kopiere fra ennå');
+    return;
+  }
+
   const modal = document.createElement('div');
   modal.id = 'dup-week-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:center;justify-content:center;padding:20px';
-  let html = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:16px;padding:20px;max-width:360px;width:100%"><div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Kopier fra uke</div>';
-  [...others].sort((a,b) => b.year-a.year||b.week-a.week).forEach(bw => {
-    html += '<button onclick="doDuplicateWeek(\'' + bw.id + '\',' + boxTypeId + ',' + currentWeek + ',' + currentYear + ')" style="display:block;width:100%;padding:10px 12px;margin-bottom:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">Uke ' + bw.week + ' · ' + bw.year + ' (' + bw.items.length + ' vekster)</button>';
-  });
-  html += '<button onclick="document.getElementById(\'dup-week-modal\').remove()" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">Avbryt</button></div>';
+
+  let html = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:16px;padding:20px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    + '<div style="font-size:15px;color:var(--accent-soft)">⧉ Kopier innhold fra</div>'
+    + '<button onclick="document.getElementById(\'dup-week-modal\').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;line-height:1">×</button>'
+    + '</div>';
+
+  // ── Base items per kassetype ──
+  if (baseItemSources.length) {
+    html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px">Basis-oppsett</div>';
+    baseItemSources.forEach(bt => {
+      const isCurrent = String(bt.id) === String(boxTypeId);
+      html += '<button data-src-base="' + bt.id + '" data-bt-id="' + boxTypeId + '" data-week="' + currentWeek + '" data-year="' + currentYear + '" onclick="doDuplicateFromBase(this.dataset.srcBase,this.dataset.btId,+this.dataset.week,+this.dataset.year)"'
+        + ' style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;margin-bottom:5px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">'
+        + '<span>' + bt.name + (isCurrent ? ' <span style="color:var(--text-muted);font-size:11px">(denne)</span>' : '') + '</span>'
+        + '<span style="font-size:12px;color:var(--accent-soft)">Basis · ' + bt.baseItems.length + ' vekster</span>'
+        + '</button>';
+    });
+  }
+
+  // ── Historical weeks grouped by kassetype ──
+  if (others.length) {
+    const grouped = {};
+    others.forEach(bw => {
+      const key = String(bw.boxTypeId);
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(bw);
+    });
+
+    // Sort: current type first, then others alphabetically
+    const sortedKeys = Object.keys(grouped).sort((a, b) => {
+      if (a === String(boxTypeId)) return -1;
+      if (b === String(boxTypeId)) return 1;
+      const na = boxTypes.find(t => String(t.id) === a)?.name || '';
+      const nb = boxTypes.find(t => String(t.id) === b)?.name || '';
+      return na.localeCompare(nb);
+    });
+
+    sortedKeys.forEach(btId => {
+      const bt = boxTypes.find(t => String(t.id) === btId);
+      const label = bt ? bt.name : 'Ukjent kassetype';
+      const isSameType = String(btId) === String(boxTypeId);
+      html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:12px 0 6px">'
+        + label + (isSameType ? ' <span style="color:var(--text-dim)">(denne)</span>' : '') + '</div>';
+      [...grouped[btId]].sort((a,b) => b.year - a.year || b.week - a.week).forEach(bw => {
+        const isCurrentWeek = bw.week == currentWeek && bw.year == currentYear;
+        html += '<button data-src-id="' + bw.id + '" data-bt-id="' + boxTypeId + '" data-week="' + currentWeek + '" data-year="' + currentYear + '" onclick="doDuplicateWeek(this.dataset.srcId,this.dataset.btId,+this.dataset.week,+this.dataset.year)"'
+          + ' style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;margin-bottom:5px;border-radius:8px;border:1px solid '
+          + (isCurrentWeek ? 'var(--accent)' : 'var(--border)') + ';background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">'
+          + '<span>Uke ' + bw.week + ' · ' + bw.year + (isCurrentWeek ? ' <span style="color:var(--accent-soft);font-size:11px">← inneværende</span>' : '') + '</span>'
+          + '<span style="font-size:12px;color:var(--text-muted)">' + bw.items.length + ' vekster</span>'
+          + '</button>';
+      });
+    });
+  }
+
+  html += '</div>';
   modal.innerHTML = html;
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function doDuplicateFromBase(srcBtId, targetBtId, targetWeek, targetYear) {
+  const srcBt = boxTypes.find(t => String(t.id) === String(srcBtId));
+  if (!srcBt?.baseItems?.length) return;
+  snapshotLev();
+  let target = boxWeeks.find(b => String(b.boxTypeId)==String(targetBtId) && b.week==targetWeek && b.year==targetYear);
+  if (!target) {
+    target = {id:String(targetBtId)+'_w'+targetWeek+'_y'+targetYear, boxTypeId:targetBtId, week:targetWeek, year:targetYear, items:[], customerAdj:{}};
+    boxWeeks.push(target);
+  }
+  target.items = JSON.parse(JSON.stringify(srcBt.baseItems));
+  saveLevering();
+  document.getElementById('dup-week-modal')?.remove();
+  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
 }
 
 function doDuplicateWeek(sourceBwId, boxTypeId, targetWeek, targetYear) {
@@ -6472,27 +6613,68 @@ function doDuplicateWeek(sourceBwId, boxTypeId, targetWeek, targetYear) {
 }
 
 function autoHarvestBoxWeek(bwId) {
-  const bw = boxWeeks.find(b=>b.id==bwId);
+  bwId = String(bwId);
+  const bw = boxWeeks.find(b=>String(b.id)==bwId);
   if (!bw || !bw.items?.length) { showSyncToast('Legg til vekster først'); return; }
   if (!bw.customerWeek) bw.customerWeek = {};
   if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
+  if (!bw.loggedQtys) bw.loggedQtys = {}; // cropId → total qty already logged this week
+
   const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
   const activeCu = btCu.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
   const totalCount = activeCu.length + (bw.extraBoxes || 0);
   if (!totalCount) { showSyncToast('Ingen aktive kasser denne uken'); return; }
-  snapshotLev();
+
   const today = new Date().toISOString().split('T')[0];
   const bt = boxTypes.find(t=>t.id==bw.boxTypeId);
+
+  // Calculate deltas — only log what hasn't been logged yet
+  const toLog = [];
   bw.items.forEach(item => {
     if (!item.qty) return;
-    harvestLog.unshift({id:Date.now()+Math.random(), date:today, cropId:item.cropId, bedId:null,
-      qty: item.qty * totalCount, unit:item.unit, dest:'kasse', note:(bt?.name||'Kasse')+' uke '+bw.week});
+    const totalQty = item.qty * totalCount;
+    const alreadyLogged = bw.loggedQtys[item.cropId] || 0;
+    const delta = totalQty - alreadyLogged;
+    if (delta > 0) toLog.push({ item, totalQty, delta });
   });
-  if (bw.checklist) bw.checklist = {};
+
+  if (!toLog.length) { showSyncToast('Ingen nye endringer å logge'); return; }
+
+  snapshotLev();
+  toLog.forEach(({ item, totalQty, delta }) => {
+    harvestLog.unshift({
+      id: Date.now()+Math.random(), date: today,
+      cropId: item.cropId, bedId: null,
+      qty: delta, unit: item.unit,
+      dest: 'kasse',
+      note: (bt?.name||'Kasse') + ' uke ' + bw.week
+    });
+    // Update logged qty to full current total
+    bw.loggedQtys[item.cropId] = totalQty;
+  });
+
+  // Mark all items as checked
+  if (!bw.checklist) bw.checklist = {};
+  (bw.items||[]).forEach((_, ii) => { bw.checklist[ii] = true; });
+
+  // Mark as harvested — but re-enable if content changes later (handled in render)
+  bw.harvested = true;
+
   saveLevering();
-  showSyncToast('✓ Logget ' + totalCount + ' kasser til Høstelogg');
-  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
-  if (el) renderLevKasse(el);
+  const plural = toLog.length !== 1;
+  showSyncToast('✓ Logget ' + toLog.length + ' vekst' + (plural?'er':'') + ' til Høstelogg');
+
+  // Update button inline
+  const logBtn = document.getElementById('kasse-log-btn-' + bwId);
+  if (logBtn) {
+    logBtn.textContent = '✓ Ferdiglogget';
+    logBtn.disabled = true;
+    logBtn.style.opacity = '0.5';
+    logBtn.style.cursor = 'default';
+  } else {
+    const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+    if (el) renderLevKasse(el);
+  }
 }
 
 function calcBoxValue(box) {
