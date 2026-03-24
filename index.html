@@ -610,7 +610,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (drawMode && gardenMap.drawStrokes?.length) {
       gardenMap.drawStrokes.pop(); saveGardenMap(); redrawCanvas();
-    } else { undo(); }
+    } else if (isPlukk) { undo(); }
     return;
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
@@ -2792,9 +2792,12 @@ function renderSenger() {
   const visibleBeds = bedFieldFilter === 'alle' ? BED_IDS : BED_IDS.filter(id => (id.match(/^([A-Za-z]+)/)?.[1] || '') === bedFieldFilter);
 
   document.getElementById('tab-senger').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      <div class="filter-bar" style="margin:0;flex-wrap:wrap">
-      ${fields.map(f => `<button class="filter-btn ${bedFieldFilter===f?'active':''}" onclick="setBedField('${f}')">${f==='alle'?'Alle':f}</button>`).join('')}
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+      <select onchange="setBedField(this.value)" style="flex:1;padding:7px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M0 0l5 6 5-6z%22 fill=%22%236b7280%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;padding-right:26px">
+        ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Alle felt':'Felt '+f}</option>`).join('')}
+      </select>
+      <button onclick="openAddBed()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Legg til seng</button>
+      <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">🗺 Visuell oversikt</button>
     </div>
     <div class="bed-grid">
       ${(() => {
@@ -4782,7 +4785,33 @@ function importFileObject(file, skipSave = false) {
         }
       }
 
-      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks };
+      // ── Parse Kunder ──
+      const wsKu = wb.Sheets['Kunder'];
+      const newCustomers = [];
+      if (wsKu) {
+        const rows = XLSX.utils.sheet_to_json(wsKu, { header: 1 });
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r[0]) continue;
+          const name = String(r[0] || '').trim();
+          const phone = String(r[1] || '').trim();
+          const btName = String(r[2] || '').trim();
+          const btIdRaw = String(r[3] || '').trim();
+          // Try to resolve box type: first by ID, then by name
+          let boxTypeId = null;
+          if (btIdRaw) {
+            const btById = boxTypes.find(t => String(t.id) === btIdRaw);
+            if (btById) boxTypeId = btById.id;
+          }
+          if (!boxTypeId && btName) {
+            const btByName = boxTypes.find(t => t.name.toLowerCase() === btName.toLowerCase());
+            if (btByName) boxTypeId = btByName.id;
+          }
+          newCustomers.push({ id: Date.now() + i * 7, name, phone, boxTypeId, notes: '', custom: {} });
+        }
+      }
+
+      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks, customers: newCustomers };
       confirmImport(skipSave);
       resolve();
     } catch(err) {
@@ -4802,6 +4831,10 @@ function confirmImport(skipSave = false) {
   bedSizes = pendingImport.bedSizes;
   BED_IDS  = pendingImport.bedIDs;
   tasks    = pendingImport.tasks;
+  if (pendingImport.customers && pendingImport.customers.length) {
+    deliveryCustomers = pendingImport.customers;
+    saveLevering();
+  }
   pendingImport = null;
   selectedBed = null;
   saveToLocal(); // always save — data is now correct regardless of source
@@ -4884,6 +4917,17 @@ function buildWorkbook() {
   wsOppgaver['!cols'] = [{wch:40},{wch:14},{wch:12},{wch:8}];
   styleHeaderRow(wsOppgaver, taskHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsOppgaver, 'Oppgaver');
+
+  // ── Sheet 4: Kunder ──────────────────────────────────────────
+  const customerHeaders = ['Navn', 'Telefon', 'Kassetype', 'Kassetypeid'];
+  const customerRows = deliveryCustomers.map(cu => {
+    const bt = boxTypes.find(t => t.id == cu.boxTypeId);
+    return [cu.name, cu.phone || '', bt ? bt.name : '', cu.boxTypeId || ''];
+  });
+  const wsKunder = XLSX.utils.aoa_to_sheet([customerHeaders, ...customerRows]);
+  wsKunder['!cols'] = [{wch:24},{wch:16},{wch:20},{wch:20}];
+  styleHeaderRow(wsKunder, customerHeaders.length);
+  XLSX.utils.book_append_sheet(wb, wsKunder, 'Kunder');
 
   // ── Download ──────────────────────────────────────────────────
   const date = new Date();
@@ -4995,8 +5039,8 @@ function showLeveringOverlay() {
       background:var(--bg-nav);backdrop-filter:blur(12px);
       border-top:1px solid var(--border-accent);display:flex;
       padding-bottom:env(safe-area-inset-bottom);flex-shrink:0">
-      ${['kasse','marked','hoestlogg'].map((t,i) => {
-        const labels = ['Grønnsakskasser','Marked','Høstelogg'];
+      ${['oversikt','kasse','marked','hoestlogg'].map((t,i) => {
+        const labels = ['Oversikt','Kasser','Marked','Høstelogg'];
         return `<button onclick="leveringTab='${t}';renderLeveringInto(document.getElementById('lev-overlay-content'))"
           id="lev-tab-${t}"
           style="flex:1;min-width:0;padding:20px 2px 18px;border:none;background:transparent;
@@ -5026,13 +5070,14 @@ function closeLeveringOverlay() {
 function renderLeveringInto(el) {
   if (!el) return;
   // Update bottom nav active states
-  ['kunder','kasse','marked','hoestlogg'].forEach(t => {
+  ['oversikt','kunder','kasse','marked','hoestlogg'].forEach(t => {
     const btn = document.getElementById('lev-tab-' + t);
     if (!btn) return;
     btn.style.color = leveringTab===t ? 'var(--accent-soft)' : 'var(--text-dim)';
     btn.style.borderTopColor = leveringTab===t ? 'var(--accent)' : 'transparent';
   });
-  if (leveringTab === '_kunder') renderLevKunder(el);
+  if (leveringTab === 'oversikt') renderLevOversikt(el);
+  else if (leveringTab === '_kunder') renderLevKunder(el);
   else if (leveringTab === 'kasse')  renderLevKasse(el);
   else if (leveringTab === 'marked') renderLevMarked(el);
   else if (leveringTab === 'hoestlogg') renderLevHoestLogg(el);
@@ -5407,14 +5452,16 @@ if ('serviceWorker' in navigator) {
 // LEVERING
 // ═══════════════════════════════════════════════════════════════
 
-let leveringTab = 'kasse'; // 'kasse' | 'marked' | 'hoestlogg' // 'kasse' | 'marked' | 'hoest' | 'logg'
+let leveringTab = 'kasse'; // 'kasse' | 'marked' | 'hoestlogg'
+let markedModus = (() => { try { return localStorage.getItem('mh_marked_modus') || 'plan'; } catch(e) { return 'plan'; } })();
+let markedViewIdx = null; // index into deliveryMarket of currently viewed market
 
 function renderLevering() {
   const el = document.getElementById('lev-overlay-content') || document.getElementById('tab-levering');
   if (!el) return;
 
   const TABS = [
-    {id:'kasse',  label:'Grønnsakskasser'},
+    {id:'kasse',  label:'Grønnsakskasse'},
     {id:'marked', label:'Marked'},
     {id:'hoestlogg', label:'Høstelogg'},
   ];
@@ -5458,8 +5505,7 @@ function renderLevKunder(el) {
               <div style="font-size:15px;color:var(--text-head);font-weight:400">${cu.name}</div>
               <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${cu.phone || ''}</div>
               <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-                <span style="font-size:12px;padding:2px 10px;border-radius:10px;background:var(--accent-bg);color:var(--accent-soft)">${cu.boxes} kasse${cu.boxes!==1?'r':''}</span>
-                <span style="font-size:12px;padding:2px 10px;border-radius:10px;border:1px solid var(--border);color:var(--text-muted)"></span>
+                ${(() => { const bt = boxTypes.find(t => t.id == cu.boxTypeId); return bt ? `<span style="font-size:12px;padding:2px 10px;border-radius:10px;background:var(--accent-bg);color:var(--accent-soft)">${bt.name}</span>` : ''; })()}
               </div>
             </div>
             <div style="display:flex;gap:6px">
@@ -5582,10 +5628,8 @@ function openKasseOppsett() {
     }
 
     // Kunder section
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:10px">'
-      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kunder</div>'
-      + '<button onclick="openAddCustomer()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny kunde</button>'
-      + '</div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:10px">'      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kunder</div>'      + '<div style="display:flex;gap:6px;align-items:center">'      + '<label style="padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:#60a5fa;cursor:pointer;font-size:12px;font-family:inherit">⬆ Importer<input type="file" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none"></label>'      + '<button onclick="exportCustomersToExcel()" style="padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">⬇ Eksporter</button>'      + '<button onclick="openAddCustomer()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny</button>'      + '</div></div>';
+
 
     if (!deliveryCustomers.length) {
       html += '<p style="font-size:13px;color:var(--text-muted);padding:8px 0">Ingen kunder ennå.</p>';
@@ -5602,8 +5646,8 @@ function openKasseOppsett() {
           + '<div style="font-size:14px;color:var(--text-head)">' + cu.name + '</div>'
           + (cu.phone ? '<div style="font-size:12px;color:var(--text-muted)">' + cu.phone + '</div>' : '')
           + '<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">'
-          + '<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accent-bg);color:var(--accent-soft)">' + cu.boxes + ' kasse' + (cu.boxes!==1?'r':'') + '</span>'
-          + (bt ? '<span style="font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--border);color:var(--text-muted)">' + bt.name + '</span>' : '')
+          + (bt ? '<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accent-bg);color:var(--accent-soft)">' + bt.name + '</span>' : '')
+
           + (dayStr !== '–' ? '<span style="font-size:11px;color:var(--text-muted)">' + dayStr + '</span>' : '')
           + (weekStr ? '<span style="font-size:11px;color:var(--text-muted)">' + weekStr + '</span>' : '')
           + (freqStr ? '<span style="font-size:11px;color:var(--text-muted)">' + freqStr + '</span>' : '')
@@ -5627,6 +5671,67 @@ function openKasseOppsett() {
     + '</div>';
 
   document.body.appendChild(modal);
+}
+
+function importCustomersFromExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+      // Accept sheet named 'Kunder' or first sheet
+      const wsKu = wb.Sheets['Kunder'] || wb.Sheets[wb.SheetNames[0]];
+      if (!wsKu) { showSyncToast('Fant ingen data i filen'); return; }
+      const rows = XLSX.utils.sheet_to_json(wsKu, { header: 1 });
+      if (rows.length < 2) { showSyncToast('Ingen kunder funnet i filen'); return; }
+
+      const newCustomers = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r[0]) continue;
+        const name = String(r[0] || '').trim();
+        const phone = String(r[1] || '').trim();
+        const btName = String(r[2] || '').trim();
+        const btIdRaw = String(r[3] || '').trim();
+        let boxTypeId = null;
+        if (btIdRaw) { const bt = boxTypes.find(t => String(t.id) === btIdRaw); if (bt) boxTypeId = bt.id; }
+        if (!boxTypeId && btName) { const bt = boxTypes.find(t => t.name.toLowerCase() === btName.toLowerCase()); if (bt) boxTypeId = bt.id; }
+        newCustomers.push({ id: Date.now() + i * 7, name, phone, boxTypeId, notes: '', custom: {} });
+      }
+
+      if (!newCustomers.length) { showSyncToast('Ingen gyldige kunder i filen'); return; }
+
+      const msg = 'Dette vil erstatte alle eksisterende kunder (' + deliveryCustomers.length + ') med ' + newCustomers.length + ' kunder fra filen. Fortsette?';
+      if (!confirm(msg)) return;
+      snapshotLev();
+      deliveryCustomers = newCustomers;
+      saveLevering();
+      showSyncToast('✓ Importerte ' + newCustomers.length + ' kunder');
+      document.getElementById('kasse-oppsett-modal')?.remove();
+      openKasseOppsett();
+    } catch(err) {
+      showSyncToast('Kunne ikke lese kundefilen');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportCustomersToExcel() {
+  const wb = XLSX.utils.book_new();
+  const headers = ['Navn', 'Telefon', 'Kassetype', 'Kassetypeid'];
+  const rows = deliveryCustomers.map(cu => {
+    const bt = boxTypes.find(t => t.id == cu.boxTypeId);
+    return [cu.name, cu.phone || '', bt ? bt.name : '', cu.boxTypeId || ''];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [{wch:24},{wch:16},{wch:20},{wch:20}];
+  styleHeaderRow(ws, headers.length);
+  XLSX.utils.book_append_sheet(wb, ws, 'Kunder');
+  const d = new Date();
+  XLSX.writeFile(wb, 'Kunder_' + d.getDate() + '-' + (d.getMonth()+1) + '-' + d.getFullYear() + '.xlsx');
 }
 
 function closeKasseOppsett() { document.getElementById("kasse-oppsett-modal")?.remove(); }
@@ -5750,176 +5855,554 @@ function getOrCreateBoxWeek(boxTypeId, week, year) {
   return bw;
 }
 
-let kasseViewWeek = getCurrentWeek();
-let kasseViewYear = getCurrentYear();
-let kasseViewTypeId = null;
+let kasseViewWeek = (() => { try { return +localStorage.getItem('mh_kasse_week') || getCurrentWeek(); } catch(e) { return getCurrentWeek(); } })();
+let kasseViewYear = (() => { try { return +localStorage.getItem('mh_kasse_year') || getCurrentYear(); } catch(e) { return getCurrentYear(); } })();
+let kasseViewTypeId = (() => { try { return localStorage.getItem('mh_kasse_type') || null; } catch(e) { return null; } })();
+let kasseModus = (() => { try { return localStorage.getItem('mh_kasse_modus') || 'plan'; } catch(e) { return 'plan'; } })(); // 'plan' | 'pakk'
+
+function saveKassePrefs() {
+  try {
+    localStorage.setItem('mh_kasse_week', kasseViewWeek);
+    localStorage.setItem('mh_kasse_year', kasseViewYear);
+    localStorage.setItem('mh_kasse_type', kasseViewTypeId || '');
+    localStorage.setItem('mh_kasse_modus', kasseModus);
+  } catch(e) {}
+}
 
 function renderLevKasse(el) {
-  // Init selected type
+
+  // Init type
   if (!kasseViewTypeId && boxTypes.length) kasseViewTypeId = boxTypes[0].id;
-  // Ensure kasseViewTypeId matches actual boxType (type coercion safe)
-  if (kasseViewTypeId && !boxTypes.find(t=>t.id==kasseViewTypeId)) kasseViewTypeId = boxTypes[0]?.id;
-
-  const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
-  const FREQ = {weekly:'Ukentlig', biweekly:'Annenhver uke', monthly:'Månedlig'};
-
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    + '<button onclick="openKasseOppsett()" style="padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">⚙ Oppsett</button>'
-    + '</div>';
+  if (kasseViewTypeId && !boxTypes.find(t => t.id == kasseViewTypeId)) kasseViewTypeId = boxTypes[0]?.id;
+  saveKassePrefs();
 
   if (!boxTypes.length) {
-    html += '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen kassetyper ennå.<br>Gå til ⚙ Oppsett for å legge til.</p>';
-    el.innerHTML = html;
+    el.innerHTML = '<div style="padding:20px 0">'
+      + '<p style="color:var(--text-muted);font-size:13px;text-align:center;margin-bottom:16px">Ingen kassetyper ennå.<br>Gå til Oppsett for å legge til.</p>'
+      + '<button onclick="openKasseOppsett()" style="display:block;margin:0 auto;padding:10px 24px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">⚙ Oppsett</button>'
+      + '</div>';
     return;
   }
 
-  // Kassetype selector
-  html += '<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:14px;padding-bottom:2px">';
+  const isLight = document.body.classList.contains('light');
+
+  // ── Kassetype-tabs ──
+  let html = '<div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:16px;padding-bottom:2px">';
   boxTypes.forEach(bt => {
     const sel = String(kasseViewTypeId) == String(bt.id);
-    html += '<button onclick="kasseViewTypeId='+bt.id+';kasseViewWeek=getCurrentWeek();kasseViewYear=getCurrentYear();renderLevKasse(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
-      + ' style="padding:7px 14px;border-radius:20px;border:2px solid '+(sel?'var(--accent)':'var(--border)')
-      + ';background:'+(sel?'var(--accent-bg)':'transparent')
-      + ';color:'+(sel?'var(--accent-soft)':'var(--text-muted)')
-      + ';cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;flex-shrink:0">'
-      + bt.name+'</button>';
+    html += '<button onclick="kasseSetType(' + bt.id + ')"'
+      + ' style="padding:7px 16px;border-radius:20px;flex-shrink:0;'
+      + 'border:2px solid ' + (sel ? 'var(--accent)' : 'var(--border)') + ';'
+      + 'background:' + (sel ? 'var(--accent-bg)' : 'transparent') + ';'
+      + 'color:' + (sel ? 'var(--accent-soft)' : 'var(--text-muted)') + ';'
+      + 'cursor:pointer;font-size:13px;font-family:inherit;font-weight:' + (sel ? '600' : '400') + '">'
+      + bt.name + '</button>';
   });
+  html += '<button onclick="openKasseOppsett()" style="padding:7px 12px;border-radius:20px;flex-shrink:0;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;font-size:12px;font-family:inherit;margin-left:auto">⚙</button>';
   html += '</div>';
 
   const bt = boxTypes.find(t => t.id == kasseViewTypeId);
   if (!bt) { el.innerHTML = html; return; }
 
-  // Delivery info
-  const dayStr = (bt.weekdays||[]).map(d=>DAYS[d]).join(', ');
-  const weekStr = bt.startWeek && bt.endWeek ? 'Uke '+bt.startWeek+'–'+bt.endWeek : '';
-  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">'
-    + (bt.type==='vasket'?'Vasket':'Uvasket')
-    + (dayStr?' · '+dayStr:'') + (weekStr?' · '+weekStr:'')
-    + (bt.frequency?' · '+(FREQ[bt.frequency]||bt.frequency):'')
-    + '</div>';
+  // ── Plan / Pakk toggle ──
+  const isPlukk = kasseModus === 'plukk';
+  const isLevering = kasseModus === 'levering';
+  html += '<div style="display:flex;background:' + (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)') + ';border-radius:14px;padding:4px;margin-bottom:20px;position:relative">';
+  [['plan','📋 Plan'],['plukk','📦 Plukk'],['levering','🚗 Levering']].forEach(([m, label]) => {
+    const active = kasseModus === m;
+    html += '<button onclick="kasseSwitchModus(\'' + m + '\')"'
+      + ' style="flex:1;padding:9px 4px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-family:inherit;font-weight:' + (active ? '600' : '400') + ';'
+      + 'background:' + (active ? (isLight ? '#fff8f0' : 'var(--bg-card)') : 'transparent') + ';'
+      + 'color:' + (active ? 'var(--text-head)' : 'var(--text-muted)') + ';'
+      + 'box-shadow:' + (active ? '0 1px 4px rgba(0,0,0,0.15)' : 'none') + ';'
+      + 'transition:all 0.2s">' + label + '</button>';
+  });
+  html += '</div>';
 
-  // Week navigator — only valid delivery weeks
+  // ── Ukenavigator ──
   const validWeeks = getValidDeliveryWeeks(bt, kasseViewYear);
-  if (!validWeeks.length) {
-    html += '<p style="color:var(--text-muted);font-size:13px;padding:10px 0">Ingen leveringsuker definert. Sett ukeplan i ⚙ Oppsett.</p>';
-    el.innerHTML = html; return;
-  }
-  if (!validWeeks.includes(kasseViewWeek)) kasseViewWeek = validWeeks[0];
-  const _vIdx = validWeeks.indexOf(kasseViewWeek);
-  const _prevW = _vIdx > 0 ? validWeeks[_vIdx-1] : null;
-  const _nextW = _vIdx < validWeeks.length-1 ? validWeeks[_vIdx+1] : null;
-  const _rl = "document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content')";
+  const noSchedule = validWeeks.length === 0;
+  // If no schedule defined, use all 52 weeks so the tab is always accessible
+  const displayWeeks = noSchedule
+    ? Array.from({length: 52}, (_, i) => i + 1)
+    : validWeeks;
+  if (!displayWeeks.includes(kasseViewWeek)) { kasseViewWeek = displayWeeks.includes(getCurrentWeek()) ? getCurrentWeek() : displayWeeks[0]; saveKassePrefs(); }
+  const vIdx = displayWeeks.indexOf(kasseViewWeek);
+  const prevW = vIdx > 0 ? displayWeeks[vIdx - 1] : null;
+  const nextW = vIdx < displayWeeks.length - 1 ? displayWeeks[vIdx + 1] : null;
+  const RL = "document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content')";
+  const isCurrentWeek = kasseViewWeek === getCurrentWeek() && kasseViewYear === getCurrentYear();
 
-  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
-    + '<button '+(_prevW?'onclick="kasseViewWeek='+_prevW+';renderLevKasse('+_rl+')"':'disabled')
-    + ' style="padding:4px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;opacity:'+(_prevW?1:0.3)+'">‹</button>'
-    + '<div style="flex:1;text-align:center;font-size:14px;color:var(--text-head)">Uke '+kasseViewWeek+' · '+kasseViewYear+' ('+(_vIdx+1)+'/'+validWeeks.length+')</div>'
-    + '<button '+(_nextW?'onclick="kasseViewWeek='+_nextW+';renderLevKasse('+_rl+')"':'disabled')
-    + ' style="padding:4px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;opacity:'+(_nextW?1:0.3)+'">›</button>'
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
+    + '<button ' + (prevW ? 'onclick="kasseNavWeek(' + prevW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (prevW ? 1 : 0.25) + '">‹</button>'
+    + '<div style="flex:1;text-align:center">'
+    + '<div style="font-size:18px;font-weight:600;color:var(--text-head)">Uke ' + kasseViewWeek + '</div>'
+    + '<div style="font-size:11px;color:' + (isCurrentWeek ? 'var(--accent-soft)' : 'var(--text-muted)') + ';margin-top:1px">' + (isCurrentWeek ? '● Denne uken' : kasseViewYear + ' · ' + (vIdx + 1) + '/' + displayWeeks.length) + '</div>'
+    + '</div>'
+    + '<button ' + (nextW ? 'onclick="kasseNavWeek(' + nextW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (nextW ? 1 : 0.25) + '">›</button>'
     + '</div>';
 
   const bw = getOrCreateBoxWeek(kasseViewTypeId, kasseViewWeek, kasseViewYear);
 
-  // Count + total
-  const totalBoxes = bw.count || 0;
-  const boxVal = (bw.items||[]).reduce((s,item) => { const cr=crops.find(c=>c.id===item.cropId); return s+calcItemValue(cr,item.qty||0,item.unit); }, 0);
-  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
-    + '<label style="font-size:13px;color:var(--text-muted);white-space:nowrap">Antall kasser:</label>'
-    + '<input type="number" min="0" value="'+totalBoxes+'" oninput="updateBoxWeekCount(\''+bw.id+'\',+this.value)"'
-    + ' style="width:70px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
-    + '<div id="kasse-total-'+bw.id+'" style="flex:1;text-align:right;font-size:13px;color:var(--accent-soft)">kr '+(boxVal*totalBoxes).toFixed(0)+' totalt</div>'
-    + '</div>';
-
-  // Crop grid (collapsible)
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-    + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Innhold denne uken</div>'
-    + '<div style="display:flex;gap:4px;align-items:center">';
-  if (bt.baseItems && bt.baseItems.length) {
-    html += '<button onclick="importBaseItems(\''+bw.id+'\')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">↓ Basis</button>';
+  // Soft notice if no delivery schedule set
+  if (noSchedule) {
+    html += '<div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:10px;padding:10px 12px;font-size:12px;color:#fbbf24;margin-bottom:14px">Ingen leveringsplan satt for denne kassetypen. Gå til ⚙ Oppsett for å definere uker og frekvens.</div>';
   }
-  html += '<button onclick="openDuplicateWeek(\''+bt.id+'\','+kasseViewWeek+','+kasseViewYear+')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">⧉ Kopier</button>'
-    + '<button id="kasse-grid-toggle" onclick="toggleKasseGrid()" style="padding:4px 8px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;line-height:1">▲</button>'
-    + '</div></div>';
-  const selIds = new Set((bw.items||[]).map(i=>i.cropId));
-  html += '<div id="kasse-crop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:14px">';
-  crops.forEach(cr => {
-    const sel = selIds.has(cr.id);
-    html += '<button onclick="toggleKasseCrop(\''+bw.id+'\','+cr.id+')" data-cropid="'+cr.id+'"'
-      + ' style="padding:8px 4px;border-radius:10px;border:2px solid '+(sel?'var(--accent)':'var(--border)')
-      + ';background:'+(sel?'var(--accent-bg)':'transparent')
-      + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px'
-      + ';color:'+(sel?'var(--accent-soft)':'var(--text-muted)')+';font-family:inherit">'
-      + '<span style="font-size:22px">'+cr.emoji+'</span>'
-      + '<span style="font-size:10px;text-align:center;line-height:1.2">'+(cr.family||cr.name)+'</span>'
-      + '</button>';
-  });
-  html += '</div>';
 
-  // Item amounts + totals
-  if ((bw.items||[]).length) {
-    html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Mengde per kasse</div>';
-    (bw.items||[]).forEach((item,ii) => {
-      const cr = crops.find(c=>c.id==item.cropId);
-      if (!cr) return;
-      const perKasse = calcItemValue(cr,item.qty||0,item.unit);
-      const totalNeeded = (item.qty||0) * totalBoxes;
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'
-        + '<span style="font-size:18px">'+cr.emoji+'</span>'
-        + '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)">'+(cr.family||cr.name)+'</div>'
-        + '<div id="kasse-need-'+bw.id+'-'+ii+'" style="font-size:11px;color:var(--text-muted)">Totalt: '+(totalBoxes?totalNeeded+' '+item.unit:'–')+'</div></div>'
-        + '<input type="number" min="0" step="1" value="'+(item.qty||'')+'" placeholder="Mengde"'
-        + ' oninput="updateKasseItem(\''+bw.id+'\','+ii+',\'qty\',+this.value)"'
-        + ' style="width:65px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
-        + '<select onchange="updateKasseItem(\''+bw.id+'\','+ii+',\'unit\',this.value)"'
-        + ' style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
-        + ['stk','kg','bunt','boks'].map(u=>'<option value="'+u+'"'+(item.unit===u?' selected':'')+'>'+u+'</option>').join('')
-        + '</select>'
-        + '<span id="kasse-price-'+bw.id+'-'+ii+'" style="font-size:11px;color:var(--accent-soft);min-width:40px;text-align:right">kr '+perKasse.toFixed(0)+'</span>'
-        + '<button onclick="removeKasseItem(\''+bw.id+'\','+ii+')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px">×</button>'
-        + '</div>';
+  // ════════════════════════════════
+  // PLAN-MODUS
+  // ════════════════════════════════
+  if (kasseModus === 'plan') {
+    // ── Antall kasser: kunder-panel knapp ──
+    if (!bw.customerWeek) bw.customerWeek = {};
+    if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
+    const btCustomersForPlan = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
+    const activeCustomers = btCustomersForPlan.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const totalKasser = activeCustomers.length + (bw.extraBoxes || 0);
+    const boxVal2 = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
+    html += '<button data-bwid="' + bw.id + '" onclick="openKassekundePanel(this.dataset.bwid)" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px;cursor:pointer;text-align:left;font-family:inherit">'
+      + '<div style="display:flex;align-items:center;gap:12px">'
+      + '<div style="font-size:22px">📦</div>'
+      + '<div>'
+      + '<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px">Antall kasser</div>'
+      + '<div style="display:flex;align-items:baseline;gap:6px">'
+      + '<div style="font-size:26px;font-weight:300;color:var(--text-head);line-height:1">' + totalKasser + '</div>'
+      + '<div style="font-size:12px;color:var(--text-muted)">'
+      + (activeCustomers.length ? activeCustomers.length + ' kunde' + (activeCustomers.length !== 1 ? 'r' : '') : 'ingen kunder')
+      + (bw.extraBoxes ? ' + ' + bw.extraBoxes + ' ekstra' : '')
+      + '</div></div></div></div>'
+      + '<div style="text-align:right">'
+      + '<div style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + (boxVal2 * totalKasser).toFixed(0) + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">totalt</div>'
+      + '</div></button>';
+
+    // Vekst-innhold header
+    const selCount = (bw.items||[]).length;
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Innhold i kassen</div>'
+      + '<div style="display:flex;gap:6px">';
+    if (bt.baseItems && bt.baseItems.length) {
+      html += '<button onclick="importBaseItems(\'' + bw.id + '\')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">↓ Basis</button>';
+    }
+    html += '<button onclick="openDuplicateWeek(\'' + bt.id + '\',' + kasseViewWeek + ',' + kasseViewYear + ')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">⧉ Kopier</button>';
+    html += '</div></div>';
+
+    // Vekst-grid (toggle)
+    const selIds = new Set((bw.items||[]).map(i => i.cropId));
+    html += '<div id="kasse-crop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:16px">';
+    crops.forEach(cr => {
+      const sel = selIds.has(cr.id);
+      html += '<button onclick="toggleKasseCrop(\'' + bw.id + '\',' + cr.id + ')" data-cropid="' + cr.id + '"'
+        + ' style="padding:8px 4px;border-radius:10px;'
+        + 'border:2px solid ' + (sel ? 'var(--accent)' : 'var(--border)') + ';'
+        + 'background:' + (sel ? 'var(--accent-bg)' : 'transparent') + ';'
+        + 'cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;'
+        + 'color:' + (sel ? 'var(--accent-soft)' : 'var(--text-muted)') + ';font-family:inherit">'
+        + '<span style="font-size:22px">' + cr.emoji + '</span>'
+        + '<span style="font-size:10px;text-align:center;line-height:1.2">' + (cr.family || cr.name) + '</span>'
+        + '</button>';
     });
+    html += '</div>';
 
-    // Auto-harvest button
-    html += '<button onclick="openKasseChecklist(&quot;'+bw.id+'&quot;)" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">☑ Sjekkliste for uke '+kasseViewWeek+'</button>';
-    html += '<button id="kasse-harvest-btn-'+bw.id+'" onclick="autoHarvestBoxWeek(\'' + bw.id + '\')" style="width:100%;margin-top:12px;padding:10px;border-radius:10px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:13px;font-family:inherit">✓ Logg '+totalBoxes+' kasser som høstet</button>';
+    // Mengde per vekst
+    if ((bw.items||[]).length) {
+      html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Mengde per kasse</div>';
+      (bw.items||[]).forEach((item, ii) => {
+        const cr = crops.find(c => c.id == item.cropId);
+        if (!cr) return;
+        const perKasse = calcItemValue(cr, item.qty||0, item.unit);
+        const totalNeeded = (item.qty||0) * (bw.count||0);
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">'
+          + '<span style="font-size:20px">' + cr.emoji + '</span>'
+          + '<div style="flex:1">'
+          + '<div style="font-size:13px;color:var(--text-head)">' + (cr.family||cr.name) + '</div>'
+          + '<div id="kasse-need-' + bw.id + '-' + ii + '" style="font-size:11px;color:var(--text-muted)">Totalt: ' + (bw.count ? totalNeeded + ' ' + item.unit : '–') + '</div>'
+          + '</div>'
+          + '<input type="number" min="0" step="1" value="' + (item.qty||'') + '" placeholder="0"'
+          + ' oninput="updateKasseItem(\'' + bw.id + '\',' + ii + ',\'qty\',+this.value)"'
+          + ' style="width:60px;padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;text-align:center">'
+          + '<select onchange="updateKasseItem(\'' + bw.id + '\',' + ii + ',\'unit\',this.value)"'
+          + ' style="padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+          + ['stk','kg','bunt','boks'].map(u => '<option value="' + u + '"' + (item.unit===u?' selected':'') + '>' + u + '</option>').join('')
+          + '</select>'
+          + '<button onclick="removeKasseItem(\'' + bw.id + '\',' + ii + ')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:2px;line-height:1">×</button>'
+          + '</div>';
+      });
+
+      // Sett som basis-knapp
+
+    }
+
+  // ════════════════════════════════
+  // PLUKK-MODUS
+  // ════════════════════════════════
+  } else if (isPlukk) {
+    if (!bw.customerWeek) bw.customerWeek = {};
+    if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
+    const btCuPlukk = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
+    const activeCuPlukk = btCuPlukk.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const totalBoxes = activeCuPlukk.length + (bw.extraBoxes || 0);
+    const items = bw.items || [];
+    if (!bw.checklist) bw.checklist = {};
+    const doneCount = items.filter((_, ii) => bw.checklist[ii]).length;
+    const allDone = items.length > 0 && doneCount === items.length;
+
+    // Hero: antall kasser + fremgang
+    const pct = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0;
+    const accentColor = allDone ? '#34d399' : 'var(--accent-soft)';
+
+    html += '<div style="background:var(--bg-card);border:1px solid ' + (allDone ? 'rgba(52,211,153,0.4)' : 'var(--border)') + ';border-radius:16px;padding:16px 18px;margin-bottom:20px">';
+
+    // Kasse-teller
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+      + '<div>'
+      + '<div style="font-size:32px;font-weight:300;color:' + accentColor + ';line-height:1">' + totalBoxes + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">kasse' + (totalBoxes !== 1 ? 'r' : '') + ' denne uken</div>'
+      + '</div>'
+      + '<div style="text-align:right">'
+      + '<div style="font-size:20px;font-weight:300;color:' + accentColor + '">' + doneCount + '<span style="font-size:14px;color:var(--text-muted)">/' + items.length + '</span></div>'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">vekster klare</div>'
+      + '</div>'
+      + '</div>';
+
+    // Fremgangsbar
+    html += '<div style="height:6px;border-radius:3px;background:' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') + ';overflow:hidden">'
+      + '<div style="height:100%;border-radius:3px;background:' + (allDone ? '#34d399' : 'var(--accent)') + ';width:' + pct + '%;transition:width 0.3s"></div>'
+      + '</div>';
+
+    html += '</div>';
+
+    if (!items.length) {
+      html += '<div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px">'
+        + 'Ingen vekster lagt til i Plan-modus ennå.<br>'
+        + '<button onclick="kasseSwitchModus(\'plan\')" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Gå til Plan</button>'
+        + '</div>';
+    } else {
+      // Sjekkliste – store touch-targets
+      items.forEach((item, ii) => {
+        const cr = crops.find(c => c.id === item.cropId);
+        if (!cr) return;
+        const done = !!bw.checklist[ii];
+        const tot = (item.qty || 0) * totalBoxes;
+        html += '<div onclick="kassePakkCheck(\'' + bw.id + '\',' + ii + ',this)" data-done="' + done + '"'
+          + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
+          + 'background:' + (done ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)') + ';'
+          + 'border:2px solid ' + (done ? (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') : 'var(--border)') + ';'
+          + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
+          + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
+          + 'background:' + (done ? 'var(--accent)' : 'transparent') + ';'
+          + 'border:2px solid ' + (done ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)')) + ';'
+          + 'color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
+          + (done ? '✓' : '') + '</div>'
+          + '<span style="font-size:28px;flex-shrink:0;' + (done ? 'opacity:0.4' : '') + '">' + cr.emoji + '</span>'
+          + '<div style="flex:1;' + (done ? 'opacity:0.45' : '') + '">'
+          + '<div style="font-size:16px;color:var(--text-head);' + (done ? 'text-decoration:line-through' : '') + '">' + (cr.family||cr.name) + '</div>'
+          + '<div style="font-size:13px;color:var(--text-muted);margin-top:2px">'
+          + (tot ? tot + ' ' + item.unit + ' totalt' : item.qty + ' ' + item.unit + ' per kasse')
+          + (item.qty && totalBoxes > 1 ? ' <span style="color:var(--text-dim)">(' + item.qty + ' × ' + totalBoxes + ')</span>' : '')
+          + '</div>'
+          + '</div>'
+          + '</div>';
+      });
+
+      // Logg-knapp
+      if (allDone) {
+        html += '<button onclick="autoHarvestBoxWeek(\'' + bw.id + '\')" style="width:100%;margin-top:8px;padding:16px;border-radius:14px;border:none;background:var(--accent);color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';cursor:pointer;font-size:15px;font-family:inherit;font-weight:600">✓ Logg ' + totalBoxes + ' kasser som høstet</button>';
+      } else {
+        html += '<button onclick="autoHarvestBoxWeek(\'' + bw.id + '\')" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
+      }
+    }
+  } else if (isLevering) {
+    // ════════════════════════════════
+    // LEVERING-MODUS
+    // ════════════════════════════════
+    if (!bw.customerWeek) bw.customerWeek = {};
+    if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
+    const btCuLev = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
+    const activeCuLev = btCuLev.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const totalBoxes = activeCuLev.length + (bw.extraBoxes || 0);
+    const isLight2 = isLight;
+
+    // Find customers using this box type
+    html += '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">'
+      + totalBoxes + ' kasser · Uke ' + kasseViewWeek
+      + '</div>';
+
+    if (!activeCuLev.length) {
+      html += '<div style="text-align:center;padding:30px 16px;color:var(--text-muted);font-size:13px">'
+        + 'Ingen aktive kunder denne uken for <strong style="color:var(--text-head)">' + bt.name + '</strong>.<br>'
+        + '<button onclick="openKasseOppsett()" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">⚙ Oppsett → kunder</button>'
+        + '</div>';
+    } else {
+      // Init delivery checklist for this week
+      if (!bw.deliveryCheck) bw.deliveryCheck = {};
+      const doneCount = activeCuLev.filter(cu => bw.deliveryCheck[cu.id || cu.name]).length;
+      const allDelivered = doneCount === activeCuLev.length;
+
+      // Progress
+      const pct = activeCuLev.length ? Math.round((doneCount / activeCuLev.length) * 100) : 100;
+      html += '<div style="background:var(--bg-card);border:1px solid ' + (allDelivered ? 'rgba(52,211,153,0.4)' : 'var(--border)') + ';border-radius:16px;padding:14px 16px;margin-bottom:20px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+        + '<div>'
+        + '<div style="font-size:28px;font-weight:300;color:' + (allDelivered ? '#34d399' : 'var(--accent-soft)') + ';line-height:1">' + doneCount + '<span style="font-size:16px;color:var(--text-muted)">/' + activeCuLev.length + '</span></div>'
+        + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">levert</div>'
+        + '</div>'
+        + (allDelivered ? '<div style="font-size:22px">🎉</div>' : '<div style="font-size:13px;color:var(--text-muted)">' + (activeCuLev.length - doneCount) + ' gjenstår</div>')
+        + '</div>'
+        + '<div style="height:6px;border-radius:3px;background:' + (isLight2 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') + ';overflow:hidden">'
+        + '<div style="height:100%;border-radius:3px;background:' + (allDelivered ? '#34d399' : 'var(--accent)') + ';width:' + pct + '%;transition:width 0.3s"></div>'
+        + '</div>'
+        + '</div>';
+
+      // Customer list — use data attributes + event delegation to avoid quoting issues
+      activeCuLev.forEach((cu, cuIdx) => {
+        const delivered = !!bw.deliveryCheck[cu.id || cu.name];
+        const bg = delivered ? (isLight2 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
+        const bd = delivered ? (isLight2 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') : 'var(--border)';
+        const cbBg = delivered ? 'var(--accent)' : 'transparent';
+        const cbBd = delivered ? 'var(--accent)' : (isLight2 ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)');
+        html += '<div data-lev-bwid="' + bw.id + '" data-lev-idx="' + cuIdx + '" onclick="kasseLeveringCheckByIdx(this)"'
+          + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
+          + 'background:' + bg + ';border:2px solid ' + bd + ';'
+          + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;'
+          + 'transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
+          + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
+          + 'background:' + cbBg + ';border:2px solid ' + cbBd + ';'
+          + 'color:' + (isLight2 ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
+          + (delivered ? '✓' : '') + '</div>'
+          + '<div style="width:36px;height:36px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;' + (delivered ? 'opacity:0.4' : '') + '">👤</div>'
+          + '<div style="flex:1;' + (delivered ? 'opacity:0.45' : '') + '">'
+          + '<div style="font-size:16px;color:var(--text-head);' + (delivered ? 'text-decoration:line-through' : '') + '">' + cu.name + '</div>'
+          + (cu.phone ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + cu.phone + '</div>' : '')
+          + '</div>'
+          + (delivered ? '<div style="font-size:12px;color:var(--accent-soft);flex-shrink:0">Levert ✓</div>' : '')
+          + '</div>';
+      });
+
+      if (allDelivered) {
+        html += '<div style="text-align:center;padding:16px 0;font-size:13px;color:var(--accent-soft)">Alle kasser levert denne uken! 🌿</div>';
+      }
+    }
   }
 
   el.innerHTML = html;
 }
 
+function openKassekundePanel(bwId) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  if (!bw.customerWeek) bw.customerWeek = {};
+  if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
+  const isLight = document.body.classList.contains('light');
+  const btCustomers = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+
+  const existing = document.getElementById('kassekunde-panel');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.id = 'kassekunde-panel';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
+
+  function renderPanel() {
+    if (!bw.customerWeek) bw.customerWeek = {};
+    const activeCu = btCustomers.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const total = activeCu.length + (bw.extraBoxes || 0);
+
+    let html = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:600px;max-height:80vh;overflow-y:auto">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+      + '<div style="font-size:15px;color:var(--accent-soft)">📦 Kasser uke ' + bw.week + '</div>'
+      + '<div style="display:flex;align-items:center;gap:10px">'
+      + '<div style="font-size:22px;font-weight:300;color:var(--text-head)">' + total + ' <span style="font-size:13px;color:var(--text-muted)">kasser</span></div>'
+      + '<button onclick="document.getElementById(\'kassekunde-panel\').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1">×</button>'
+      + '</div></div>';
+
+    if (!btCustomers.length) {
+      html += '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">Ingen kunder koblet til denne kassetypen.<br>Gå til ⚙ Oppsett for å legge til kunder.</p>';
+    } else {
+      html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Kunder denne uken</div>';
+      btCustomers.forEach((cu) => {
+        const cuKey = cu.id || cu.name;
+        const active = bw.customerWeek[cuKey] !== false;
+        html += '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">'
+          + '<div data-kk-bwid="' + bwId + '" data-kk-cukey="' + String(cuKey).replace(/"/g, '&quot;') + '" onclick="toggleKassekundePlan(this)"'
+          + ' style="width:24px;height:24px;border-radius:6px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;'
+          + 'background:' + (active ? 'var(--accent)' : 'transparent') + ';'
+          + 'border:2px solid ' + (active ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)')) + ';'
+          + 'color:' + (isLight ? '#1c1410' : '#0d1a0e') + '">'
+          + (active ? '✓' : '') + '</div>'
+          + '<div style="flex:1;' + (active ? '' : 'opacity:0.45') + '">'
+          + '<div style="font-size:14px;color:var(--text-head);' + (active ? '' : 'text-decoration:line-through') + '">' + cu.name + '</div>'
+          + (cu.phone ? '<div style="font-size:12px;color:var(--text-muted)">' + cu.phone + '</div>' : '')
+          + '</div>'
+          + '<div style="font-size:12px;color:' + (active ? 'var(--accent-soft)' : 'var(--text-muted)') + '">' + (active ? 'Aktiv' : 'Hopper over') + '</div>'
+          + '</div>';
+      });
+    }
+
+    // Ekstra kasser
+    html += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Ekstra kasser (uspesifiserte)</div>'
+      + '<div style="display:flex;align-items:center;gap:10px">'
+      + '<button data-kk-bwid="' + bwId + '" onclick="adjustExtraBoxes(this.dataset.kkBwid,-1)" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-head);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">−</button>'
+      + '<div id="extra-boxes-disp-' + bwId + '" style="font-size:22px;font-weight:300;color:var(--text-head);min-width:30px;text-align:center">' + (bw.extraBoxes || 0) + '</div>'
+      + '<button data-kk-bwid="' + bwId + '" onclick="adjustExtraBoxes(this.dataset.kkBwid,1)" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-head);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">+</button>'
+      + '<div style="font-size:13px;color:var(--text-muted);margin-left:4px">ekstra kasse' + ((bw.extraBoxes||0) !== 1 ? 'r' : '') + '</div>'
+      + '</div></div>';
+
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
+  panel._renderPanel = renderPanel;
+  renderPanel();
+  document.body.appendChild(panel);
+  panel.addEventListener('click', e => { if (e.target === panel) panel.remove(); });
+}
+
+function toggleKassekundePlan(el) {
+  const bwId = el.dataset.kkBwid;
+  const cuKey = el.dataset.kkCukey;
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  if (!bw.customerWeek) bw.customerWeek = {};
+  bw.customerWeek[cuKey] = bw.customerWeek[cuKey] === false ? undefined : false;
+  if (bw.customerWeek[cuKey] === undefined) delete bw.customerWeek[cuKey];
+  saveLevering();
+  const panel = document.getElementById('kassekunde-panel');
+  if (panel?._renderPanel) panel._renderPanel();
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderLevKasse(cont);
+}
+
+function adjustExtraBoxes(bwId, delta) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  bw.extraBoxes = Math.max(0, (bw.extraBoxes || 0) + delta);
+  saveLevering();
+  const disp = document.getElementById('extra-boxes-disp-' + bwId);
+  if (disp) disp.textContent = bw.extraBoxes;
+  const panel = document.getElementById('kassekunde-panel');
+  if (panel?._renderPanel) panel._renderPanel();
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderLevKasse(cont);
+}
+
+function kasseSetType(typeId) {
+  kasseViewTypeId = typeId;
+  saveKassePrefs();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function kasseSwitchModus(m) {
+  kasseModus = m;
+  saveKassePrefs();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function kasseNavWeek(week, year) {
+  kasseViewWeek = week;
+  kasseViewYear = year;
+  saveKassePrefs();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function kasseDeltaCount(bwId, delta) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  bw.count = Math.max(0, (bw.count || 0) + delta);
+  saveLevering();
+  // Update display without full re-render
+  const disp = document.getElementById('kasse-count-disp-' + bwId);
+  if (disp) disp.textContent = bw.count;
+  const inp = document.getElementById('kasse-count-input-' + bwId);
+  if (inp) inp.value = bw.count;
+  const totalEl = document.getElementById('kasse-total-' + bwId);
+  if (totalEl) {
+    const bv = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
+    totalEl.innerHTML = '<div style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + (bv * bw.count).toFixed(0) + '</div><div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">totalt</div>';
+  }
+  (bw.items||[]).forEach((item, ii) => {
+    const el = document.getElementById('kasse-need-' + bwId + '-' + ii);
+    if (el) el.textContent = 'Totalt: ' + (bw.count ? (item.qty||0)*bw.count+' '+item.unit : '–');
+  });
+}
+
+function kassePakkCheck(bwId, ii, rowEl) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  if (!bw.checklist) bw.checklist = {};
+  bw.checklist[ii] = !bw.checklist[ii];
+  saveLevering();
+  // Re-render for accuracy
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function kasseLeveringCheckByIdx(el) {
+  const bwId = el.dataset.levBwid;
+  const cuIdx = +el.dataset.levIdx;
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  const bt = boxTypes.find(t => t.id == bw.boxTypeId);
+  if (!bt) return;
+  const btCustomers = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const cu = btCustomers[cuIdx];
+  if (!cu) return;
+  const cuKey = cu.id || cu.name;
+  if (!bw.deliveryCheck) bw.deliveryCheck = {};
+  bw.deliveryCheck[cuKey] = !bw.deliveryCheck[cuKey];
+  saveLevering();
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderLevKasse(cont);
+}
+
+function kasseLeveringCheck(bwId, cuKey) {
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bw) return;
+  if (!bw.deliveryCheck) bw.deliveryCheck = {};
+  bw.deliveryCheck[cuKey] = !bw.deliveryCheck[cuKey];
+  saveLevering();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function saveAsBaseItems(btId, bwId) {
+  const bt = boxTypes.find(t => t.id == btId);
+  const bw = boxWeeks.find(b => b.id == bwId);
+  if (!bt || !bw) return;
+  if (!confirm('Lagre innholdet i uke ' + bw.week + ' som basis for ' + bt.name + '?')) return;
+  snapshotLev();
+  bt.baseItems = JSON.parse(JSON.stringify(bw.items || []));
+  saveLevering();
+  showSyncToast('✓ Lagret som basis');
+}
+
 function updateBoxWeekCount(bwId, val) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw) return;
-  bw.count = +val;
+  bw.count = Math.max(0, +val || 0);
   saveLevering();
-  const boxVal = (bw.items||[]).reduce((s,item) => {
-    const cr = crops.find(c => c.id === item.cropId);
-    return s + calcItemValue(cr, item.qty||0, item.unit);
-  }, 0);
-  const totalEl = document.getElementById('kasse-total-'+bwId);
-  if (totalEl) totalEl.textContent = 'kr ' + (boxVal * bw.count).toFixed(0) + ' totalt';
-  const hBtn = document.getElementById('kasse-harvest-btn-'+bwId);
-  if (hBtn) hBtn.textContent = '\u2713 Logg ' + bw.count + ' kasser som h\u00f8stet';
-  (bw.items||[]).forEach((item, ii) => {
-    const el = document.getElementById('kasse-need-'+bwId+'-'+ii);
-    if (el) el.textContent = 'Totalt: ' + (bw.count ? (item.qty||0)*bw.count+' '+item.unit : '\u2013');
-  });
+  kasseDeltaCount(bwId, 0); // refresh displays
 }
 
 function updateKasseItem(bwId, idx, field, val) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw?.items?.[idx]) return;
-  bw.items[idx][field] = field==='qty' ? +val : val;
+  bw.items[idx][field] = field === 'qty' ? +val : val;
   saveLevering();
-  // Update price display inline
+  // Update totals
   const item = bw.items[idx];
   const cr = crops.find(c => c.id == item.cropId);
-  const priceEl = document.getElementById('kasse-price-'+bwId+'-'+idx);
-  if (priceEl && cr) priceEl.textContent = 'kr ' + calcItemValue(cr, item.qty||0, item.unit).toFixed(0);
-  // Update total
-  const boxVal = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id==it.cropId), it.qty||0, it.unit), 0);
-  const totalEl = document.getElementById('kasse-total-'+bwId);
-  if (totalEl) totalEl.textContent = 'kr ' + (boxVal * (bw.count||0)).toFixed(0) + ' totalt';
+  const needEl = document.getElementById('kasse-need-' + bwId + '-' + idx);
+  if (needEl) needEl.textContent = 'Totalt: ' + (bw.count ? (item.qty||0)*bw.count+' '+item.unit : '–');
+  const totalEl = document.getElementById('kasse-total-' + bwId);
+  if (totalEl) {
+    const bv = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
+    totalEl.innerHTML = '<div style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + (bv * (bw.count||0)).toFixed(0) + '</div><div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">totalt</div>';
+  }
 }
 
 function removeKasseItem(bwId, idx) {
@@ -5928,7 +6411,7 @@ function removeKasseItem(bwId, idx) {
   snapshotLev();
   bw.items.splice(idx, 1);
   saveLevering();
-  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
   if (el) renderLevKasse(el);
 }
 
@@ -5938,16 +6421,9 @@ function toggleKasseCrop(bwId, cropId) {
   snapshotLev();
   const idx = bw.items.findIndex(i => i.cropId == +cropId);
   if (idx >= 0) bw.items.splice(idx, 1);
-  else bw.items.push({cropId: +cropId, qty: 0, unit: 'kg'});
+  else bw.items.push({cropId: +cropId, qty: 1, unit: 'stk'});
   saveLevering();
-  const btn = document.querySelector('[data-cropid="'+cropId+'"]');
-  const sel = bw.items.some(i => i.cropId == +cropId);
-  if (btn) {
-    btn.style.borderColor = sel ? 'var(--accent)' : 'var(--border)';
-    btn.style.background  = sel ? 'var(--accent-bg)' : 'transparent';
-    btn.style.color       = sel ? 'var(--accent-soft)' : 'var(--text-muted)';
-  }
-  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
   if (el) renderLevKasse(el);
 }
 
@@ -5959,19 +6435,19 @@ function importBaseItems(bwId) {
   snapshotLev();
   bw.items = JSON.parse(JSON.stringify(bt.baseItems));
   saveLevering();
-  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
   if (el) renderLevKasse(el);
 }
 
 function openDuplicateWeek(boxTypeId, currentWeek, currentYear) {
   const others = boxWeeks.filter(b => b.boxTypeId==boxTypeId && !(b.week==currentWeek && b.year==currentYear) && b.items && b.items.length);
-  if (!others.length) { alert('Ingen tidligere uker \u00e5 kopiere fra.'); return; }
+  if (!others.length) { showSyncToast('Ingen tidligere uker å kopiere fra'); return; }
   const modal = document.createElement('div');
   modal.id = 'dup-week-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:center;justify-content:center;padding:20px';
   let html = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:16px;padding:20px;max-width:360px;width:100%"><div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Kopier fra uke</div>';
   [...others].sort((a,b) => b.year-a.year||b.week-a.week).forEach(bw => {
-    html += '<button onclick="doDuplicateWeek(\'' + bw.id + '\',' + boxTypeId + ',' + currentWeek + ',' + currentYear + ')" style="display:block;width:100%;padding:10px 12px;margin-bottom:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">Uke ' + bw.week + ' \u00b7 ' + bw.year + ' (' + bw.items.length + ' vekster)</button>';
+    html += '<button onclick="doDuplicateWeek(\'' + bw.id + '\',' + boxTypeId + ',' + currentWeek + ',' + currentYear + ')" style="display:block;width:100%;padding:10px 12px;margin-bottom:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">Uke ' + bw.week + ' · ' + bw.year + ' (' + bw.items.length + ' vekster)</button>';
   });
   html += '<button onclick="document.getElementById(\'dup-week-modal\').remove()" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">Avbryt</button></div>';
   modal.innerHTML = html;
@@ -5995,98 +6471,29 @@ function doDuplicateWeek(sourceBwId, boxTypeId, targetWeek, targetYear) {
   if (el) renderLevKasse(el);
 }
 
-function toggleKasseGrid() {
-  const grid = document.getElementById('kasse-crop-grid');
-  const btn = document.getElementById('kasse-grid-toggle');
-  if (!grid) return;
-  const hiding = grid.style.display !== 'none';
-  grid.style.display = hiding ? 'none' : 'grid';
-  if (btn) btn.textContent = hiding ? '▼' : '▲';
-}
-
-function openKasseChecklist(bwId) {
-  const bw = boxWeeks.find(b => b.id == bwId);
-  if (!bw || !bw.items || !bw.items.length) { alert('Ingen vekster i kassen denne uken.'); return; }
-  if (!bw.checklist) bw.checklist = {};
-  const bt = boxTypes.find(t => t.id == bw.boxTypeId);
-  const totalBoxes = bw.count || 0;
-
-  const existing = document.getElementById('kasse-checklist-modal');
-  if (existing) existing.remove();
-
-  const modal = document.createElement('div');
-  modal.id = 'kasse-checklist-modal';
-  modal.style.cssText = 'position:fixed;top:var(--header-h,0px);left:0;right:0;bottom:0;background:var(--bg-main);z-index:5999;display:flex;flex-direction:column;overflow:hidden';
-
-  function renderCL() {
-    const doneCount = bw.items.filter((_, ii) => bw.checklist[ii]).length;
-    let h = '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
-      + '<button onclick="closeKasseChecklist()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
-      + '<div style="flex:1">'
-      + '<div style="font-size:15px;color:var(--text-head)">' + (bt ? bt.name : 'Kasse') + ' · Uke ' + bw.week + '</div>'
-      + '<div style="font-size:12px;color:var(--text-muted)">' + totalBoxes + ' kasser · ' + doneCount + '/' + bw.items.length + ' klare</div>'
-      + '</div></div>'
-      + '<div style="flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch">';
-    bw.items.forEach((item, ii) => {
-      const cr = crops.find(c => c.id === item.cropId);
-      if (!cr) return;
-      const done = !!bw.checklist[ii];
-      const tot = (item.qty || 0) * totalBoxes;
-      const boxColor = done ? 'var(--accent)' : 'var(--border)';
-      const boxBg = done ? 'var(--accent)' : 'transparent';
-      h += '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">'
-        + '<div data-bwid="' + bwId + '" data-ii="' + ii + '" onclick="doKasseCheck(this)" style="width:26px;height:26px;border-radius:7px;border:2px solid ' + boxColor + ';background:' + boxBg + ';cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--bg-main);flex-shrink:0">' + (done ? '✓' : '') + '</div>'
-        + '<span style="font-size:22px;flex-shrink:0">' + cr.emoji + '</span>'
-        + '<div style="flex:1">'
-        + '<div style="font-size:14px;color:var(--text-head);' + (done ? 'text-decoration:line-through;opacity:0.5' : '') + '">' + (cr.family || cr.name) + '</div>'
-        + '<div style="font-size:12px;color:var(--text-muted)">' + tot + ' ' + item.unit + (totalBoxes ? ' · ' + item.qty + ' × ' + totalBoxes : '') + '</div>'
-        + '</div></div>';
-    });
-    h += '</div>';
-    modal.innerHTML = h;
-  }
-  modal._renderCL = renderCL;
-  renderCL();
-  document.body.appendChild(modal);
-}
-
-function closeKasseChecklist() {
-  document.getElementById('kasse-checklist-modal')?.remove();
-}
-
-function doKasseCheck(el) {
-  const bwId = el.dataset.bwid;
-  const ii = +el.dataset.ii;
-  const bw = boxWeeks.find(b => b.id == bwId);
-  if (!bw) return;
-  if (!bw.checklist) bw.checklist = {};
-  bw.checklist[ii] = !bw.checklist[ii];
-  saveLevering();
-  const modal = document.getElementById('kasse-checklist-modal');
-  if (modal && modal._renderCL) modal._renderCL();
-}
-
-
 function autoHarvestBoxWeek(bwId) {
   const bw = boxWeeks.find(b=>b.id==bwId);
-  if (!bw || !bw.count || !bw.items?.length) { alert('Sett antall kasser og legg til vekster først.'); return; }
+  if (!bw || !bw.items?.length) { showSyncToast('Legg til vekster først'); return; }
+  if (!bw.customerWeek) bw.customerWeek = {};
+  if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
+  const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+  const activeCu = btCu.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+  const totalCount = activeCu.length + (bw.extraBoxes || 0);
+  if (!totalCount) { showSyncToast('Ingen aktive kasser denne uken'); return; }
   snapshotLev();
   const today = new Date().toISOString().split('T')[0];
   const bt = boxTypes.find(t=>t.id==bw.boxTypeId);
   bw.items.forEach(item => {
     if (!item.qty) return;
-    harvestLog.unshift({id:Date.now()+Math.random(), date:today,
-      cropId:item.cropId, bedId:null,
-      qty: item.qty * bw.count,
-      unit:item.unit,
-      dest:'kasse',
-      note:(bt?.name||'Kasse')+' uke '+bw.week});
+    harvestLog.unshift({id:Date.now()+Math.random(), date:today, cropId:item.cropId, bedId:null,
+      qty: item.qty * totalCount, unit:item.unit, dest:'kasse', note:(bt?.name||'Kasse')+' uke '+bw.week});
   });
+  if (bw.checklist) bw.checklist = {};
   saveLevering();
-  alert('Logget '+bw.count+' kasser til Høstelogg!');
+  showSyncToast('✓ Logget ' + totalCount + ' kasser til Høstelogg');
+  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
 }
-
-
 
 function calcBoxValue(box) {
   return box.reduce((sum, item) => {
@@ -6098,7 +6505,6 @@ function calcBoxValue(box) {
 function calcItemValue(cr, qty, unit) {
   if (!cr || !qty) return 0;
   const pkg = cr.pricePerKg || 0;
-  // pricePerUnit: stored or auto-calc from kg*weightG
   const ppu = cr.pricePerUnit || (pkg && cr.weightG ? +(pkg * cr.weightG / 1000).toFixed(2) : pkg);
   if (unit === 'kg')   return qty * pkg;
   if (unit === 'g')    return (qty / 1000) * pkg;
@@ -6113,26 +6519,23 @@ function openAddBoxItem(editIdx) {
   const modal = document.createElement('div');
   modal.id = 'box-item-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
-      <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">${editIdx!==undefined?'Rediger':'Legg til'} vekst i kasse</div>
-      <select id="bi-crop" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;margin-bottom:10px">
-        ${crops.map(c => `<option value="${c.id}" ${item.cropId===c.id?'selected':''}>${c.emoji} ${c.family||c.name}</option>`).join('')}
+  modal.innerHTML = `<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
+    <select id="bi-crop" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;margin-bottom:10px">
+      ${crops.map(c => `<option value="${c.id}" ${item.cropId===c.id?'selected':''}>${c.emoji} ${c.family||c.name}</option>`).join('')}
+    </select>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <input id="bi-qty" type="number" min="0.1" step="0.1" value="${item.qty}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+      <select id="bi-unit" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <option value="stk" ${item.unit==='stk'?'selected':''}>stk</option>
+        <option value="kg" ${item.unit==='kg'?'selected':''}>kg</option>
+        <option value="g" ${item.unit==='g'?'selected':''}>g</option>
       </select>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-        <label style="font-size:13px;color:var(--text-muted)">Mengde:</label>
-        <input id="bi-qty" type="number" min="0.1" step="0.1" value="${item.qty}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        <select id="bi-unit" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-          <option value="stk" ${item.unit==='stk'?'selected':''}>stk</option>
-          <option value="kg"  ${item.unit==='kg'?'selected':''}>kg</option>
-          <option value="g"   ${item.unit==='g'?'selected':''}>g</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button onclick="document.getElementById('box-item-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
-        <button onclick="saveBoxItem(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
-      </div>
-    </div>`;
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('box-item-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+      <button onclick="saveBoxItem(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
+    </div>
+  </div>`;
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
 }
@@ -6146,410 +6549,544 @@ function saveBoxItem(editIdx) {
   if (!cropId || !qty) return;
   if (editIdx !== undefined) deliveryBox[editIdx] = {cropId, qty, unit};
   else deliveryBox.push({cropId, qty, unit});
-  saveLevering(); document.getElementById('box-item-modal')?.remove(); (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) { leveringTab='hoestlogg'; renderLeveringInto(_rl); }})();
+  saveLevering();
+  document.getElementById('box-item-modal')?.remove();
+  const el = document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
 }
+
 function removeBoxItem(i) {
-  snapshotLev(); deliveryBox.splice(i,1); saveLevering(); const _el2=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_el2) renderLevKasse(_el2); }
+  snapshotLev(); deliveryBox.splice(i,1); saveLevering();
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
 
 // ── Marked ──────────────────────────────────────────────────────
 function renderLevMarked(el) {
+  const isLight = document.body.classList.contains('light');
   const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-  function fmtDate(d) {
-    if (!d) return '';
-    const [day,m,y] = d.split('-');
-    return day + '. ' + (MONTHS[+m-1]||'') + ' ' + y;
-  }
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    + '<div style="font-size:13px;color:var(--text-muted)">' + deliveryMarket.length + ' marked' + (deliveryMarket.length!==1?'er':'') + '</div>'
-    + '<button onclick="openNewMarket()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Nytt marked</button>'
-    + '</div>';
+  function fmtDate(d) { if (!d) return ''; const [day,m,y] = d.split('-'); return (+day) + '. ' + (MONTHS[+m-1]||'') + ' ' + y; }
 
-  const sortedMarkets = [...deliveryMarket].map((m,i)=>({...m,_idx:i})).sort((a,b)=>{
+  // If a specific market is selected, show Plan/Plukk for it
+  if (markedViewIdx !== null && deliveryMarket[markedViewIdx]) {
+    renderMarkedDetail(el, markedViewIdx);
+    return;
+  }
+
+  // ── Market list ──
+  const sorted = [...deliveryMarket].map((m,i) => ({...m, _idx:i})).sort((a,b) => {
     if (!a.date && !b.date) return 0;
     if (!a.date) return 1; if (!b.date) return -1;
-    const da=a.date.split('-').reverse().join('-'), db=b.date.split('-').reverse().join('-');
-    return da.localeCompare(db);
+    return a.date.split('-').reverse().join('-').localeCompare(b.date.split('-').reverse().join('-'));
   });
-  const pastMarkets = sortedMarkets.filter(m=>m.done);
-  const upcomingMarkets = sortedMarkets.filter(m=>!m.done);
-  if (!upcomingMarkets.length && !pastMarkets.length) {
-    html += '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen markeder ennå.</p>';
+  const upcoming = sorted.filter(m => !m.done);
+  const past = sorted.filter(m => m.done);
+
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    + '<div style="font-size:13px;color:var(--text-muted)">' + deliveryMarket.length + ' marked' + (deliveryMarket.length!==1?'er':'') + '</div>'
+    + '<button onclick="openNewMarket()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Nytt marked</button>'
+    + '</div>';
+
+  if (!upcoming.length && !past.length) {
+    html += '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px">🛒<br><br>Ingen markeder ennå.<br>Trykk «+ Nytt marked» for å legge til.</div>';
   } else {
-    if (upcomingMarkets.length) upcomingMarkets.forEach(mkt => { const i = mkt._idx;
+    upcoming.forEach(mkt => {
+      const i = mkt._idx;
       const n = (mkt.items||[]).length;
-      const totalVal = (mkt.items||[]).reduce((s,item) => {
-        const cr = crops.find(c => c.id === item.cropId);
-        return s + calcItemValue(cr, item.planned||0, item.unit);
-      }, 0);
-      html += '<div onclick="openMarketDetail(' + i + ')" data-market-idx="' + i + '" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center">'
+      const totalVal = (mkt.items||[]).reduce((s,item) => s + calcItemValue(crops.find(c=>c.id===item.cropId), item.qty||0, item.unit), 0);
+      const doneCount = (mkt.items||[]).filter(item => item.harvested).length;
+      const pct = n > 0 ? Math.round(doneCount/n*100) : 0;
+      html += '<div onclick="markedViewIdx=' + i + ';renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
+        + ' style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:' + (n > 0 ? '10' : '0') + 'px">'
         + '<div>'
         + '<div style="font-size:15px;color:var(--text-head)">' + (mkt.name||'Marked') + '</div>'
         + (mkt.date ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📅 ' + fmtDate(mkt.date) + '</div>' : '')
         + '</div>'
-        + '<div style="display:flex;align-items:center;gap:8px">'
-        + (n > 0 ? '<span style="font-size:12px;color:var(--accent-soft)">kr ' + totalVal.toFixed(0) + '</span>' : '')
-
-        + '</div>'
-        + '</div>'
-        + (n > 0 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">' + n + ' vekst' + (n!==1?'er':'') + '</div>' : '')
+        + '<div style="text-align:right">'
+        + (totalVal > 0 ? '<div style="font-size:14px;color:var(--accent-soft)">kr ' + totalVal.toFixed(0) + '</div>' : '')
+        + '<div style="font-size:11px;color:var(--text-muted)">' + n + ' vekst' + (n!==1?'er':'') + '</div>'
+        + '</div></div>'
+        + (n > 0 ? '<div style="height:4px;border-radius:2px;background:' + (isLight?'rgba(0,0,0,0.08)':'rgba(255,255,255,0.08)') + ';overflow:hidden">'
+          + '<div style="height:100%;background:var(--accent);width:' + pct + '%;border-radius:2px;transition:width 0.3s"></div></div>' : '')
         + '</div>';
     });
-    if (pastMarkets.length) {
-      html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:20px 0 10px">Historikk</div>';
-      pastMarkets.forEach(mkt => { const i = mkt._idx;
-      const n = (mkt.items||[]).length;
-      const totalVal = (mkt.items||[]).reduce((s,item) => { const cr = crops.find(c => c.id === item.cropId); return s + calcItemValue(cr, item.qty||0, item.unit); }, 0);
-      html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;opacity:0.6">'
-        + '<div style="font-size:14px;color:var(--text-muted)">'+( mkt.name||'Marked')+'</div>'
-        + (mkt.date ? '<div style="font-size:11px;color:var(--text-muted)">'+fmtDate(mkt.date)+'</div>' : '')
-        + '</div>';
+    if (past.length) {
+      html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:16px 0 8px">Historikk</div>';
+      past.forEach(mkt => {
+        const i = mkt._idx;
+        html += '<div onclick="markedViewIdx=' + i + ';renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
+          + ' style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:6px;opacity:0.55;cursor:pointer">'
+          + '<div style="font-size:14px;color:var(--text-muted)">' + (mkt.name||'Marked') + '</div>'
+          + (mkt.date ? '<div style="font-size:11px;color:var(--text-muted)">' + fmtDate(mkt.date) + '</div>' : '')
+          + '</div>';
       });
     }
   }
   el.innerHTML = html;
 }
 
-function openNewMarketDatePicker(btn) {
-  openCal('mkt-date-btn', 'mkt-date-val');
-}
-function openMarketDatePicker() {
-  const b = document.getElementById('mkt-edit-date-btn');
-  const v = document.getElementById('mkt-edit-date-val');
-  if (b && v) openCal('mkt-edit-date-btn', 'mkt-edit-date-val');
-}
-
-function openNewMarket() {
-  const modal = document.createElement('div');
-  modal.id = 'new-market-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
-      <div style="font-size:15px;color:var(--accent-soft);margin-bottom:16px">Nytt marked</div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <input id="mkt-name" placeholder="Navn på marked (f.eks. Bondens marked)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        <div style="position:relative">
-          <button type="button" id="mkt-date-btn" onclick="event.stopPropagation();openNewMarketDatePicker(this)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer;width:100%">Velg dato 📅</button>
-          <input type="hidden" id="mkt-date-val">
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:16px">
-        <button onclick="document.getElementById('new-market-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
-        <button onclick="saveNewMarket()" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Opprett</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
-}
-
-function saveNewMarket() {
-  snapshotLev();
-  const name = document.getElementById('mkt-name')?.value.trim() || 'Marked';
-  const date = document.getElementById('mkt-date-val')?.value || '';
-  const mkt = { id: Date.now(), name, date, items: [] };
-  deliveryMarket.push(mkt);
-  saveLevering();
-  document.getElementById('new-market-modal')?.remove();
-  // Add to calendar tasks
-  if (mkt.date) {
-    const taskId = 'market-' + mkt.id;
-    tasks.push({ id: taskId, text: '🛒 Marked: ' + mkt.name, date: mkt.date, priority: 'middels', done: false });
-    saveToLocal();
-  }
-  // Re-render list first so card exists in DOM, then open detail
-  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-  if (el) {
-    renderLevMarked(el);
-    openMarketDetail(deliveryMarket.length - 1);
-  }
-}
-
-function deleteMarket(i) {
-  snapshotLev();
-  deliveryMarket.splice(i, 1);
-  saveLevering();
-  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-  if (el) renderLevMarked(el);
-}
-
-function openMarketDetail(mktIdx) {
-  // Toggle inline expand in the market list
-  const existing = document.getElementById('market-expand-' + mktIdx);
-  if (existing) { existing.remove(); return; }
-  // Close any other open markets
-  document.querySelectorAll('[id^="market-expand-"]').forEach(el => el.remove());
-
+function renderMarkedDetail(el, mktIdx) {
   const mkt = deliveryMarket[mktIdx];
-  if (!mkt) return;
-
+  if (!mkt) { markedViewIdx = null; renderLevMarked(el); return; }
+  const isLight = document.body.classList.contains('light');
   const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-  function fmtDate(d) { if (!d) return ''; const [day,m,y] = d.split('-'); return day+'. '+(MONTHS[+m-1]||'')+' '+y; }
-
-  const card = document.querySelector('[data-market-idx="' + mktIdx + '"]');
-  if (!card) return;
-
-  const expand = document.createElement('div');
-  expand.id = 'market-expand-' + mktIdx;
-  expand.style.cssText = 'background:var(--bg-card);border:1px solid var(--accent);border-top:none;border-radius:0 0 12px 12px;padding:12px 14px;margin-top:-10px;margin-bottom:10px';
+  function fmtDate(d) { if (!d) return ''; const [day,m,y] = d.split('-'); return (+day)+'. '+(MONTHS[+m-1]||'')+' '+y; }
 
   let html = '';
 
-  // Crop rows — read-only with checkboxes
-  if ((mkt.items||[]).length > 0) {
-    (mkt.items||[]).forEach((item, ii) => {
-      const cr = crops.find(c => c.id === item.cropId);
-      if (!cr) return;
-      const val = calcItemValue(cr, item.qty||0, item.unit);
-      const done = item.harvested;
-      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)'+(done?';opacity:0.5':'')+'">'
-        + '<button onclick="event.stopPropagation();toggleMarketItemHarvest('+mktIdx+','+ii+')" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(done?'var(--accent)':'var(--border)')
-        + ';background:'+(done?'var(--accent)':'transparent')+';cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">'
-        + (done?'✓':'') + '</button>'
-        + '<span style="font-size:18px;flex-shrink:0">'+cr.emoji+'</span>'
-        + '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)'+(done?';text-decoration:line-through':'')+'">'+(cr.family||cr.name)+'</div>'
-        + (item.qty ? '<div style="font-size:11px;color:var(--text-muted)">'+item.qty+' '+item.unit+(val>0?' · kr '+val.toFixed(0):'')+'</div>' : '')
-        + '</div></div>';
-    });
-
-    const totalVal = (mkt.items||[]).reduce((s,item) => {
-      const cr = crops.find(c => c.id === item.cropId);
-      return s + calcItemValue(cr, item.qty||0, item.unit);
-    }, 0);
-    if (totalVal > 0) html += '<div style="font-size:12px;color:var(--accent-soft);padding-top:8px;text-align:right">Totalverdi: kr '+totalVal.toFixed(0)+'</div>';
-  } else {
-    html += '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">Ingen vekster lagt til ennå.</div>';
-  }
-
-  // Edit button
-  html += '<div style="display:flex;gap:8px;margin-top:12px">'
-    + '<button onclick="event.stopPropagation();openMarketEdit('+mktIdx+')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
+  // ── Back + title bar ──
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    + '<button onclick="markedViewIdx=null;markedModus=\'plan\';renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
+    + ' style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;padding:0;line-height:1">←</button>'
+    + '<div style="flex:1">'
+    + '<div style="font-size:16px;color:var(--text-head)">' + (mkt.name||'Marked') + '</div>'
+    + (mkt.date ? '<div style="font-size:12px;color:var(--text-muted)">📅 ' + fmtDate(mkt.date) + '</div>' : '')
+    + '</div>'
+    + '<button onclick="markedOpenEdit(' + mktIdx + ')" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
     + '</div>';
 
-  expand.innerHTML = html;
-  card.after(expand);
+  // ── Plan / Plukk toggle ──
+  html += '<div style="display:flex;background:' + (isLight?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.06)') + ';border-radius:14px;padding:4px;margin-bottom:20px">';
+  [['plan','📋 Plan'],['plukk','📦 Plukk']].forEach(([m,label]) => {
+    const active = markedModus === m;
+    html += '<button onclick="markedModus=\'' + m + '\';try{localStorage.setItem(\'mh_marked_modus\',\'' + m + '\')}catch(e){}renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
+      + ' style="flex:1;padding:10px 8px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:' + (active?'600':'400') + ';'
+      + 'background:' + (active?(isLight?'#fff8f0':'var(--bg-card)'):'transparent') + ';'
+      + 'color:' + (active?'var(--text-head)':'var(--text-muted)') + ';'
+      + 'box-shadow:' + (active?'0 1px 4px rgba(0,0,0,0.15)':'none') + ';transition:all 0.2s">' + label + '</button>';
+  });
+  html += '</div>';
+
+  const items = mkt.items || [];
+  const totalVal = items.reduce((s,item) => s + calcItemValue(crops.find(c=>c.id===item.cropId), item.qty||0, item.unit), 0);
+
+  if (markedModus === 'plan') {
+    // ── Summary card ──
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px">'
+      + '<div><div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px">Vekster planlagt</div>'
+      + '<div style="font-size:26px;font-weight:300;color:var(--text-head)">' + items.length + '</div></div>'
+      + '<div style="text-align:right"><div style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + totalVal.toFixed(0) + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">estimert</div></div>'
+      + '</div>';
+
+    // ── Crop grid ──
+    const selIds = new Set(items.map(i => i.cropId));
+    html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Velg vekster</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:16px">';
+    crops.forEach(cr => {
+      const sel = selIds.has(cr.id);
+      html += '<button data-mkt-idx="' + mktIdx + '" data-crop-id="' + cr.id + '" onclick="markedToggleCrop(this)"'
+        + ' style="padding:8px 4px;border-radius:10px;border:2px solid ' + (sel?'var(--accent)':'var(--border)') + ';'
+        + 'background:' + (sel?'var(--accent-bg)':'transparent') + ';cursor:pointer;'
+        + 'display:flex;flex-direction:column;align-items:center;gap:3px;'
+        + 'color:' + (sel?'var(--accent-soft)':'var(--text-muted)') + ';font-family:inherit">'
+        + '<span style="font-size:22px">' + cr.emoji + '</span>'
+        + '<span style="font-size:10px;text-align:center;line-height:1.2">' + (cr.family||cr.name) + '</span>'
+        + '</button>';
+    });
+    html += '</div>';
+
+    // ── Amounts ──
+    if (items.length) {
+      html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Mengde</div>';
+      items.forEach((item, ii) => {
+        const cr = crops.find(c => c.id === item.cropId);
+        if (!cr) return;
+        const val = calcItemValue(cr, item.qty||0, item.unit);
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">'
+          + '<span style="font-size:20px">' + cr.emoji + '</span>'
+          + '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)">' + (cr.family||cr.name) + '</div>'
+          + (val > 0 ? '<div style="font-size:11px;color:var(--accent-soft)">kr ' + val.toFixed(0) + '</div>' : '')
+          + '</div>'
+          + '<input type="number" min="0" step="1" value="' + (item.qty||'') + '" placeholder="0"'
+          + ' data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" oninput="markedUpdateQty(this)"'
+          + ' style="width:60px;padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;text-align:center">'
+          + '<select data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" onchange="markedUpdateUnit(this)"'
+          + ' style="padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+          + ['stk','kg','bunt','boks'].map(u => '<option value="' + u + '"' + (item.unit===u?' selected':'') + '>' + u + '</option>').join('')
+          + '</select>'
+          + '<button data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" onclick="markedRemoveItem(this)"'
+          + ' style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:2px;line-height:1">×</button>'
+          + '</div>';
+      });
+    }
+
+  } else {
+    // ── PLUKK-MODUS ──
+    const doneCount = items.filter(i => i.harvested).length;
+    const allDone = items.length > 0 && doneCount === items.length;
+    const pct = items.length > 0 ? Math.round(doneCount/items.length*100) : 0;
+
+    // Hero card
+    html += '<div style="background:var(--bg-card);border:1px solid ' + (allDone?'rgba(52,211,153,0.4)':'var(--border)') + ';border-radius:16px;padding:16px 18px;margin-bottom:20px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      + '<div><div style="font-size:30px;font-weight:300;color:' + (allDone?'#34d399':'var(--accent-soft)') + ';line-height:1">'
+      + doneCount + '<span style="font-size:16px;color:var(--text-muted)">/' + items.length + '</span></div>'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">vekster klare</div>'
+      + '</div>'
+      + (allDone ? '<div style="font-size:28px">🎉</div>' : '<div style="font-size:14px;color:var(--accent-soft)">kr ' + totalVal.toFixed(0) + '</div>')
+      + '</div>'
+      + '<div style="height:6px;border-radius:3px;background:' + (isLight?'rgba(0,0,0,0.1)':'rgba(255,255,255,0.1)') + ';overflow:hidden">'
+      + '<div style="height:100%;border-radius:3px;background:' + (allDone?'#34d399':'var(--accent)') + ';width:' + pct + '%;transition:width 0.3s"></div>'
+      + '</div></div>';
+
+    if (!items.length) {
+      html += '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Ingen vekster ennå.<br>'
+        + '<button onclick="markedModus=\'plan\';renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
+        + ' style="margin-top:10px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Gå til Plan</button></div>';
+    } else {
+      items.forEach((item, ii) => {
+        const cr = crops.find(c => c.id === item.cropId);
+        if (!cr) return;
+        const done = !!item.harvested;
+        const val = calcItemValue(cr, item.qty||0, item.unit);
+        html += '<div data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" onclick="markedToggleHarvest(this)"'
+          + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
+          + 'background:' + (done?(isLight?'rgba(0,0,0,0.03)':'rgba(255,255,255,0.03)'):'var(--bg-card)') + ';'
+          + 'border:2px solid ' + (done?(isLight?'rgba(0,0,0,0.1)':'rgba(255,255,255,0.1)'):'var(--border)') + ';'
+          + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:all 0.15s">'
+          + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
+          + 'background:' + (done?'var(--accent)':'transparent') + ';'
+          + 'border:2px solid ' + (done?'var(--accent)':(isLight?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.25)')) + ';'
+          + 'color:' + (isLight?'#1c1410':'#0d1a0e') + ';font-size:16px">' + (done?'✓':'') + '</div>'
+          + '<span style="font-size:28px;flex-shrink:0;' + (done?'opacity:0.4':'') + '">' + cr.emoji + '</span>'
+          + '<div style="flex:1;' + (done?'opacity:0.45':'') + '">'
+          + '<div style="font-size:16px;color:var(--text-head);' + (done?'text-decoration:line-through':'') + '">' + (cr.family||cr.name) + '</div>'
+          + '<div style="font-size:13px;color:var(--text-muted);margin-top:2px">'
+          + (item.qty ? item.qty + ' ' + item.unit : 'Ingen mengde satt')
+          + (val > 0 ? ' · kr ' + val.toFixed(0) : '') + '</div>'
+          + '</div></div>';
+      });
+
+      if (allDone) {
+        html += '<button data-mkt-idx="' + mktIdx + '" onclick="markedLogHarvest(this)" style="width:100%;margin-top:8px;padding:16px;border-radius:14px;border:none;background:var(--accent);color:' + (isLight?'#1c1410':'#0d1a0e') + ';cursor:pointer;font-size:15px;font-family:inherit;font-weight:600">✓ Logg som høstet</button>';
+      } else {
+        html += '<button data-mkt-idx="' + mktIdx + '" onclick="markedLogHarvest(this)" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
+      }
+    }
+  }
+
+  el.innerHTML = html;
 }
 
-function toggleMarketItemHarvest(mktIdx, itemIdx) {
+function markedToggleCrop(el) {
+  const mktIdx = +el.dataset.mktIdx;
+  const cropId = +el.dataset.cropId;
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  snapshotLev();
+  if (!mkt.items) mkt.items = [];
+  const idx = mkt.items.findIndex(i => i.cropId === cropId);
+  if (idx >= 0) mkt.items.splice(idx, 1);
+  else mkt.items.push({ cropId, qty: 1, unit: 'stk', harvested: false });
+  saveLevering();
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderMarkedDetail(cont, mktIdx);
+}
+
+function markedUpdateQty(el) {
+  const mktIdx = +el.dataset.mktIdx;
+  const itemIdx = +el.dataset.itemIdx;
+  if (deliveryMarket[mktIdx]?.items?.[itemIdx]) {
+    deliveryMarket[mktIdx].items[itemIdx].qty = +el.value;
+    saveLevering();
+  }
+}
+
+function markedUpdateUnit(el) {
+  const mktIdx = +el.dataset.mktIdx;
+  const itemIdx = +el.dataset.itemIdx;
+  if (deliveryMarket[mktIdx]?.items?.[itemIdx]) {
+    deliveryMarket[mktIdx].items[itemIdx].unit = el.value;
+    saveLevering();
+    const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+    if (cont) renderMarkedDetail(cont, mktIdx);
+  }
+}
+
+function markedRemoveItem(el) {
+  const mktIdx = +el.dataset.mktIdx;
+  const itemIdx = +el.dataset.itemIdx;
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  snapshotLev();
+  mkt.items.splice(itemIdx, 1);
+  saveLevering();
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderMarkedDetail(cont, mktIdx);
+}
+
+function markedToggleHarvest(el) {
+  const mktIdx = +el.dataset.mktIdx;
+  const itemIdx = +el.dataset.itemIdx;
   const mkt = deliveryMarket[mktIdx];
   if (!mkt?.items?.[itemIdx]) return;
   mkt.items[itemIdx].harvested = !mkt.items[itemIdx].harvested;
-  // If all done, log to harvestLog
-  const allDone = mkt.items.every(i => i.harvested);
-  if (allDone && !mkt.done) {
-    const today = new Date().toISOString().split('T')[0];
-    mkt.items.forEach(item => {
-      if (!item.qty) return;
-      harvestLog.unshift({ id: Date.now()+Math.random(), date: today, cropId: item.cropId, bedId: null, qty: item.qty, unit: item.unit, dest: 'marked', note: mkt.name });
-    });
-    mkt.done = true;
-  }
   saveLevering();
-  // Re-render expand in place without toggling
-  const expand = document.getElementById('market-expand-' + mktIdx);
-  if (expand) {
-    document.querySelectorAll('[id^="market-expand-"]').forEach(el => el.remove());
-    // Re-open without toggle
-    _openMarketDetailDirect(mktIdx);
-  }
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderMarkedDetail(cont, mktIdx);
 }
 
-function _openMarketDetailDirect(mktIdx) {
-  // Same as openMarketDetail but always opens (never toggles)
-  document.querySelectorAll('[id^="market-expand-"]').forEach(el => el.remove());
+function markedLogHarvest(el) {
+  const mktIdx = +el.dataset.mktIdx;
   const mkt = deliveryMarket[mktIdx];
   if (!mkt) return;
-  const card = document.querySelector('[data-market-idx="' + mktIdx + '"]');
-  if (!card) return;
-  const expand = document.createElement('div');
-  expand.id = 'market-expand-' + mktIdx;
-  expand.style.cssText = 'background:var(--bg-card);border:1px solid var(--accent);border-top:none;border-radius:0 0 12px 12px;padding:12px 14px;margin-top:-10px;margin-bottom:10px';
-  expand.onclick = e => e.stopPropagation();
-
-  let html = '';
-  if ((mkt.items||[]).length > 0) {
-    (mkt.items||[]).forEach((item, ii) => {
-      const cr = crops.find(c => c.id === item.cropId);
-      if (!cr) return;
-      const val = calcItemValue(cr, item.qty||0, item.unit);
-      const done = item.harvested;
-      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)'+(done?';opacity:0.5':'')+'">';
-      html += '<button onclick="event.stopPropagation();toggleMarketItemHarvest('+mktIdx+','+ii+')" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(done?'var(--accent)':'var(--border)')+';background:'+(done?'var(--accent)':'transparent')+';cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">'+(done?'✓':'')+'</button>';
-      html += '<span style="font-size:18px;flex-shrink:0">'+cr.emoji+'</span>';
-      html += '<div style="flex:1"><div style="font-size:13px;color:var(--text-head)'+(done?';text-decoration:line-through':'')+'">'+String(cr.family||cr.name)+'</div>';
-      html += '<div style="font-size:11px;color:var(--text-muted)">'+(item.qty?item.qty+' '+item.unit:'Ingen mengde')+(val>0?' · <span style="color:var(--accent-soft)">kr '+val.toFixed(0)+'</span>':'')+'</div>';
-      html += '</div></div>';
-    });
-    const totalVal = (mkt.items||[]).reduce((s,item) => { const cr = crops.find(c=>c.id===item.cropId); return s+calcItemValue(cr,item.qty||0,item.unit); },0);
-    if (totalVal > 0) html += '<div style="font-size:12px;color:var(--accent-soft);padding-top:8px;text-align:right">Totalverdi: kr '+totalVal.toFixed(0)+'</div>';
-  } else {
-    html += '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">Ingen vekster lagt til ennå.</div>';
-  }
-  html += '<div style="display:flex;gap:8px;margin-top:12px"><button onclick="event.stopPropagation();openMarketEdit('+mktIdx+')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button></div>';
-  expand.innerHTML = html;
-  card.after(expand);
-}
-
-function closeMarketDetail() { document.getElementById('market-detail-modal')?.remove(); }
-function closeMarketEdit() { document.getElementById('market-edit-modal')?.remove(); }
-function confirmDeleteMarket(i) {
-  // Replace button with inline confirm
-  const btn = event.target;
-  if (btn.dataset.confirmed) {
-    closeMarketEdit();
-    deliveryMarket.splice(i, 1);
-    saveLevering();
-    const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-    if (el) renderLevMarked(el);
-    return;
-  }
-  btn.dataset.confirmed = '1';
-  btn.textContent = 'Bekreft fjerning';
-  btn.style.background = 'rgba(248,113,113,0.15)';
-  setTimeout(() => { if (btn.dataset.confirmed) { btn.dataset.confirmed = ''; btn.textContent = '× Fjern'; btn.style.background = 'transparent'; } }, 3000);
-}
-
-function openMarketEdit(mktIdx) {
-  const mkt = deliveryMarket[mktIdx];
-  if (!mkt) return;
-  const modal = document.createElement('div');
-  modal.id = 'market-edit-modal';
-  modal.style.cssText = 'position:fixed;top:var(--header-h,0px);left:0;right:0;bottom:0;background:var(--bg-main);z-index:5999;display:flex;flex-direction:column;overflow:hidden';
-
-  let html = '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
-    + '<button onclick="closeMarketEdit()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
-    + '<div style="font-size:15px;color:var(--text-head);flex:1">Rediger marked</div>'
-    + '</div>'
-    + '<div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:14px;-webkit-overflow-scrolling:touch">';
-
-  // Name + date edit
-  html += '<div style="margin-bottom:16px">'
-    + '<input id="mkt-edit-name" value="'+(mkt.name||'')+'" placeholder="Navn" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px">'
-    + '<button type="button" id="mkt-edit-date-btn" onclick="event.stopPropagation();openMarketDatePicker()" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer">'+(mkt.date ? '📅 '+mkt.date : 'Velg dato 📅')+'</button>'
-    + '<input type="hidden" id="mkt-edit-date-val" value="'+(mkt.date||'')+'">'
-    + '</div>';
-
-  // Crop grid (collapsible, shown by default)
-  const selIds = new Set((mkt.items||[]).map(i => i.cropId));
-  html += '<div style="margin-bottom:16px">'
-    + '<button onclick="toggleMarketGrid(this)" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 0;background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;font-family:inherit">'
-    + 'Velg vekster <span id="mkt-grid-arrow">▲</span></button>'
-    + '<div id="mkt-crop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-top:8px">';
-  crops.forEach(cr => {
-    const sel = selIds.has(cr.id);
-    html += '<button onclick="toggleMarketCropInEdit('+mktIdx+','+cr.id+')" data-cropid="'+cr.id+'"'
-      + ' style="padding:8px 4px;border-radius:10px;border:2px solid '+(sel?'var(--accent)':'var(--border)')
-      + ';background:'+(sel?'var(--accent-bg)':'transparent')
-      + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px'
-      + ';color:'+(sel?'var(--accent-soft)':'var(--text-muted)')+';font-family:inherit">'
-      + '<span style="font-size:22px">'+cr.emoji+'</span>'
-      + '<span style="font-size:10px;text-align:center;line-height:1.2">'+(cr.family||cr.name)+'</span>'
-      + '</button>';
-  });
-  html += '</div></div>';
-
-  // Items with qty/unit (below grid)
-  if ((mkt.items||[]).length > 0) {
-    html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Mengde per vekst</div>';
-    (mkt.items||[]).forEach((item, ii) => {
-      const cr = crops.find(c => c.id === item.cropId);
-      if (!cr) return;
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'
-        + '<span style="font-size:18px">'+cr.emoji+'</span>'
-        + '<div style="flex:1;font-size:13px;color:var(--text-head)">'+(cr.family||cr.name)+'</div>'
-        + '<input type="number" min="0" step="1" value="'+(item.qty||'')+'" placeholder="Mengde"'
-        + ' oninput="updateMarketItemQty('+mktIdx+','+ii+',+this.value)"'
-        + ' style="width:65px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
-        + '<select onchange="updateMarketItemUnit('+mktIdx+','+ii+',this.value)"'
-        + ' style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
-        + ['stk','kg','bunt','boks'].map(u => '<option value="'+u+'"'+(item.unit===u?' selected':'')+'>'+u+'</option>').join('')
-        + '</select>'
-        + '<button onclick="removeMarketCrop('+mktIdx+','+ii+')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:4px">×</button>'
-        + '</div>';
-    });
-  }
-
-  html += '<div style="display:flex;gap:8px;margin-top:20px">'
-    + '<button onclick="confirmDeleteMarket('+mktIdx+')" style="padding:12px;border-radius:10px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:14px;font-family:inherit">× Fjern</button>'
-    + '<button onclick="saveMarketEdit('+mktIdx+')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>'
-    + '</div>'
-    + '</div>';
-
-  modal.innerHTML = html;
-  document.body.appendChild(modal);
-}
-
-function toggleMarketGrid(btn) {
-  const grid = document.getElementById('mkt-crop-grid');
-  const arrow = document.getElementById('mkt-grid-arrow');
-  if (!grid) return;
-  const hidden = grid.style.display === 'none';
-  grid.style.display = hidden ? 'grid' : 'none';
-  if (arrow) arrow.textContent = hidden ? '▲' : '▼';
-}
-
-function toggleMarketCropInEdit(mktIdx, cropId) {
   snapshotLev();
-  const mkt = deliveryMarket[mktIdx];
-  if (!mkt) return;
-  if (!mkt.items) mkt.items = [];
-  const existing = mkt.items.findIndex(i => i.cropId === cropId);
-  if (existing >= 0) mkt.items.splice(existing, 1);
-  else mkt.items.push({ cropId, qty: 0, unit: 'stk', harvested: false });
-  saveLevering();
-  document.getElementById('market-edit-modal')?.remove();
-  openMarketEdit(mktIdx);
-}
-
-function saveMarketEdit(mktIdx) {
-  snapshotLev();
-  const mkt = deliveryMarket[mktIdx];
-  if (!mkt) return;
-  const name = document.getElementById('mkt-edit-name')?.value.trim();
-  const date = document.getElementById('mkt-edit-date-val')?.value;
-  if (name) mkt.name = name;
-  if (date) mkt.date = date;
-  saveLevering();
-  document.getElementById('market-edit-modal')?.remove();
-  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-  if (el) renderLevMarked(el);
-}
-
-function editMarketName(mktIdx) {
-  const mkt = deliveryMarket[mktIdx];
-  if (!mkt) return;
-  const name = prompt('Navn på marked:', mkt.name||'');
-  if (name !== null) { mkt.name = name.trim(); saveLevering(); openMarketDetail(mktIdx); }
-}
-
-function markMarketDone(mktIdx) {
-  snapshotLev();
-  const mkt = deliveryMarket[mktIdx];
-  if (!mkt) return;
   const today = new Date().toISOString().split('T')[0];
   (mkt.items||[]).forEach(item => {
     if (!item.qty) return;
     harvestLog.unshift({ id: Date.now()+Math.random(), date: today, cropId: item.cropId, bedId: null, qty: item.qty, unit: item.unit, dest: 'marked', note: mkt.name });
   });
   mkt.done = true;
+  mkt.items.forEach(i => i.harvested = true);
   saveLevering();
-  document.getElementById('market-detail-modal')?.remove();
-  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-  if (el) renderLevMarked(el);
-  alert('Høsting logget!');
+  showSyncToast('✓ Høsting logget for ' + (mkt.name||'Marked'));
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderMarkedDetail(cont, mktIdx);
 }
 
-function updateMarketItemQty(mktIdx, itemIdx, val) {
-  if (deliveryMarket[mktIdx]?.items?.[itemIdx]) { deliveryMarket[mktIdx].items[itemIdx].qty = val; saveLevering(); }
-}
-function updateMarketItemUnit(mktIdx, itemIdx, val) {
-  if (deliveryMarket[mktIdx]?.items?.[itemIdx]) { deliveryMarket[mktIdx].items[itemIdx].unit = val; saveLevering(); }
+function markedOpenEdit(mktIdx) {
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  const modal = document.createElement('div');
+  modal.id = 'market-edit-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">'
+    + '<div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Rediger marked</div>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
+    + '<input id="mkt-edit-name" value="' + (mkt.name||'') + '" placeholder="Navn" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
+    + '<button type="button" id="mkt-edit-date-btn" onclick="event.stopPropagation();openMarketDatePicker()" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer">' + (mkt.date ? '📅 ' + mkt.date : 'Velg dato 📅') + '</button>'
+    + '<input type="hidden" id="mkt-edit-date-val" value="' + (mkt.date||'') + '">'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="markedConfirmDelete(' + mktIdx + ',this)" style="padding:11px;border-radius:10px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:14px;font-family:inherit">× Slett</button>'
+    + '<button onclick="markedSaveEdit(' + mktIdx + ')" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>'
+    + '<button onclick="document.getElementById(\'market-edit-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>'
+    + '</div></div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
+function markedSaveEdit(mktIdx) {
+  const mkt = deliveryMarket[mktIdx];
+  if (!mkt) return;
+  const name = document.getElementById('mkt-edit-name')?.value.trim();
+  const date = document.getElementById('mkt-edit-date-val')?.value;
+  snapshotLev();
+  if (name) mkt.name = name;
+  if (date !== undefined) mkt.date = date;
+  saveLevering();
+  document.getElementById('market-edit-modal')?.remove();
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderMarkedDetail(cont, mktIdx);
+}
 
-function saveMarketItem() {} // legacy stub
-function removeMarketItem(i) { deliveryMarket.splice(i,1); saveLevering(); const _elm=document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content'); if(_elm) renderLevMarked(_elm); }
+function markedConfirmDelete(mktIdx, btn) {
+  if (btn.dataset.confirmed) {
+    snapshotLev();
+    deliveryMarket.splice(mktIdx, 1);
+    markedViewIdx = null;
+    saveLevering();
+    document.getElementById('market-edit-modal')?.remove();
+    const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+    if (cont) renderLevMarked(cont);
+    return;
+  }
+  btn.dataset.confirmed = '1';
+  btn.textContent = 'Bekreft sletting';
+  btn.style.background = 'rgba(248,113,113,0.15)';
+  setTimeout(() => { if (btn.dataset.confirmed) { btn.dataset.confirmed=''; btn.textContent='× Slett'; btn.style.background='transparent'; } }, 3000);
+}
+
+// ── Legacy stubs for backward compat ──
+function openNewMarket() {
+  const modal = document.createElement('div');
+  modal.id = 'new-market-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">'
+    + '<div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Nytt marked</div>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
+    + '<input id="mkt-name" placeholder="Navn på marked" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
+    + '<button type="button" id="mkt-date-btn" onclick="event.stopPropagation();openNewMarketDatePicker(this)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer;width:100%">Velg dato 📅</button>'
+    + '<input type="hidden" id="mkt-date-val">'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="document.getElementById(\'new-market-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>'
+    + '<button onclick="saveNewMarket()" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Opprett</button>'
+    + '</div></div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+function openNewMarketDatePicker(btn) { openCal('mkt-date-btn', 'mkt-date-val'); }
+function openMarketDatePicker() { const b=document.getElementById('mkt-edit-date-btn'); if(b) openCal('mkt-edit-date-btn','mkt-edit-date-val'); }
+function saveNewMarket() {
+  snapshotLev();
+  const name = document.getElementById('mkt-name')?.value.trim() || 'Marked';
+  const date = document.getElementById('mkt-date-val')?.value || '';
+  deliveryMarket.push({ id: Date.now(), name, date, items: [] });
+  saveLevering();
+  if (date) { tasks.push({ id:'market-'+Date.now(), text:'🛒 Marked: '+name, date, priority:'middels', done:false }); saveToLocal(); }
+  document.getElementById('new-market-modal')?.remove();
+  markedViewIdx = deliveryMarket.length - 1;
+  markedModus = 'plan';
+  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (cont) renderLevMarked(cont);
+}
+function saveMarketItem() {}
+function removeMarketItem(i) { deliveryMarket.splice(i,1); saveLevering(); const _elm=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_elm) renderLevMarked(_elm); }
+// Legacy functions (kept for any stored onclick refs in old data)
+function openMarketDetail(i) { markedViewIdx=i; const c=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(c) renderLevMarked(c); }
+function openMarketEdit(i) { markedOpenEdit(i); }
+function closeMarketEdit() { document.getElementById('market-edit-modal')?.remove(); }
+function deleteMarket(i) { snapshotLev(); deliveryMarket.splice(i,1); markedViewIdx=null; saveLevering(); const c=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(c) renderLevMarked(c); }
+function toggleMarketItemHarvest(mktIdx, itemIdx) { const el = {dataset:{mktIdx, itemIdx}}; markedToggleHarvest({dataset:{mktIdx,itemIdx}}); }
+function updateMarketItemQty(mktIdx,itemIdx,val) { if(deliveryMarket[mktIdx]?.items?.[itemIdx]) { deliveryMarket[mktIdx].items[itemIdx].qty=val; saveLevering(); } }
+function updateMarketItemUnit(mktIdx,itemIdx,val) { if(deliveryMarket[mktIdx]?.items?.[itemIdx]) { deliveryMarket[mktIdx].items[itemIdx].unit=val; saveLevering(); } }
+function toggleMarketCropInEdit(mktIdx,cropId) { const btn={dataset:{mktIdx,cropId}}; markedToggleCrop({dataset:{mktIdx,cropId:+cropId}}); }
+function saveMarketEdit(i) { markedSaveEdit(i); }
+function confirmDeleteMarket(i) { const mkt=deliveryMarket[i]; if(!mkt) return; if(!confirm('Slett '+mkt.name+'?')) return; deleteMarket(i); }
+
 
 // ── Høst ─────────────────────────────────────────────────────────
+function renderLevOversikt(el) {
+  const isLight = document.body.classList.contains('light');
+  const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  const today = new Date().toISOString().split('T')[0];
+  const thisYear = new Date().getFullYear();
+  const thisMonth = new Date().getMonth();
+
+  // ── Beregn statistikk ──
+  const totalValue = harvestLog.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+  const thisWeekKey = (() => { const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toISOString().split('T')[0]; })();
+  const weekEnd = (() => { const d=new Date(thisWeekKey); d.setDate(d.getDate()+6); return d.toISOString().split('T')[0]; })();
+  const weekEntries = harvestLog.filter(h => h.date >= thisWeekKey && h.date <= weekEnd);
+  const weekValue = weekEntries.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+  const monthEntries = harvestLog.filter(h => { if (!h.date) return false; const [y,m] = h.date.split('-'); return +y===thisYear && +m-1===thisMonth; });
+  const monthValue = monthEntries.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+
+  // Kasse-leveringer: count box weeks with count > 0
+  const levBoxes = boxWeeks.reduce((s,bw) => s + (bw.count||0), 0);
+  // Marked: count all market items with qty
+  const levMarked = deliveryMarket.reduce((s,m) => s + (m.items||[]).filter(i=>i.qty>0).length, 0);
+
+  // Per vekst totals
+  const byCrop = {};
+  harvestLog.forEach(h => {
+    if (!byCrop[h.cropId]) byCrop[h.cropId] = { qty: {}, value: 0 };
+    if (!byCrop[h.cropId].qty[h.unit]) byCrop[h.cropId].qty[h.unit] = 0;
+    byCrop[h.cropId].qty[h.unit] += h.qty;
+    byCrop[h.cropId].value += calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit);
+  });
+  const topCrops = Object.entries(byCrop).sort(([,a],[,b]) => b.value - a.value).slice(0, 5);
+
+  // Dest breakdown
+  const byDest = {};
+  harvestLog.forEach(h => {
+    const d = h.dest || 'annet';
+    if (!byDest[d]) byDest[d] = 0;
+    byDest[d] += calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit);
+  });
+
+  // Weekly trend (last 8 weeks)
+  const weekTrend = [];
+  for (let i = 7; i >= 0; i--) {
+    const wStart = new Date(thisWeekKey); wStart.setDate(wStart.getDate() - i*7);
+    const wEnd = new Date(wStart); wEnd.setDate(wStart.getDate() + 6);
+    const wS = wStart.toISOString().split('T')[0];
+    const wE = wEnd.toISOString().split('T')[0];
+    const wVal = harvestLog.filter(h => h.date >= wS && h.date <= wE)
+      .reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
+    const wNum = getISOWeek(wStart);
+    weekTrend.push({ week: wNum, value: wVal, isCurrent: i === 0 });
+  }
+  const maxTrend = Math.max(...weekTrend.map(w => w.value), 1);
+
+  let html = '';
+
+  // ── Stat cards ──
+  const statCard = (icon, val, label, color) =>
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px">'
+    + '<div style="font-size:20px;margin-bottom:6px">' + icon + '</div>'
+    + '<div style="font-size:28px;font-weight:300;line-height:1;color:' + color + '">' + val + '</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-top:4px;letter-spacing:0.08em;text-transform:uppercase">' + label + '</div>'
+    + '</div>';
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+    + statCard('💰', 'kr ' + Math.round(totalValue).toLocaleString('nb-NO'), 'Totalverdi', '#f472b6')
+    + statCard('📦', levBoxes, 'Kasser levert', 'var(--accent-soft)')
+    + statCard('📅', 'kr ' + Math.round(weekValue).toLocaleString('nb-NO'), 'Denne uken', '#60a5fa')
+    + statCard('🗓', 'kr ' + Math.round(monthValue).toLocaleString('nb-NO'), 'Denne måneden', '#fbbf24')
+    + '</div>';
+
+  // ── Ukentlig trend (sparkline) ──
+  if (weekTrend.some(w => w.value > 0)) {
+    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">Ukentlig trend</div>'
+      + '<div style="display:flex;align-items:flex-end;gap:4px;height:56px">';
+    weekTrend.forEach(w => {
+      const h2 = Math.max(4, Math.round((w.value / maxTrend) * 52));
+      html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">'
+        + '<div style="width:100%;border-radius:3px 3px 0 0;height:' + h2 + 'px;'
+        + 'background:' + (w.isCurrent ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)')) + '">'
+        + '</div>'
+        + '<div style="font-size:9px;color:' + (w.isCurrent ? 'var(--accent-soft)' : 'var(--text-dim)') + '">' + w.week + '</div>'
+        + '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── Fordeling per destinasjon ──
+  if (Object.keys(byDest).length) {
+    const destLabels = { kasse: '📦 Kasse', marked: '🛒 Marked', annet: '📦 Annet' };
+    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Fordeling</div>';
+    const destTotal = Object.values(byDest).reduce((s,v) => s+v, 0) || 1;
+    Object.entries(byDest).sort(([,a],[,b]) => b-a).forEach(([dest, val]) => {
+      const pct = Math.round((val / destTotal) * 100);
+      html += '<div style="margin-bottom:8px">'
+        + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:3px">'
+        + '<span>' + (destLabels[dest] || dest) + '</span>'
+        + '<span style="color:var(--accent-soft)">kr ' + Math.round(val) + ' (' + pct + '%)</span>'
+        + '</div>'
+        + '<div style="height:5px;border-radius:3px;background:' + (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)') + '">'
+        + '<div style="height:100%;border-radius:3px;width:' + pct + '%;background:var(--accent);transition:width 0.3s"></div>'
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ── Topp vekster ──
+  if (topCrops.length) {
+    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Mest høstet (verdi)</div>';
+    topCrops.forEach(([cropId, data], i) => {
+      const cr = crops.find(c => c.id == cropId);
+      if (!cr) return;
+      const qtyStr = Object.entries(data.qty).map(([u,q]) => q + ' ' + u).join(', ');
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid ' + (i < topCrops.length-1 ? 'var(--border)' : 'transparent') + '">'
+        + '<span style="font-size:20px">' + cr.emoji + '</span>'
+        + '<div style="flex:1">'
+        + '<div style="font-size:13px;color:var(--text-head)">' + (cr.family||cr.name) + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted)">' + qtyStr + '</div>'
+        + '</div>'
+        + '<div style="font-size:13px;color:var(--accent-soft)">kr ' + Math.round(data.value) + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  if (!harvestLog.length) {
+    html = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px">'
+      + '🌱<br><br>Ingen høsting registrert ennå.<br>Statistikk vises her etter hvert som du logger.'
+      + '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
 function renderLevHoestLogg(el) {
   const today = new Date().toISOString().split('T')[0];
   const MONTHS = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
