@@ -4889,7 +4889,17 @@ function importFileObject(file, skipSave = false) {
         } catch(e) { console.warn('Høstelogg parse error:', e); }
       }
 
-      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks, customers: newCustomers, boxTypes: newBoxTypes, boxWeeks: newBoxWeeks, market: newMarket, harvestLog: newHarvestLog };
+      // ── Parse Kart (JSON sheet) ──
+      let newGardenMap = null;
+      const wsKart = wb.Sheets['Kart'];
+      if (wsKart) {
+        try {
+          const raw = XLSX.utils.sheet_to_json(wsKart, { header: 1 });
+          if (raw[1] && raw[1][0]) newGardenMap = JSON.parse(String(raw[1][0]));
+        } catch(e) { console.warn('Kart parse error:', e); }
+      }
+
+      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks, customers: newCustomers, boxTypes: newBoxTypes, boxWeeks: newBoxWeeks, market: newMarket, harvestLog: newHarvestLog, gardenMap: newGardenMap };
       confirmImport(skipSave);
       resolve();
     } catch(err) {
@@ -4916,6 +4926,7 @@ function confirmImport(skipSave = false) {
   if (pendingImport.boxWeeks) boxWeeks = pendingImport.boxWeeks;
   if (pendingImport.market)   deliveryMarket = pendingImport.market;
   if (pendingImport.harvestLog) harvestLog = pendingImport.harvestLog;
+  if (pendingImport.gardenMap) { gardenMap = pendingImport.gardenMap; saveGardenMap(); }
   saveLevering();
   pendingImport = null;
   selectedBed = null;
@@ -5043,6 +5054,14 @@ function buildWorkbook() {
   wsHoest['!cols'] = [{wch:120}];
   XLSX.utils.book_append_sheet(wb, wsHoest, 'Høstelogg');
 
+  // ── Sheet 9: Kart (JSON) ──────────────────────────────────────
+  const wsKart = XLSX.utils.aoa_to_sheet([
+    ['Data (ikke rediger)'],
+    [JSON.stringify(gardenMap || {})]
+  ]);
+  wsKart['!cols'] = [{wch:120}];
+  XLSX.utils.book_append_sheet(wb, wsKart, 'Kart');
+
   // ── Download ──────────────────────────────────────────────────
   const date = new Date();
   const dateStr = `${String(date.getDate()).padStart(2,'0')}-${String(date.getMonth()+1).padStart(2,'0')}-${date.getFullYear()}`;
@@ -5156,7 +5175,7 @@ function showLeveringOverlay() {
       padding-bottom:env(safe-area-inset-bottom);flex-shrink:0">
       ${['oversikt','kasse','marked','hoestlogg'].map((t,i) => {
         const labels = ['Oversikt','Kasser','Marked','Høstelogg'];
-        return `<button onclick="leveringTab='${t}';renderLeveringInto(document.getElementById('lev-overlay-content'))"
+        return `<button onclick="leveringTab='${t}';try{localStorage.setItem('mh_lev_tab','${t}')}catch(e){}renderLeveringInto(document.getElementById('lev-overlay-content'))"
           id="lev-tab-${t}"
           style="flex:1;min-width:0;padding:20px 2px 18px;border:none;background:transparent;
           color:${leveringTab===t?'var(--accent-soft)':'var(--text-dim)'};
@@ -5171,11 +5190,13 @@ function showLeveringOverlay() {
   setTimeout(() => {
     const hdr = overlay.querySelector('[style*="bg-header"]');
     if (hdr) document.documentElement.style.setProperty('--header-h', hdr.offsetHeight+'px');
+    const nav = overlay.querySelector('nav');
+    if (nav) document.documentElement.style.setProperty('--lev-nav-h', nav.offsetHeight+'px');
   }, 0);
   renderLeveringInto(document.getElementById('lev-overlay-content'));
   updateLevUndoRedoBtns();
-  // Sync cloud button color
-  const gb=document.getElementById('gist-btn'); const lgb=document.getElementById('lev-gist-btn'); if(gb&&lgb){lgb.style.color=gb.style.color||'var(--text-muted)';}
+  // Ensure sync button reflects current connection state
+  renderSyncBtn();
 }
 
 function closeLeveringOverlay() {
@@ -5385,6 +5406,16 @@ async function syncLoad(silent = false) {
     if (data.bedIDs && data.bedIDs.length) BED_IDS = data.bedIDs;
     if (data.gardenMap) gardenMap = data.gardenMap;
     if (data.taskHistory) taskHistory = data.taskHistory;
+    // Load levering data
+    if (data.levering) {
+      if (data.levering.customers) deliveryCustomers = data.levering.customers;
+      if (data.levering.box)       deliveryBox       = data.levering.box;
+      if (data.levering.boxTypes)  boxTypes          = data.levering.boxTypes;
+      if (data.levering.boxWeeks)  boxWeeks          = data.levering.boxWeeks;
+      if (data.levering.market)    deliveryMarket    = data.levering.market;
+      if (data.levering.harvest)   harvestLog        = data.levering.harvest;
+      saveLevering();
+    }
     saveToLocal();
     clearTimeout(syncTimer); syncTimer = null;
     render();
@@ -5512,10 +5543,12 @@ function gistShowMenu() {
   });
 
   document.body.appendChild(menu);
-  const gistBtn = document.getElementById('lev-gist-btn') && document.getElementById('lev-overlay') ? 
-    document.getElementById('lev-gist-btn') : document.getElementById('gist-btn');
-  if (!gistBtn) return;
+  const gistBtn = (document.getElementById('lev-overlay') && document.getElementById('lev-gist-btn'))
+    ? document.getElementById('lev-gist-btn')
+    : document.getElementById('gist-btn');
+  if (!gistBtn) { menu.style.top = '60px'; menu.style.right = '12px'; return; }
   const rect = gistBtn.getBoundingClientRect();
+  if (rect.width === 0) { menu.style.top = '60px'; menu.style.right = '12px'; return; }
   menu.style.top   = (rect.bottom + 4) + 'px';
   menu.style.right = (window.innerWidth - rect.right) + 'px';
 }
@@ -5551,7 +5584,7 @@ function scheduleGistSave() { scheduleSync(); }
 // LEVERING — state vars must be declared before init
 // ═══════════════════════════════════════════════════════════════
 
-let leveringTab = 'kasse';
+let leveringTab = (() => { try { return localStorage.getItem('mh_lev_tab') || 'kasse'; } catch(e) { return 'kasse'; } })();
 let kasseViewWeek = (() => { try { return +localStorage.getItem('mh_kasse_week') || getCurrentWeek(); } catch(e) { return getCurrentWeek(); } })();
 let kasseViewYear = (() => { try { return +localStorage.getItem('mh_kasse_year') || getCurrentYear(); } catch(e) { return getCurrentYear(); } })();
 let kasseViewTypeId = (() => { try { return localStorage.getItem('mh_kasse_type') || null; } catch(e) { return null; } })();
@@ -5723,7 +5756,7 @@ function deleteCustomer(i) {
 function openKasseOppsett() {
   const modal = document.createElement('div');
   modal.id = 'kasse-oppsett-modal';
-  modal.style.cssText = 'position:fixed;top:var(--header-h,0px);left:0;right:0;bottom:0;background:var(--bg-main);z-index:5999;display:flex;justify-content:center';
+  modal.style.cssText = 'position:fixed;top:var(--header-h,0px);left:0;right:0;bottom:calc(var(--lev-nav-h,64px) + env(safe-area-inset-bottom));background:var(--bg-main);z-index:4050;display:flex;justify-content:center';
 
   const renderOppsettContent = () => {
     const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
