@@ -86,6 +86,12 @@
     backdrop-filter: blur(12px);
     padding: 14px 16px 14px;
     border-bottom: 1px solid rgba(52,211,153,0.1);
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+  header.header-hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
   }
   .header-top { margin-bottom: 0; }
   .header-eyebrow { font-size: 10px; letter-spacing: 0.3em; color: #6ee7b7; text-transform: uppercase; margin-bottom: 2px; }
@@ -343,7 +349,28 @@
     </div>
   </div>
 </header>
-<script>document.addEventListener('DOMContentLoaded',()=>{const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--header-h',h.offsetHeight+'px');});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{
+  const h=document.querySelector('header');
+  if(h) document.documentElement.style.setProperty('--header-h',h.offsetHeight+'px');
+
+  // Hide header on scroll down, show on scroll up
+  let lastY = 0, ticking = false;
+  function onScroll() {
+    const y = window.scrollY || document.documentElement.scrollTop;
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        const hdr = document.querySelector('header');
+        if (hdr) hdr.classList.toggle('header-hidden', y > lastY && y > 60);
+        lastY = y;
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  // Also listen on the main scroll container
+  document.querySelector('main')?.addEventListener('scroll', onScroll, { passive: true });
+});</script>
 
 <main>
   <div id="tab-oversikt"></div>
@@ -2906,12 +2933,14 @@ function renderSenger() {
   const isLight = document.body.classList.contains('light');
 
   let html = `
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:16px">
-      <select onchange="setBedField(this.value)" style="flex:1;padding:8px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M0 0l5 6 5-6z%22 fill=%22%236b7280%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;padding-right:26px">
-        ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Alle felt':'Felt '+f}</option>`).join('')}
+    <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin-bottom:16px">
+      <select onchange="setBedField(this.value)" style="padding:7px 28px 7px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M0 0l5 6 5-6z%22 fill=%22%236b7280%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;width:auto">
+        ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Alle':'Felt '+f}</option>`).join('')}
       </select>
-      <button onclick="openAddBed()" style="padding:8px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Legg til</button>
-      <button onclick="openGardenMap()" style="padding:8px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Visuell oversikt</button>
+      <div style="display:flex;justify-content:center">
+        <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Visuell oversikt</button>
+      </div>
+      <button onclick="openAddBed()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Legg til</button>
     </div>`;
 
   // Group beds by field letter
@@ -2931,9 +2960,17 @@ function renderSenger() {
     const total = fieldBeds.length;
 
     if (fields.length > 2) { // more than just 'alle' + one field
-      html += `<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:${letter === fieldKeys[0] ? '0' : '16px'} 0 8px;display:flex;align-items:center;justify-content:space-between">
-        <span>Felt ${letter}</span>
-        <span style="font-weight:400;letter-spacing:0">${occupied}/${total} i bruk</span>
+      const fieldTotalVal = beds.reduce((sum, bed) => {
+        const bl = getCropsInBed(bed);
+        return sum + bl.reduce((s, crop) => {
+          const segSpecs = crop.beds.filter(sp => parseBedSpec(sp).bedId === bed);
+          return s + segSpecs.reduce((sv, spec) => sv + (calcValue({...crop, beds:[spec]}) || 0), 0);
+        }, 0);
+      }, 0);
+      const _fk = fieldTotalVal >= 1000 ? (fieldTotalVal >= 10000 ? Math.round(fieldTotalVal/1000) : Math.round(fieldTotalVal/100)/10) : null;
+      const _fkStr = _fk !== null ? ' ~' + _fk.toLocaleString('nb-NO') + 'k' : '';
+      html += `<div style="margin:${letter === fieldKeys[0] ? '0' : '20px'} 0 10px">
+        <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${_fkStr ? `<span style="font-size:14px;color:#d97706;font-weight:700"> ${_fkStr}</span>` : ''}
       </div>`;
     }
 
