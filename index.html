@@ -5115,8 +5115,8 @@ function importFileObject(file, skipSave = false) {
       if (wsKt) {
         try {
           const rows = XLSX.utils.sheet_to_json(wsKt, { header: 1 });
-          const jr = rows.find(r => r[0] === '__json__');
-          const js = jr ? jr[1] : (rows[1] && rows[1][0]);
+          const _jrowsKT = rows.filter(r => String(r[0]).startsWith('__json__'));
+          const js = _jrowsKT.length ? _jrowsKT.map(r => r[1]||'').join('') : (rows[1] && rows[1][0]);
           if (js) newBoxTypes = JSON.parse(String(js));
         } catch(e) { console.warn('Kassetyper parse error:', e); }
       }
@@ -5127,7 +5127,7 @@ function importFileObject(file, skipSave = false) {
       if (wsKu2) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsKu2, { header: 1 });
-          const _jrBW = raw.find(r => r[0] === '__json__'); const _jsBW = _jrBW ? _jrBW[1] : (raw[1] && raw[1][0]); if (_jsBW) newBoxWeeks = JSON.parse(String(_jsBW));
+          const _jrowsBW = raw.filter(r => String(r[0]).startsWith('__json__')); const _jsBW = _jrowsBW.length ? _jrowsBW.map(r=>r[1]||'').join('') : (raw[1]&&raw[1][0]); if (_jsBW) newBoxWeeks = JSON.parse(String(_jsBW));
         } catch(e) { console.warn('Kasseuker parse error:', e); }
       }
 
@@ -5137,7 +5137,7 @@ function importFileObject(file, skipSave = false) {
       if (wsMkt) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsMkt, { header: 1 });
-          const _jrM = raw.find(r => r[0] === '__json__'); const _jsM = _jrM ? _jrM[1] : (raw[1] && raw[1][0]); if (_jsM) newMarket = JSON.parse(String(_jsM));
+          const _jrowsM = raw.filter(r => String(r[0]).startsWith('__json__')); const _jsM = _jrowsM.length ? _jrowsM.map(r=>r[1]||'').join('') : (raw[1]&&raw[1][0]); if (_jsM) newMarket = JSON.parse(String(_jsM));
         } catch(e) { console.warn('Markeder parse error:', e); }
       }
 
@@ -5147,7 +5147,7 @@ function importFileObject(file, skipSave = false) {
       if (wsHl) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsHl, { header: 1 });
-          const _jrHL = raw.find(r => r[0] === '__json__'); const _jsHL = _jrHL ? _jrHL[1] : (raw[1] && raw[1][0]); if (_jsHL) newHarvestLog = JSON.parse(String(_jsHL));
+          const _jrowsHL = raw.filter(r => String(r[0]).startsWith('__json__')); const _jsHL = _jrowsHL.length ? _jrowsHL.map(r=>r[1]||'').join('') : (raw[1]&&raw[1][0]); if (_jsHL) newHarvestLog = JSON.parse(String(_jsHL));
         } catch(e) { console.warn('Høstelogg parse error:', e); }
       }
 
@@ -5157,7 +5157,7 @@ function importFileObject(file, skipSave = false) {
       if (wsKart) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsKart, { header: 1 });
-          const _jrK = raw.find(r => r[0] === '__json__'); const _jsK = _jrK ? _jrK[1] : (raw[1] && raw[1][0]); if (_jsK) newGardenMap = JSON.parse(String(_jsK));
+          const _jrowsK = raw.filter(r => String(r[0]).startsWith('__json__')); const _jsK = _jrowsK.length ? _jrowsK.map(r=>r[1]||'').join('') : (raw[1]&&raw[1][0]); if (_jsK) newGardenMap = JSON.parse(String(_jsK));
         } catch(e) { console.warn('Kart parse error:', e); }
       }
 
@@ -5167,7 +5167,7 @@ function importFileObject(file, skipSave = false) {
       if (wsTaskH) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsTaskH, { header: 1 });
-          const _jrT = raw.find(r => r[0] === '__json__'); const _jsT = _jrT ? _jrT[1] : (raw[1] && raw[1][0]); if (_jsT) newTaskHistory = JSON.parse(String(_jsT));
+          const _jrowsT = raw.filter(r => String(r[0]).startsWith('__json__')); const _jsT = _jrowsT.length ? _jrowsT.map(r=>r[1]||'').join('') : (raw[1]&&raw[1][0]); if (_jsT) newTaskHistory = JSON.parse(String(_jsT));
         } catch(e) { console.warn('Oppgavehistorikk parse error:', e); }
       }
 
@@ -5313,7 +5313,10 @@ function buildWorkbook() {
     (bt.baseItems||[]).map(item => { const cr = crops.find(c=>c.id===item.cropId); return cr ? cr.name + ' ' + (item.qty||'') + ' ' + (item.unit||'') : ''; }).filter(Boolean).join(', ')
   ]);
   // Store full JSON in last row for import (hidden)
-  const wsKassetyper = XLSX.utils.aoa_to_sheet([ktHeaders, ...ktRows, ['__json__', JSON.stringify(boxTypes)]]);
+  const _ktJson = JSON.stringify(boxTypes);
+  const _ktChunks = [];
+  for (let i = 0; i < _ktJson.length; i += 30000) _ktChunks.push(['__json__' + (i===0?'':'_cont'), _ktJson.slice(i, i+30000)]);
+  const wsKassetyper = XLSX.utils.aoa_to_sheet([ktHeaders, ...ktRows, ..._ktChunks]);
   wsKassetyper['!cols'] = [{wch:22},{wch:14},{wch:10},{wch:10},{wch:16},{wch:20},{wch:40}];
   styleHeaderRow(wsKassetyper, ktHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsKassetyper, 'Kassetyper');
@@ -5328,7 +5331,10 @@ function buildWorkbook() {
     const total = activeCu.length + (bw.extraBoxes||0);
     return [bt?.name||'', bw.week||'', bw.year||'', items, total||'', bw.harvested ? 'Ja' : 'Nei'];
   });
-  const wsKasseuker = XLSX.utils.aoa_to_sheet([kuHeaders, ...kuRows, ['__json__', JSON.stringify(boxWeeks)]]);
+  const _kuJson = JSON.stringify(boxWeeks);
+  const _kuChunks = [];
+  for (let i = 0; i < _kuJson.length; i += 30000) _kuChunks.push(['__json__' + (i===0?'':'_cont'), _kuJson.slice(i, i+30000)]);
+  const wsKasseuker = XLSX.utils.aoa_to_sheet([kuHeaders, ...kuRows, ..._kuChunks]);
   wsKasseuker['!cols'] = [{wch:22},{wch:6},{wch:6},{wch:50},{wch:14},{wch:10}];
   styleHeaderRow(wsKasseuker, kuHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsKasseuker, 'Kasseuker');
@@ -5340,7 +5346,10 @@ function buildWorkbook() {
     const val = (mkt.items||[]).reduce((s,item) => s + calcItemValue(crops.find(c=>c.id===item.cropId), item.qty||0, item.unit), 0);
     return [mkt.name||'', mkt.date||'', mkt.done ? 'Gjennomført' : 'Planlagt', items, val > 0 ? Math.round(val) : ''];
   });
-  const wsMarkeder = XLSX.utils.aoa_to_sheet([mktHeaders, ...mktRows, ['__json__', JSON.stringify(deliveryMarket)]]);
+  const _mktJson = JSON.stringify(deliveryMarket);
+  const _mktChunks = [];
+  for (let i = 0; i < _mktJson.length; i += 30000) _mktChunks.push(['__json__' + (i===0?'':'_cont'), _mktJson.slice(i, i+30000)]);
+  const wsMarkeder = XLSX.utils.aoa_to_sheet([mktHeaders, ...mktRows, ..._mktChunks]);
   wsMarkeder['!cols'] = [{wch:24},{wch:12},{wch:14},{wch:50},{wch:18}];
   styleHeaderRow(wsMarkeder, mktHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsMarkeder, 'Markeder');
@@ -5351,16 +5360,19 @@ function buildWorkbook() {
     const cr = crops.find(c=>c.id===h.cropId);
     return [h.date||'', cr ? cr.name : '', h.qty||'', h.unit||'', h.dest||'', h.note||''];
   });
-  const wsHoest = XLSX.utils.aoa_to_sheet([hlHeaders, ...hlRows, ['__json__', JSON.stringify(harvestLog)]]);
+  const _hlJson = JSON.stringify(harvestLog);
+  const _hlChunks = [];
+  for (let i = 0; i < _hlJson.length; i += 30000) _hlChunks.push(['__json__' + (i===0?'':'_cont'), _hlJson.slice(i, i+30000)]);
+  const wsHoest = XLSX.utils.aoa_to_sheet([hlHeaders, ...hlRows, ..._hlChunks]);
   wsHoest['!cols'] = [{wch:12},{wch:20},{wch:10},{wch:8},{wch:12},{wch:30}];
   styleHeaderRow(wsHoest, hlHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsHoest, 'Høstelogg');
 
   // ── Sheet 9: Kart (JSON backup) ───────────────────────────────
-  const wsKart = XLSX.utils.aoa_to_sheet([
-    ['Kartdata (teknisk backup for import)'],
-    [JSON.stringify(gardenMap || {})]
-  ]);
+  const _kartJson = JSON.stringify(gardenMap || {});
+  const _kartChunks = [['Kartdata (teknisk backup for import)']];
+  for (let i = 0; i < _kartJson.length; i += 30000) _kartChunks.push(['__json__' + (i===0?'':'_cont'), _kartJson.slice(i, i+30000)]);
+  const wsKart = XLSX.utils.aoa_to_sheet(_kartChunks);
   wsKart['!cols'] = [{wch:30}];
   XLSX.utils.book_append_sheet(wb, wsKart, 'Kart');
 
@@ -5371,7 +5383,10 @@ function buildWorkbook() {
     t.text||'',
     t.priority ? t.priority.charAt(0).toUpperCase()+t.priority.slice(1) : ''
   ]);
-  const wsTaskHist = XLSX.utils.aoa_to_sheet([thHeaders, ...thRows, ['__json__', JSON.stringify(taskHistory||[])]]);
+  const _thJson = JSON.stringify(taskHistory||[]);
+  const _thChunks = [];
+  for (let i = 0; i < _thJson.length; i += 30000) _thChunks.push(['__json__' + (i===0?'':'_cont'), _thJson.slice(i, i+30000)]);
+  const wsTaskHist = XLSX.utils.aoa_to_sheet([thHeaders, ...thRows, ..._thChunks]);
   wsTaskHist['!cols'] = [{wch:16},{wch:50},{wch:12}];
   styleHeaderRow(wsTaskHist, thHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsTaskHist, 'Oppgavehistorikk');
