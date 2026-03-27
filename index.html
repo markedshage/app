@@ -386,9 +386,9 @@
       <div><label class="field-label">Pris pr/kg (kr)</label><input class="field-input" id="c-pricepkg" type="number" step="0.5" value="0" min="0" oninput="recalcPricePerUnit()"></div>
       <div><label id="c-weightg-label" class="field-label">Vekt per stk (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0" oninput="recalcPricePerUnitFromWeight()"></div>
       <div style="position:relative"><label id="c-priceunit-label" class="field-label">Pris per stk (kr) <span id="c-priceunit-auto" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span></label><input class="field-input" id="c-priceunit" type="number" step="0.5" value="0" min="0" oninput="recalcWeightFromPrice()" placeholder="Auto fra kg×vekt"></div>
-      <div><label id="c-unitsperplant-label" class="field-label">Stk per plante</label><input class="field-input" id="c-unitsperplant" type="number" step="0.1" value="" min="0" oninput="recalcVektTotal()" placeholder="f.eks. 3"></div>
-      <div><label id="c-vekttotal-label" class="field-label">Vekt total (g)</label><input class="field-input" id="c-vekttotal" type="number" step="1" value="" min="0" oninput="recalcUnitsPerPlantFromVekt()" placeholder="Auto fra vekt×enheter"></div>
-      <div><label class="field-label">Verdi total (kr) <span style="font-size:10px;color:var(--text-muted)">(beregnet)</span></label><input class="field-input" id="c-valuetotal" type="number" step="1" value="" min="0" readonly style="opacity:0.7;cursor:default" placeholder="Auto fra vekt×pris/kg"></div>
+      <div><label id="c-unitsperplant-label" class="field-label">Stk per plante</label><input class="field-input" id="c-unitsperplant" type="number" step="1" min="1" value="" oninput="this.value=Math.max(1,Math.round(+this.value||1));recalcVektTotal();toggleVektTotalFields()" placeholder="1"></div>
+      <div id="c-vekttotal-wrap"><label id="c-vekttotal-label" class="field-label">Vekt total (g)</label><input class="field-input" id="c-vekttotal" type="number" step="1" value="" min="0" oninput="recalcUnitsPerPlantFromVekt()" placeholder="Auto fra vekt×enheter"></div>
+      <div id="c-valuetotal-wrap"><label class="field-label">Verdi total (kr) <span style="font-size:10px;color:var(--text-muted)">(beregnet)</span></label><input class="field-input" id="c-valuetotal" type="number" step="1" value="" min="0" readonly style="opacity:0.7;cursor:default" placeholder="Auto fra vekt×pris/kg"></div>
     </div>
     <div class="form-grid">
       <div><label class="field-label">Sådato</label><button type="button" class="date-display empty" id="c-sown-btn" onclick="openCal('c-sown-btn','c-sown-val')">Velg dato 📅</button><input type="hidden" id="c-sown-val"></div>
@@ -2970,21 +2970,25 @@ function renderSenger() {
                 <div style="font-size:11px;color:var(--text-muted);margin-top:1px">
                   Seng ${bed} &nbsp;·&nbsp; ${sz.length}m × ${sz.width}m
                   ${mainCrop ? `&nbsp;·&nbsp; <span style="color:${STATUS[mainCrop.status]?.color||'#86efac'}">${STATUS[mainCrop.status]?.label||mainCrop.status}</span>` : ''}
-                  ${(() => {
-                    const totalVal = bedCropList.reduce((sum, crop) => {
-                      const segSpecs = crop.beds.filter(s => parseBedSpec(s).bedId === bed);
-                      const v = segSpecs.reduce((sv, spec) => {
-                        const val = calcValue({...crop, beds:[spec]});
-                        return sv + (val || 0);
-                      }, 0);
-                      return sum + v;
-                    }, 0);
-                    return totalVal > 0 ? `&nbsp;·&nbsp; <span style="color:#d97706;font-weight:700">~${(Math.round(totalVal/100)/10).toLocaleString('nb-NO')}k</span>` : '';
-                  })()}
                 </div>
               </div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+            ${(() => {
+              const totalVal = bedCropList.reduce((sum, crop) => {
+                const segSpecs = crop.beds.filter(s => parseBedSpec(s).bedId === bed);
+                const v = segSpecs.reduce((sv, spec) => {
+                  const val = calcValue({...crop, beds:[spec]});
+                  return sv + (val || 0);
+                }, 0);
+                return sum + v;
+              }, 0);
+              return totalVal > 0
+                ? `<div style="text-align:right;flex-shrink:0">
+                    <div style="font-size:18px;font-weight:300;color:#d97706;line-height:1">~${(Math.round(totalVal/100)/10).toLocaleString('nb-NO')}k</div>
+                    <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div>
+                  </div>`
+                : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>`;
+            })()}
           </div>
         </div>
       </div>`;
@@ -3615,6 +3619,15 @@ function calcGang(crop, bedSpec) {
   return Math.round(gang * 10) / 10;
 }
 
+function toggleVektTotalFields() {
+  const upp = parseFloat(document.getElementById('c-unitsperplant')?.value) || 1;
+  const show = upp !== 1;
+  const vw = document.getElementById('c-vekttotal-wrap');
+  const vaw = document.getElementById('c-valuetotal-wrap');
+  if (vw)  vw.style.display  = show ? '' : 'none';
+  if (vaw) vaw.style.display = show ? '' : 'none';
+}
+
 function updateUnitLabels() {
   const unit = document.getElementById('c-unit')?.value || 'stk';
   const isKg = unit === 'kg';
@@ -3717,7 +3730,7 @@ function openEditCrop(id) {
   const unitSel = document.getElementById('c-unit');
   if (unitSel) { unitSel.value = c.unit || 'stk'; }
   const uppEl = document.getElementById('c-unitsperplant');
-  if (uppEl) { uppEl.value = c.unitsPerPlant || ''; delete uppEl.dataset.custom; }
+  if (uppEl) { uppEl.value = c.unitsPerPlant || 1; delete uppEl.dataset.custom; }
   const vtEl = document.getElementById('c-vekttotal');
   if (vtEl) { vtEl.value = c.vektTotal || ''; delete vtEl.dataset.custom; }
   const valEl = document.getElementById('c-valuetotal');
@@ -3725,7 +3738,7 @@ function openEditCrop(id) {
   const _catSel = document.getElementById('c-category');
   _catSel.innerHTML = cropCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
   _catSel.value = c.category || 'Andre';
-  setTimeout(updateUnitLabels, 0);
+  setTimeout(() => { updateUnitLabels(); toggleVektTotalFields(); }, 0);
   document.getElementById('c-beds').value = c.beds.join(', ');
   document.getElementById('c-rowspacing').value = c.rowSpacing;
   document.getElementById('c-plantspacing').value = c.plantSpacing;
@@ -3755,7 +3768,8 @@ function openAddCrop() {
   const unitSelA = document.getElementById('c-unit');
   if (unitSelA) { unitSelA.value = 'stk'; }
   const uppElA = document.getElementById('c-unitsperplant');
-  if (uppElA) { uppElA.value = ''; delete uppElA.dataset.custom; }
+  if (uppElA) { uppElA.value = 1; delete uppElA.dataset.custom; }
+  toggleVektTotalFields();
   const vtElA = document.getElementById('c-vekttotal');
   if (vtElA) { vtElA.value = ''; delete vtElA.dataset.custom; }
   const valElA = document.getElementById('c-valuetotal');
@@ -3840,7 +3854,7 @@ function saveCrop() {
     pricePerKg: parseFloat(document.getElementById('c-pricepkg').value) || 0,
     weightG: parseFloat(document.getElementById('c-weightg').value) || 0,
     unit: document.getElementById('c-unit')?.value || 'stk',
-    unitsPerPlant: parseFloat(document.getElementById('c-unitsperplant')?.value) || 0,
+    unitsPerPlant: parseFloat(document.getElementById('c-unitsperplant')?.value) || 1,
     vektTotal: parseFloat(document.getElementById('c-vekttotal')?.value) || 0,
     pricePerUnit: parseFloat(document.getElementById('c-priceunit')?.value) || 0,
     pricePerUnitCustom: !!document.getElementById('c-priceunit')?.dataset.custom,
@@ -4997,7 +5011,7 @@ function importFileObject(file, skipSave = false) {
             pricePerKg:      parseFloat(r[11]) || 0,
             weightG:         parseFloat(r[12]) || 0,
             unit:            String(r[13] || 'stk'),
-            unitsPerPlant:   parseFloat(r[14]) || 0,
+            unitsPerPlant:   parseFloat(r[14]) || 1,
             vektTotal:       parseFloat(r[15]) || 0,
             pricePerUnit:    parseFloat(r[16]) || 0,
             pricePerUnitCustom: !!(r[16] && parseFloat(r[16])),
