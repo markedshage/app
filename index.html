@@ -2969,7 +2969,7 @@ function renderSenger() {
       }, 0);
       const _fk = fieldTotalVal >= 1000 ? (fieldTotalVal >= 10000 ? Math.round(fieldTotalVal/1000) : Math.round(fieldTotalVal/100)/10) : null;
       const _fkStr = _fk !== null ? ' ~' + _fk.toLocaleString('nb-NO') + 'k' : '';
-      html += `<div style="margin:${letter === fieldKeys[0] ? '0' : '20px'} 0 10px">
+      html += `<div style="margin:${letter === fieldKeys[0] ? '0' : '20px'} 0 10px;text-align:center">
         <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${_fkStr ? `<span style="font-size:14px;color:#d97706;font-weight:700"> ${_fkStr}</span>` : ''}
       </div>`;
     }
@@ -3003,10 +3003,6 @@ function renderSenger() {
                         ? `<span>${mainCrop.name}</span>`
                         : `<span>${bedCropList.map(c=>c.name).join(' · ')}</span>`)
                     : `<span style="color:var(--text-muted)">Ledig</span>`}
-                </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:1px">
-                  Seng ${bed} &nbsp;·&nbsp; ${sz.length}m × ${sz.width}m
-                  ${mainCrop ? `&nbsp;·&nbsp; <span style="color:${STATUS[mainCrop.status]?.color||'#86efac'}">${STATUS[mainCrop.status]?.label||mainCrop.status}</span>` : ''}
                 </div>
               </div>
             </div>
