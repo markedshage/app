@@ -376,9 +376,19 @@
       <div><label class="field-label">Planteavstand (cm)</label><input class="field-input" id="c-plantspacing" type="number" value="20"></div>
       <div><label class="field-label">Rader (per bed)</label><input class="field-input" id="c-rows" type="number" value="2"></div>
       <div><label class="field-label">Frø per klynge</label><input class="field-input" id="c-seedspercluster" type="number" value="1" min="1"></div>
+      <div><label class="field-label">Salgsenhet</label>
+        <select class="field-input" id="c-unit" onchange="updateUnitLabels()">
+          <option value="stk">stk</option>
+          <option value="bunt">bunt</option>
+          <option value="boks">boks</option>
+        </select>
+      </div>
       <div><label class="field-label">Pris pr/kg (kr)</label><input class="field-input" id="c-pricepkg" type="number" step="0.5" value="0" min="0" oninput="recalcPricePerUnit()"></div>
-      <div><label class="field-label">Vekt per enhet (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0" oninput="recalcPricePerUnit()"></div>
-      <div style="position:relative"><label class="field-label">Pris per stk/bunt (kr) <span id="c-priceunit-auto" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span></label><input class="field-input" id="c-priceunit" type="number" step="0.5" value="0" min="0" oninput="this.dataset.custom='1'" placeholder="Auto fra kg×vekt"></div>
+      <div><label id="c-weightg-label" class="field-label">Vekt per stk (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0" oninput="recalcPricePerUnitFromWeight()"></div>
+      <div style="position:relative"><label id="c-priceunit-label" class="field-label">Pris per stk (kr) <span id="c-priceunit-auto" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span></label><input class="field-input" id="c-priceunit" type="number" step="0.5" value="0" min="0" oninput="recalcWeightFromPrice()" placeholder="Auto fra kg×vekt"></div>
+      <div><label id="c-unitsperplant-label" class="field-label">Stk per plante</label><input class="field-input" id="c-unitsperplant" type="number" step="0.1" value="" min="0" oninput="recalcVektTotal()" placeholder="f.eks. 3"></div>
+      <div><label id="c-vekttotal-label" class="field-label">Vekt total (g)</label><input class="field-input" id="c-vekttotal" type="number" step="1" value="" min="0" oninput="recalcUnitsPerPlantFromVekt()" placeholder="Auto fra vekt×enheter"></div>
+      <div><label class="field-label">Verdi total (kr) <span style="font-size:10px;color:var(--text-muted)">(beregnet)</span></label><input class="field-input" id="c-valuetotal" type="number" step="1" value="" min="0" readonly style="opacity:0.7;cursor:default" placeholder="Auto fra vekt×pris/kg"></div>
     </div>
     <div class="form-grid">
       <div><label class="field-label">Sådato</label><button type="button" class="date-display empty" id="c-sown-btn" onclick="openCal('c-sown-btn','c-sown-val')">Velg dato 📅</button><input type="hidden" id="c-sown-val"></div>
@@ -956,8 +966,12 @@ function calcPlants(crop) {
 }
 
 function calcValue(crop) {
-  // value (kr) = plants × weightG/1000 × pricePerKg
-  if (!crop.pricePerKg || !crop.weightG) return null;
+  if (!crop.pricePerKg) return null;
+  // Prefer vektTotal-based calculation if available
+  if (crop.vektTotal && crop.vektTotal > 0) {
+    return Math.round(calcPlants(crop) * (crop.vektTotal / 1000) * crop.pricePerKg);
+  }
+  if (!crop.weightG) return null;
   return Math.round(calcPlants(crop) * (crop.weightG / 1000) * crop.pricePerKg);
 }
 
@@ -3573,18 +3587,95 @@ function calcGang(crop, bedSpec) {
   return Math.round(gang * 10) / 10;
 }
 
+function updateUnitLabels() {
+  const unit = document.getElementById('c-unit')?.value || 'stk';
+  const isKg = unit === 'kg';
+  const wLabel = document.getElementById('c-weightg-label');
+  const pLabel = document.getElementById('c-priceunit-label');
+  const autoSpan = document.getElementById('c-priceunit-auto');
+  if (wLabel) wLabel.textContent = isKg ? 'Vekt per enhet (g)' : 'Vekt per ' + unit + ' (g)';
+  if (pLabel) {
+    const baseText = isKg ? 'Pris per kg (kr)' : 'Pris per ' + unit + ' (kr)';
+    pLabel.textContent = baseText + ' ';
+    if (autoSpan) pLabel.appendChild(autoSpan);
+  }
+  const uppLabel = document.getElementById('c-unitsperplant-label');
+  const vtLabel = document.getElementById('c-vekttotal-label');
+  if (uppLabel) uppLabel.textContent = unit + ' per plante';
+  if (vtLabel) vtLabel.textContent = 'Vekt total (g)';
+  recalcPricePerUnit();
+  recalcVektTotal();
+}
+
 function recalcPricePerUnit() {
   const pkg = parseFloat(document.getElementById('c-pricepkg')?.value) || 0;
   const wg  = parseFloat(document.getElementById('c-weightg')?.value) || 0;
   const field = document.getElementById('c-priceunit');
   const label = document.getElementById('c-priceunit-auto');
-  if (!field || field.dataset.custom) {
-    if (label) label.textContent = field?.dataset.custom ? '(egendefinert)' : '';
+  if (!field) return;
+  if (field.dataset.custom === '1') {
+    if (label) label.textContent = '(egendefinert)';
+    recalcValueTotal();
     return;
   }
   const calc = pkg && wg ? Math.round(pkg * wg / 1000 * 100) / 100 : 0;
   field.value = calc || '';
   if (label) label.textContent = calc > 0 ? '(beregnet)' : '';
+  recalcValueTotal();
+}
+
+function recalcPricePerUnitFromWeight() {
+  delete document.getElementById('c-priceunit')?.dataset.custom;
+  delete document.getElementById('c-vekttotal')?.dataset.custom;
+  recalcPricePerUnit();
+  recalcVektTotal();
+}
+
+function recalcWeightFromPrice() {
+  const field = document.getElementById('c-priceunit');
+  if (!field) return;
+  field.dataset.custom = '1';
+  const pu = parseFloat(field.value) || 0;
+  const pkg = parseFloat(document.getElementById('c-pricepkg')?.value) || 0;
+  const wg = document.getElementById('c-weightg');
+  const label = document.getElementById('c-priceunit-auto');
+  if (label) label.textContent = '(egendefinert)';
+  if (pkg && pu && wg) {
+    const calcWg = Math.round(pu / pkg * 1000);
+    if (calcWg > 0 && calcWg < 100000) wg.value = calcWg;
+  }
+  recalcVektTotal();
+}
+
+function recalcValueTotal() {
+  const vt = parseFloat(document.getElementById('c-vekttotal')?.value) || 0;
+  const pkg = parseFloat(document.getElementById('c-pricepkg')?.value) || 0;
+  const field = document.getElementById('c-valuetotal');
+  if (!field) return;
+  field.value = (vt && pkg) ? Math.round(vt / 1000 * pkg) : '';
+}
+
+function recalcVektTotal() {
+  const wg = parseFloat(document.getElementById('c-weightg')?.value) || 0;
+  const upp = parseFloat(document.getElementById('c-unitsperplant')?.value) || 0;
+  const vtField = document.getElementById('c-vekttotal');
+  if (!vtField || vtField.dataset.custom === '1') return;
+  vtField.value = (wg && upp) ? Math.round(wg * upp) : '';
+  recalcValueTotal();
+}
+
+function recalcUnitsPerPlantFromVekt() {
+  // Vekt total entered → back-calc enheter per plante
+  const vtField = document.getElementById('c-vekttotal');
+  if (!vtField) return;
+  vtField.dataset.custom = '1';
+  const vt = parseFloat(vtField.value) || 0;
+  const wg = parseFloat(document.getElementById('c-weightg')?.value) || 0;
+  const uppField = document.getElementById('c-unitsperplant');
+  if (wg && vt && uppField) {
+    const calc = Math.round((vt / wg) * 10) / 10;
+    if (calc > 0) uppField.value = calc;
+  }
 }
 
 function openEditCrop(id) {
@@ -3595,9 +3686,18 @@ function openEditCrop(id) {
   document.getElementById('c-name').value = c.name;
   document.getElementById('c-emoji').value = c.emoji;
   document.getElementById('c-family').value = c.family;
+  const unitSel = document.getElementById('c-unit');
+  if (unitSel) { unitSel.value = c.unit || 'stk'; }
+  const uppEl = document.getElementById('c-unitsperplant');
+  if (uppEl) { uppEl.value = c.unitsPerPlant || ''; delete uppEl.dataset.custom; }
+  const vtEl = document.getElementById('c-vekttotal');
+  if (vtEl) { vtEl.value = c.vektTotal || ''; delete vtEl.dataset.custom; }
+  const valEl = document.getElementById('c-valuetotal');
+  if (valEl) valEl.value = '';
   const _catSel = document.getElementById('c-category');
   _catSel.innerHTML = cropCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
   _catSel.value = c.category || 'Andre';
+  setTimeout(updateUnitLabels, 0);
   document.getElementById('c-beds').value = c.beds.join(', ');
   document.getElementById('c-rowspacing').value = c.rowSpacing;
   document.getElementById('c-plantspacing').value = c.plantSpacing;
@@ -3624,6 +3724,14 @@ function openAddCrop() {
   document.getElementById('c-name').value = '';
   document.getElementById('c-emoji').value = '🌱';
   document.getElementById('c-family').value = '';
+  const unitSelA = document.getElementById('c-unit');
+  if (unitSelA) { unitSelA.value = 'stk'; }
+  const uppElA = document.getElementById('c-unitsperplant');
+  if (uppElA) { uppElA.value = ''; delete uppElA.dataset.custom; }
+  const vtElA = document.getElementById('c-vekttotal');
+  if (vtElA) { vtElA.value = ''; delete vtElA.dataset.custom; }
+  const valElA = document.getElementById('c-valuetotal');
+  if (valElA) valElA.value = '';
   const _catSelA = document.getElementById('c-category');
   _catSelA.innerHTML = cropCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
   _catSelA.value = 'Andre';
@@ -3703,6 +3811,9 @@ function saveCrop() {
     status: document.getElementById('c-status').value,
     pricePerKg: parseFloat(document.getElementById('c-pricepkg').value) || 0,
     weightG: parseFloat(document.getElementById('c-weightg').value) || 0,
+    unit: document.getElementById('c-unit')?.value || 'stk',
+    unitsPerPlant: parseFloat(document.getElementById('c-unitsperplant')?.value) || 0,
+    vektTotal: parseFloat(document.getElementById('c-vekttotal')?.value) || 0,
     pricePerUnit: parseFloat(document.getElementById('c-priceunit')?.value) || 0,
     pricePerUnitCustom: !!document.getElementById('c-priceunit')?.dataset.custom,
     notes: document.getElementById('c-notes').value,
@@ -4855,12 +4966,13 @@ function importFileObject(file, skipSave = false) {
             rows:         parseInt(r[7])   || 2,
             seedsPerCluster: parseInt(r[8]) || 1,
             // col 9 = antall planter (calculated), col 10 = estimert verdi (calculated), skip both
-            sownDate:     parseImportDate(r[13]),
-            sowLog:       parseImportDate(r[14]),
-            plantedDate:  parseImportDate(r[15]),
-            plantLog:     parseImportDate(r[16]),
-            notes:        String(r[17] || ''),
-            category:     String(r[18] || 'Andre'),
+            unit:         String(r[13] || 'stk'),
+            sownDate:     parseImportDate(r[14]),
+            sowLog:       parseImportDate(r[15]),
+            plantedDate:  parseImportDate(r[16]),
+            plantLog:     parseImportDate(r[17]),
+            notes:        String(r[18] || ''),
+            category:     String(r[19] || 'Andre'),
             pricePerKg:   parseFloat(r[11]) || 0,
             weightG:      parseFloat(r[12]) || 0,
           });
@@ -4948,13 +5060,15 @@ function importFileObject(file, skipSave = false) {
         }
       }
 
-      // ── Parse Kassetyper (JSON sheet) ──
+      // ── Parse Kassetyper ──
       let newBoxTypes = null;
       const wsKt = wb.Sheets['Kassetyper'];
       if (wsKt) {
         try {
-          const raw = XLSX.utils.sheet_to_json(wsKt, { header: 1 });
-          if (raw[1] && raw[1][0]) newBoxTypes = JSON.parse(String(raw[1][0]));
+          const rows = XLSX.utils.sheet_to_json(wsKt, { header: 1 });
+          const jr = rows.find(r => r[0] === '__json__');
+          const js = jr ? jr[1] : (rows[1] && rows[1][0]);
+          if (js) newBoxTypes = JSON.parse(String(js));
         } catch(e) { console.warn('Kassetyper parse error:', e); }
       }
 
@@ -4964,7 +5078,7 @@ function importFileObject(file, skipSave = false) {
       if (wsKu2) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsKu2, { header: 1 });
-          if (raw[1] && raw[1][0]) newBoxWeeks = JSON.parse(String(raw[1][0]));
+          const _jrBW = raw.find(r => r[0] === '__json__'); const _jsBW = _jrBW ? _jrBW[1] : (raw[1] && raw[1][0]); if (_jsBW) newBoxWeeks = JSON.parse(String(_jsBW));
         } catch(e) { console.warn('Kasseuker parse error:', e); }
       }
 
@@ -4974,7 +5088,7 @@ function importFileObject(file, skipSave = false) {
       if (wsMkt) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsMkt, { header: 1 });
-          if (raw[1] && raw[1][0]) newMarket = JSON.parse(String(raw[1][0]));
+          const _jrM = raw.find(r => r[0] === '__json__'); const _jsM = _jrM ? _jrM[1] : (raw[1] && raw[1][0]); if (_jsM) newMarket = JSON.parse(String(_jsM));
         } catch(e) { console.warn('Markeder parse error:', e); }
       }
 
@@ -4984,7 +5098,7 @@ function importFileObject(file, skipSave = false) {
       if (wsHl) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsHl, { header: 1 });
-          if (raw[1] && raw[1][0]) newHarvestLog = JSON.parse(String(raw[1][0]));
+          const _jrHL = raw.find(r => r[0] === '__json__'); const _jsHL = _jrHL ? _jrHL[1] : (raw[1] && raw[1][0]); if (_jsHL) newHarvestLog = JSON.parse(String(_jsHL));
         } catch(e) { console.warn('Høstelogg parse error:', e); }
       }
 
@@ -4994,11 +5108,21 @@ function importFileObject(file, skipSave = false) {
       if (wsKart) {
         try {
           const raw = XLSX.utils.sheet_to_json(wsKart, { header: 1 });
-          if (raw[1] && raw[1][0]) newGardenMap = JSON.parse(String(raw[1][0]));
+          const _jrK = raw.find(r => r[0] === '__json__'); const _jsK = _jrK ? _jrK[1] : (raw[1] && raw[1][0]); if (_jsK) newGardenMap = JSON.parse(String(_jsK));
         } catch(e) { console.warn('Kart parse error:', e); }
       }
 
-      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks, customers: newCustomers, boxTypes: newBoxTypes, boxWeeks: newBoxWeeks, market: newMarket, harvestLog: newHarvestLog, gardenMap: newGardenMap };
+      // ── Parse Oppgavehistorikk (JSON sheet) ──
+      let newTaskHistory = null;
+      const wsTaskH = wb.Sheets['Oppgavehistorikk'];
+      if (wsTaskH) {
+        try {
+          const raw = XLSX.utils.sheet_to_json(wsTaskH, { header: 1 });
+          const _jrT = raw.find(r => r[0] === '__json__'); const _jsT = _jrT ? _jrT[1] : (raw[1] && raw[1][0]); if (_jsT) newTaskHistory = JSON.parse(String(_jsT));
+        } catch(e) { console.warn('Oppgavehistorikk parse error:', e); }
+      }
+
+      pendingImport = { crops: newCrops, bedSizes: newBedSizes, bedIDs: newBedIDs, tasks: newTasks, customers: newCustomers, boxTypes: newBoxTypes, boxWeeks: newBoxWeeks, market: newMarket, harvestLog: newHarvestLog, gardenMap: newGardenMap, taskHistory: newTaskHistory };
       confirmImport(skipSave);
       resolve();
     } catch(err) {
@@ -5026,6 +5150,10 @@ function confirmImport(skipSave = false) {
   if (pendingImport.market)   deliveryMarket = pendingImport.market;
   if (pendingImport.harvestLog) harvestLog = pendingImport.harvestLog;
   if (pendingImport.gardenMap) { gardenMap = pendingImport.gardenMap; saveGardenMap(); }
+  if (pendingImport.taskHistory) {
+    taskHistory = pendingImport.taskHistory;
+    try { localStorage.setItem('mh_task_history', JSON.stringify(taskHistory)); } catch(e) {}
+  }
   saveLevering();
   pendingImport = null;
   selectedBed = null;
@@ -5049,7 +5177,7 @@ function buildWorkbook() {
     'Radavstand (cm)', 'Planteavstand (cm)', 'Rader', 'Frø per klynge',
     'Antall planter totalt', 'Estimert verdi (kr)',
     'Pris pr/kg (kr)', 'Vekt per enhet (g)',
-    'Sådato', 'Sålogg (dato)', 'Plantedato', 'Plantelogg (dato)', 'Notater', 'Kategori'
+    'Salgsenhet', 'Sådato', 'Sålogg (dato)', 'Plantedato', 'Plantelogg (dato)', 'Notater', 'Kategori'
   ];
   const cropRows = crops.map(c => [
     c.name, c.emoji, c.family,
@@ -5059,7 +5187,7 @@ function buildWorkbook() {
     calcPlants(c),
     calcValue(c) !== null ? calcValue(c) : '',
     c.pricePerKg || '', c.weightG || '',
-    fmtDate(c.sownDate), fmtDate(c.sowLog), fmtDate(c.plantedDate), fmtDate(c.plantLog), c.notes, c.category || 'Andre'
+    c.unit || 'stk', fmtDate(c.sownDate), fmtDate(c.sowLog), fmtDate(c.plantedDate), fmtDate(c.plantLog), c.notes, c.category || 'Andre'
   ]);
   const wsVekster = XLSX.utils.aoa_to_sheet([cropHeaders, ...cropRows]);
   wsVekster['!cols'] = [
@@ -5121,45 +5249,80 @@ function buildWorkbook() {
   styleHeaderRow(wsKunder, customerHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsKunder, 'Kunder');
 
-  // ── Sheet 5: Kassetyper (JSON) ────────────────────────────────
-  const wsKassetyper = XLSX.utils.aoa_to_sheet([
-    ['Data (ikke rediger)'],
-    [JSON.stringify(boxTypes)]
+  // ── Sheet 5: Kassetyper ───────────────────────────────────────
+  const ktHeaders = ['Navn', 'Kassepris (kr)', 'Uker fra', 'Uker til', 'Frekvens', 'Ukedager', 'Basis-vekster'];
+  const ktRows = boxTypes.map(bt => [
+    bt.name || '',
+    bt.salePrice || '',
+    bt.startWeek || '',
+    bt.endWeek || '',
+    bt.frequency === 'biweekly' ? 'Annenhver uke' : bt.frequency === 'monthly' ? 'Månedlig' : 'Ukentlig',
+    (bt.weekdays||[]).map(d => ['Man','Tir','Ons','Tor','Fre','Lør','Søn'][d]).join(', '),
+    (bt.baseItems||[]).map(item => { const cr = crops.find(c=>c.id===item.cropId); return cr ? cr.name + ' ' + (item.qty||'') + ' ' + (item.unit||'') : ''; }).filter(Boolean).join(', ')
   ]);
-  wsKassetyper['!cols'] = [{wch:120}];
+  // Store full JSON in last row for import (hidden)
+  const wsKassetyper = XLSX.utils.aoa_to_sheet([ktHeaders, ...ktRows, ['__json__', JSON.stringify(boxTypes)]]);
+  wsKassetyper['!cols'] = [{wch:22},{wch:14},{wch:10},{wch:10},{wch:16},{wch:20},{wch:40}];
+  styleHeaderRow(wsKassetyper, ktHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsKassetyper, 'Kassetyper');
 
-  // ── Sheet 6: Kasseuker (JSON) ─────────────────────────────────
-  const wsKasseuker = XLSX.utils.aoa_to_sheet([
-    ['Data (ikke rediger)'],
-    [JSON.stringify(boxWeeks)]
-  ]);
-  wsKasseuker['!cols'] = [{wch:120}];
+  // ── Sheet 6: Kasseuker ────────────────────────────────────────
+  const kuHeaders = ['Kassetype', 'Uke', 'År', 'Vekster (innhold)', 'Ant. kasser', 'Logget'];
+  const kuRows = boxWeeks.map(bw => {
+    const bt = boxTypes.find(t => t.id == bw.boxTypeId);
+    const items = (bw.items||[]).map(item => { const cr = crops.find(c=>c.id===item.cropId); return cr ? cr.name + ' ' + (item.qty||'') + ' ' + (item.unit||'') : ''; }).filter(Boolean).join(', ');
+    const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
+    const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id||cu.name] !== false);
+    const total = activeCu.length + (bw.extraBoxes||0);
+    return [bt?.name||'', bw.week||'', bw.year||'', items, total||'', bw.harvested ? 'Ja' : 'Nei'];
+  });
+  const wsKasseuker = XLSX.utils.aoa_to_sheet([kuHeaders, ...kuRows, ['__json__', JSON.stringify(boxWeeks)]]);
+  wsKasseuker['!cols'] = [{wch:22},{wch:6},{wch:6},{wch:50},{wch:14},{wch:10}];
+  styleHeaderRow(wsKasseuker, kuHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsKasseuker, 'Kasseuker');
 
-  // ── Sheet 7: Markeder (JSON) ──────────────────────────────────
-  const wsMarkeder = XLSX.utils.aoa_to_sheet([
-    ['Data (ikke rediger)'],
-    [JSON.stringify(deliveryMarket)]
-  ]);
-  wsMarkeder['!cols'] = [{wch:120}];
+  // ── Sheet 7: Markeder ─────────────────────────────────────────
+  const mktHeaders = ['Navn', 'Dato', 'Status', 'Vekster', 'Estimert verdi (kr)'];
+  const mktRows = deliveryMarket.map(mkt => {
+    const items = (mkt.items||[]).map(item => { const cr = crops.find(c=>c.id===item.cropId); return cr ? cr.name + ' ' + (item.qty||'') + ' ' + (item.unit||'') : ''; }).filter(Boolean).join(', ');
+    const val = (mkt.items||[]).reduce((s,item) => s + calcItemValue(crops.find(c=>c.id===item.cropId), item.qty||0, item.unit), 0);
+    return [mkt.name||'', mkt.date||'', mkt.done ? 'Gjennomført' : 'Planlagt', items, val > 0 ? Math.round(val) : ''];
+  });
+  const wsMarkeder = XLSX.utils.aoa_to_sheet([mktHeaders, ...mktRows, ['__json__', JSON.stringify(deliveryMarket)]]);
+  wsMarkeder['!cols'] = [{wch:24},{wch:12},{wch:14},{wch:50},{wch:18}];
+  styleHeaderRow(wsMarkeder, mktHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsMarkeder, 'Markeder');
 
-  // ── Sheet 8: Høstelogg (JSON) ─────────────────────────────────
-  const wsHoest = XLSX.utils.aoa_to_sheet([
-    ['Data (ikke rediger)'],
-    [JSON.stringify(harvestLog)]
-  ]);
-  wsHoest['!cols'] = [{wch:120}];
+  // ── Sheet 8: Høstelogg ────────────────────────────────────────
+  const hlHeaders = ['Dato', 'Vekst', 'Mengde', 'Enhet', 'Destinasjon', 'Notat'];
+  const hlRows = harvestLog.map(h => {
+    const cr = crops.find(c=>c.id===h.cropId);
+    return [h.date||'', cr ? cr.name : '', h.qty||'', h.unit||'', h.dest||'', h.note||''];
+  });
+  const wsHoest = XLSX.utils.aoa_to_sheet([hlHeaders, ...hlRows, ['__json__', JSON.stringify(harvestLog)]]);
+  wsHoest['!cols'] = [{wch:12},{wch:20},{wch:10},{wch:8},{wch:12},{wch:30}];
+  styleHeaderRow(wsHoest, hlHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsHoest, 'Høstelogg');
 
-  // ── Sheet 9: Kart (JSON) ──────────────────────────────────────
+  // ── Sheet 9: Kart (JSON backup) ───────────────────────────────
   const wsKart = XLSX.utils.aoa_to_sheet([
-    ['Data (ikke rediger)'],
+    ['Kartdata (teknisk backup for import)'],
     [JSON.stringify(gardenMap || {})]
   ]);
-  wsKart['!cols'] = [{wch:120}];
+  wsKart['!cols'] = [{wch:30}];
   XLSX.utils.book_append_sheet(wb, wsKart, 'Kart');
+
+  // ── Sheet 10: Oppgavehistorikk ────────────────────────────────
+  const thHeaders = ['Dato fullført', 'Oppgave', 'Prioritet'];
+  const thRows = (taskHistory||[]).map(t => [
+    t.completedAt ? fmtDate(t.completedAt.split('T')[0].split('-').reverse().join('-')) : '',
+    t.text||'',
+    t.priority ? t.priority.charAt(0).toUpperCase()+t.priority.slice(1) : ''
+  ]);
+  const wsTaskHist = XLSX.utils.aoa_to_sheet([thHeaders, ...thRows, ['__json__', JSON.stringify(taskHistory||[])]]);
+  wsTaskHist['!cols'] = [{wch:16},{wch:50},{wch:12}];
+  styleHeaderRow(wsTaskHist, thHeaders.length);
+  XLSX.utils.book_append_sheet(wb, wsTaskHist, 'Oppgavehistorikk');
 
   // ── Download ──────────────────────────────────────────────────
   const date = new Date();
@@ -7888,8 +8051,7 @@ function openNyRegistrering() {
           <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <select id="hoest-unit" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
             <option value="stk">stk</option>
-            <option value="kg">kg</option>
-            <option value="bunt">bunt</option>
+              <option value="bunt">bunt</option>
             <option value="boks">boks</option>
           </select>
         </div>
@@ -7926,8 +8088,7 @@ function renderLevHoest(el) {
           <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <select id="hoest-unit" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
             <option value="stk">stk</option>
-            <option value="kg">kg</option>
-            <option value="g">g</option>
+              <option value="g">g</option>
           </select>
         </div>
         <select id="hoest-dest" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
