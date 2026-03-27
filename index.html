@@ -886,7 +886,7 @@ function checkOverlap(bedSpecs, excludeCropId) {
 }
 
 function badge(status) {
-  const s = STATUS[status];
+  const s = STATUS[status] || STATUS['planlagt'];
   return `<span class="badge" style="background:${s.bg};color:${s.color}">${s.label}</span>`;
 }
 
@@ -3220,17 +3220,18 @@ function renderVekster() {
               <div class="crop-family">${c.family ? c.name : ''}</div>            </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            <div onclick="event.stopPropagation()" style="display:flex;gap:3px;flex-wrap:nowrap">
-              ${Object.entries(STATUS).map(([key, s]) => `
-                <button onclick="event.stopPropagation();setCropStatus(${c.id},'${key}')"
+            <div onclick="event.stopPropagation()" style="display:grid;grid-template-columns:1fr 1fr;gap:3px;width:120px">
+              ${Object.entries(STATUS).map(([key, s]) => {
+                const active = c.status===key;
+                return `<button onclick="event.stopPropagation();setCropStatus(${c.id},'${key}')"
                   title="${s.label}"
-                  style="padding:3px 6px;border-radius:20px;border:1.5px solid ${c.status===key ? s.color : 'transparent'};
-                  background:${c.status===key ? s.bg : 'transparent'};
-                  color:${c.status===key ? s.color : 'var(--text-dim)'};
-                  cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap;
-                  font-weight:${c.status===key ? '600' : '400'};
-                  transition:all 0.15s">${s.label.split(' ')[0]}</button>
-              `).join('')}
+                  style="padding:3px 4px;border-radius:20px;border:1.5px solid ${active ? s.color : 'transparent'};
+                  background:${active ? s.bg : 'transparent'};
+                  color:${active ? s.color : 'var(--text-dim)'};
+                  cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap;text-align:center;
+                  font-weight:${active ? '600' : '400'};
+                  transition:all 0.15s">${s.label.split(' ')[0]}</button>`;
+              }).join('')}
             </div>
           </div>
         </div>
@@ -4976,6 +4977,8 @@ function loadFromLocal() {
     if (data.bedIDs && data.bedIDs.length) BED_IDS = data.bedIDs;
     if (data.gardenMap) gardenMap = data.gardenMap;
     if (data.taskHistory) taskHistory = data.taskHistory;
+    // Normalize any removed statuses
+    crops = crops.map(c => STATUS[c.status] ? c : {...c, status: 'plantet'});
     return true;
   } catch(e) { return false; }
 }
@@ -5234,7 +5237,7 @@ function buildWorkbook() {
     calcPlants(c),
     calcValue(c) !== null ? calcValue(c) : '',
     c.pricePerKg || '', c.weightG || '',
-    c.unit || 'stk', c.unitsPerPlant || '', c.vektTotal || '', c.pricePerUnit || '',
+    c.unit || 'stk', c.unitsPerPlant || 1, c.vektTotal || '', c.pricePerUnit || '',
     fmtDate(c.sownDate), fmtDate(c.sowLog), fmtDate(c.plantedDate), fmtDate(c.plantLog), c.notes, c.category || 'Andre'
   ]);
   const wsVekster = XLSX.utils.aoa_to_sheet([cropHeaders, ...cropRows]);
@@ -5380,10 +5383,15 @@ function buildWorkbook() {
 }
 
 function exportToExcel() {
-  const wb = buildWorkbook();
-  const date = new Date();
-  const dateStr = `${String(date.getDate()).padStart(2,'0')}-${String(date.getMonth()+1).padStart(2,'0')}-${date.getFullYear()}`;
-  XLSX.writeFile(wb, `Markedshage_${dateStr}.xlsx`);
+  try {
+    const wb = buildWorkbook();
+    const date = new Date();
+    const dateStr = `${String(date.getDate()).padStart(2,'0')}-${String(date.getMonth()+1).padStart(2,'0')}-${date.getFullYear()}`;
+    XLSX.writeFile(wb, `Markedshage_${dateStr}.xlsx`);
+  } catch(e) {
+    console.error('Excel export error:', e);
+    alert('Eksport feilet: ' + e.message + '\n\nSjekk konsollen for detaljer.');
+  }
 }
 
 function styleHeaderRow(ws, numCols) {
