@@ -438,7 +438,7 @@
     <div class="form-full"><label class="field-label">Prioritet</label>
       <div class="priority-row" id="priority-btns">
         <button class="priority-btn" onclick="setPriority('høy')" style="color:#f87171;border-color:#f87171">Høy</button>
-        <button class="priority-btn active" onclick="setPriority('middels')" style="color:#fbbf24;border-color:#fbbf24">Middels</button>
+        <button class="priority-btn active" onclick="setPriority('middels')" style="color:#d97706;border-color:#d97706">Middels</button>
         <button class="priority-btn" onclick="setPriority('lav')" style="color:var(--accent-soft);border-color:var(--accent-soft)">Lav</button>
       </div>
     </div>
@@ -453,7 +453,7 @@
   <div class="modal">
     <div class="modal-title">Importer fra Excel</div>
     <div id="import-preview" style="font-size:13px;color:var(--text-muted);margin-bottom:16px"></div>
-    <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#fbbf24">
+    <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#d97706">
       ⚠️ Dette vil erstatte all eksisterende data med innholdet fra filen.
     </div>
     <div class="modal-actions">
@@ -511,11 +511,20 @@
 </div>
 
 <script>
+function fmtKr(val) {
+  if (val >= 1000) {
+    const k = val / 1000;
+    const rounded = Math.round(k * 10) / 10;
+    return (Number.isInteger(rounded) || rounded >= 10 ? Math.round(k) : rounded).toLocaleString('nb-NO') + 'k';
+  }
+  return Math.round(val).toLocaleString('nb-NO');
+}
+
 const STATUS = {
   planlagt:     { label: "Planlagt",     color: "#a78bfa", bg: "rgba(167,139,250,0.15)" },
   sådd:         { label: "Sådd",         color: "#60a5fa", bg: "rgba(96,165,250,0.15)" },
   plantet:      { label: "Plantet",      color: "#34d399", bg: "rgba(52,211,153,0.15)" },
-  høstet:       { label: "Høstet",       color: "#fbbf24", bg: "rgba(251,191,36,0.15)" },
+  høstet:       { label: "Høstet",       color: "#d97706", bg: "rgba(251,191,36,0.15)" },
 };
 
 let BED_IDS = ["A1","A2","A3","B1","B2","B3","C1","C2","C3","D1","D2","D3","E1","E2","E3","F1","F2","F3"];
@@ -901,7 +910,7 @@ function renderOversikt() {
   const stats = [
     { label:"Sålogg",     val:`${sowingDone}/${sowingTotal}`,    icon:"🌱",  color:"#60a5fa" },
     { label:"Plantelogg", val:`${plantingDone}/${plantingTotal}`,icon:"🪴",  color:"#34d399" },
-    { label:"Senger",     val:`${filledBeds}/${totalBeds}`,      icon:"🌿",  color:"#fbbf24" },
+    { label:"Senger",     val:`${filledBeds}/${totalBeds}`,      icon:"🌿",  color:"#d97706" },
     { label:"Verdi",      val:valueDisplay,                      icon:"💰",  color:"#f472b6" },
   ];
 
@@ -920,7 +929,7 @@ function renderOversikt() {
       <div class="card-title">Kommende oppgaver</div>
       ${upcoming.length === 0 ? '<p style="color:var(--text-muted);font-size:13px">Ingen åpne oppgaver 🎉</p>' : ''}
       ${upcoming.map(t => {
-        const pc = {høy:"#f87171",middels:"#fbbf24",lav:"#6ee7b7"}[t.priority];
+        const pc = {høy:"#f87171",middels:"#d97706",lav:"#6ee7b7"}[t.priority];
         return `<div class="list-row">
           <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${pc}"></div>
           <div style="flex:1">
@@ -992,13 +1001,13 @@ function calcValue(crop) {
 const MAP_PX_PER_M = 28;   // px per meter (base scale)
 const MAP_PAD_M    = 1.5;  // padding in meters
 
-const MAP_FIELD_ACCENTS = ['#34d399','#60a5fa','#f87171','#fbbf24','#a78bfa','#fb923c'];
+const MAP_FIELD_ACCENTS = ['#34d399','#60a5fa','#f87171','#d97706','#a78bfa','#fb923c'];
 const MAP_FIELD_FILLS   = [
   'rgba(52,211,153,0.13)','rgba(96,165,250,0.13)','rgba(248,113,113,0.13)',
   'rgba(251,191,36,0.13)', 'rgba(167,139,250,0.13)','rgba(251,146,60,0.13)'
 ];
 const MAP_STATUS_COLORS = {
-  planlagt:'#6b7280', sådd:'#60a5fa', plantet:'#34d399', høstet:'#fbbf24', avsluttet:'#4b5563'
+  planlagt:'#6b7280', sådd:'#60a5fa', plantet:'#34d399', høstet:'#d97706', avsluttet:'#4b5563'
 };
 
 function mapFieldLetters() {
@@ -2960,7 +2969,18 @@ function renderSenger() {
                 </div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:1px">
                   Seng ${bed} &nbsp;·&nbsp; ${sz.length}m × ${sz.width}m
-                  ${mainCrop ? `&nbsp;·&nbsp; <span style="color:${isLight?'#6b8c42':'#86efac'}">${STATUS[mainCrop.status]?.label||mainCrop.status}</span>` : ''}
+                  ${mainCrop ? `&nbsp;·&nbsp; <span style="color:${STATUS[mainCrop.status]?.color||'#86efac'}">${STATUS[mainCrop.status]?.label||mainCrop.status}</span>` : ''}
+                  ${(() => {
+                    const totalVal = bedCropList.reduce((sum, crop) => {
+                      const segSpecs = crop.beds.filter(s => parseBedSpec(s).bedId === bed);
+                      const v = segSpecs.reduce((sv, spec) => {
+                        const val = calcValue({...crop, beds:[spec]});
+                        return sv + (val || 0);
+                      }, 0);
+                      return sum + v;
+                    }, 0);
+                    return totalVal > 0 ? `&nbsp;·&nbsp; <span style="color:#d97706;font-weight:700">~${fmtKr(totalVal)}</span>` : '';
+                  })()}
                 </div>
               </div>
             </div>
@@ -3013,6 +3033,14 @@ function renderSenger() {
                 <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Planter</div>
                 <div style="font-size:16px;font-weight:300;color:var(--text-head)">${calcPlants({...o.crop, beds:[o.spec]})}</div>
               </div>
+              ${(() => {
+                const segCrop = {...o.crop, beds:[o.spec]};
+                const v = calcValue(segCrop);
+                return v !== null && v > 0 ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
+                  <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Verdi</div>
+                  <div style="font-size:16px;font-weight:300;color:#d97706">~${fmtKr(v)}</div>
+                </div>` : '';
+              })()}
               ${g?.pct != null ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
                 <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Vekst</div>
                 <div style="height:5px;border-radius:3px;background:${isLight?'rgba(0,0,0,0.1)':'rgba(255,255,255,0.1)'}">
@@ -3020,13 +3048,13 @@ function renderSenger() {
                 </div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${g.label}</div>
               </div>` : ''}
-              ${o.crop.sownDate ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
-                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Sådd</div>
-                <div style="font-size:13px;color:var(--text-head)">${o.crop.sownDate}</div>
-              </div>` : ''}
               ${o.crop.plantedDate ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
-                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Plantet</div>
+                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Plantedato</div>
                 <div style="font-size:13px;color:var(--text-head)">${o.crop.plantedDate}</div>
+              </div>` : ''}
+              ${o.crop.plantLog ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Plantelogg</div>
+                <div style="font-size:13px;color:var(--text-head)">${o.crop.plantLog}</div>
               </div>` : ''}
             </div>
           </div>`;
@@ -3210,7 +3238,7 @@ function renderVekster() {
           </div>
           ${calcValue(c) !== null ? `
           <div style="margin-left:auto;text-align:right">
-            <div style="font-size:18px;font-weight:300;color:#fbbf24;line-height:1">~${calcValue(c).toLocaleString('nb-NO')} kr</div>
+            <div style="font-size:18px;font-weight:300;color:#d97706;line-height:1">~${fmtKr(calcValue(c))}</div>
             <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div>
           </div>` : ''}
           ${c.beds.length > 1 && calcValue(c) === null ? `<div style="margin-left:auto;font-size:12px;color:var(--text-muted)">${c.beds.map(b => {
@@ -3905,7 +3933,7 @@ function toggleFocusTask(id) {
 
 function openFocusModal() {
   const focused = tasks.filter(t => focusTaskIds.has(t.id));
-  const pColors = {høy:'#f87171',middels:'#fbbf24',lav:'#6ee7b7'};
+  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
   const MONTHS_SHORT = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
 
   const buildInner = () => `
@@ -3919,13 +3947,13 @@ function openFocusModal() {
         : focused.map(t => {
             const tid = typeof t.id === 'string' ? `'${t.id}'` : t.id;
             const dateDisplay = t.date ? (() => { const [d,m] = t.date.split('-'); return `${+d}. ${MONTHS_SHORT[+m-1]}`; })() : '';
-            return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--task-bg);border:1px solid ${pColors[t.priority]||'#fbbf24'}44;border-radius:12px;margin-bottom:10px;${t.done?'opacity:0.6':''}">
-              <button onclick="toggleTask(${tid});openFocusModal()" style="width:24px;height:24px;border-radius:6px;border:2px solid ${pColors[t.priority]||'#fbbf24'};background:${t.done?(pColors[t.priority]||'#fbbf24'):'transparent'};cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">${t.done?'✓':''}</button>
+            return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--task-bg);border:1px solid ${pColors[t.priority]||'#d97706'}44;border-radius:12px;margin-bottom:10px;${t.done?'opacity:0.6':''}">
+              <button onclick="toggleTask(${tid});openFocusModal()" style="width:24px;height:24px;border-radius:6px;border:2px solid ${pColors[t.priority]||'#d97706'};background:${t.done?(pColors[t.priority]||'#d97706'):'transparent'};cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">${t.done?'✓':''}</button>
               <div style="flex:1">
                 <div style="font-size:15px;color:var(--text-head);${t.done?'text-decoration:line-through':''}">${t.text}</div>
                 ${dateDisplay ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">📅 ${dateDisplay}</div>` : ''}
               </div>
-              <div style="width:10px;height:10px;border-radius:50%;background:${pColors[t.priority]||'#fbbf24'};flex-shrink:0"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:${pColors[t.priority]||'#d97706'};flex-shrink:0"></div>
             </div>`;
           }).join('')
       }
@@ -3946,7 +3974,7 @@ function openFocusModal() {
 
 
 function renderPriorityDots(taskId, currentPriority) {
-  const pColors = {høy:'#f87171',middels:'#fbbf24',lav:'#6ee7b7'};
+  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
   const priorities = ['høy','middels','lav'];
   const tid = typeof taskId === 'string' ? `'${taskId}'` : taskId;
   return `<div style="display:flex;flex-direction:column;gap:4px;align-items:center;padding:2px 4px">
@@ -4032,14 +4060,14 @@ function initTaskDragDrop() {
 
 function renderOppgaver() {
   const priorities = ['høy','middels','lav'];
-  const pColors = {høy:'#f87171',middels:'#fbbf24',lav:'#6ee7b7'};
+  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
   const pLabels = {høy:'Høy',middels:'Middels',lav:'Lav'};
   const MONTHS_SHORT = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
   const focusCount = tasks.filter(t => focusTaskIds.has(t.id)).length;
 
   document.getElementById('tab-oppgaver').innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button onclick="openFocusModal()" style="padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:${focusCount>0?'#fbbf24':'var(--text-muted)'};cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Fokus">🎯${focusCount>0?` ${focusCount}`:''}</button>
+      <button onclick="openFocusModal()" style="padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:${focusCount>0?'#d97706':'var(--text-muted)'};cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Fokus">🎯${focusCount>0?` ${focusCount}`:''}</button>
       <button class="add-btn" style="margin-bottom:0;flex:1" onclick="document.getElementById('modal-task').style.display='flex'">+ Ny oppgave</button>
       <button onclick="openHistoryModal()" style="padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Historikk">📋</button>
     </div>
@@ -4062,7 +4090,7 @@ function renderOppgaver() {
               <div class="task-text" onclick="startEditTaskText(${tid}, this)" style="cursor:text;min-height:20px" title="Trykk for å redigere">${t.text}</div>
               <div class="task-date" onclick="startEditTaskDate(${tid}, event)" style="cursor:pointer;color:${t.date?'var(--text-muted)':'rgba(107,114,128,0.4)'}">📅 ${dateDisplay}</div>
             </div>
-            <button onclick="toggleFocusTask(${tid})" title="Fokus" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:${isFocused?'#fbbf24':'rgba(107,114,128,0.4)'}">⊙</button>
+            <button onclick="toggleFocusTask(${tid})" title="Fokus" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:${isFocused?'#d97706':'rgba(107,114,128,0.4)'}">⊙</button>
             ${renderPriorityDots(t.id, p)}
             <button class="delete-btn" onclick="deleteTask(${tid})">×</button>
           </div>`;
@@ -4125,7 +4153,7 @@ function openHistoryModal() {
 
   // Sort newest first (already unshifted, but re-sort to be safe)
   const sorted = [...taskHistory].sort((a,b) => new Date(b.completedAt||0) - new Date(a.completedAt||0));
-  const pColors = {høy:'#f87171',middels:'#fbbf24',lav:'#6ee7b7'};
+  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
 
   const rows = sorted.length
     ? sorted.map((t, i) => {
@@ -4246,7 +4274,7 @@ function addTask() {
 
 function setPriority(p) {
   newPriority = p;
-  const colors = {høy:'#f87171',middels:'#fbbf24',lav:'#6ee7b7'};
+  const colors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
   document.querySelectorAll('.priority-btn').forEach((b,i) => {
     const pp = ['høy','middels','lav'][i];
     b.style.background = pp===p ? `rgba(255,255,255,0.08)` : 'transparent';
@@ -4306,9 +4334,9 @@ function getCalEvents() {
       add(c.plantedDate, 'Plantedato: '+(c.family||c.name)+segLabel, c.emoji, '#34d399', { cropId: c.id });
     }
   });
-  const pColors = {høy:'#f87171', middels:'#fbbf24', lav:'#6ee7b7'};
+  const pColors = {høy:'#f87171', middels:'#d97706', lav:'#6ee7b7'};
   tasks.filter(t => t.date && !t.done && !String(t.id).startsWith('crop-')).forEach(t => {
-    add(t.date, t.text, '📋', pColors[t.priority] || '#fbbf24', { taskId: t.id, priority: t.priority });
+    add(t.date, t.text, '📋', pColors[t.priority] || '#d97706', { taskId: t.id, priority: t.priority });
   });
 
   return map;
@@ -4377,7 +4405,7 @@ function renderKalender() {
     const k = toDateKey(d);
     if (!weekKeys.includes(k)) return; // only show in their own week
     if (!overdueEvents[k]) overdueEvents[k] = [];
-    overdueEvents[k].push({ label: t.text, emoji: '📋', color: ({høy:'#f87171',middels:'#fbbf24',lav:'#6ee7b7'})[t.priority]||'#fbbf24', taskId: t.id, priority: t.priority });
+    overdueEvents[k].push({ label: t.text, emoji: '📋', color: ({høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'})[t.priority]||'#d97706', taskId: t.id, priority: t.priority });
   });
   const ukelisteItems = weekKeys.map((key, i) => {
     const ev = [...(events[key] || [])];
@@ -4438,7 +4466,7 @@ function renderKalender() {
     +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#60a5fa"></div>Sådato</div>'
     +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#34d399"></div>Plantedato</div>'
     +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#f87171"></div>Høy</div>'
-    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#fbbf24"></div>Middels</div>'
+    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#d97706"></div>Middels</div>'
     +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#6ee7b7"></div>Lav</div>'
     +'</div>'
     +ukeliste;
@@ -4966,15 +4994,19 @@ function importFileObject(file, skipSave = false) {
             rows:         parseInt(r[7])   || 2,
             seedsPerCluster: parseInt(r[8]) || 1,
             // col 9 = antall planter (calculated), col 10 = estimert verdi (calculated), skip both
-            unit:         String(r[13] || 'stk'),
-            sownDate:     parseImportDate(r[14]),
-            sowLog:       parseImportDate(r[15]),
-            plantedDate:  parseImportDate(r[16]),
-            plantLog:     parseImportDate(r[17]),
-            notes:        String(r[18] || ''),
-            category:     String(r[19] || 'Andre'),
-            pricePerKg:   parseFloat(r[11]) || 0,
-            weightG:      parseFloat(r[12]) || 0,
+            pricePerKg:      parseFloat(r[11]) || 0,
+            weightG:         parseFloat(r[12]) || 0,
+            unit:            String(r[13] || 'stk'),
+            unitsPerPlant:   parseFloat(r[14]) || 0,
+            vektTotal:       parseFloat(r[15]) || 0,
+            pricePerUnit:    parseFloat(r[16]) || 0,
+            pricePerUnitCustom: !!(r[16] && parseFloat(r[16])),
+            sownDate:        parseImportDate(r[17]),
+            sowLog:          parseImportDate(r[18]),
+            plantedDate:     parseImportDate(r[19]),
+            plantLog:        parseImportDate(r[20]),
+            notes:           String(r[21] || ''),
+            category:        String(r[22] || 'Andre'),
           });
         }
       }
@@ -5177,7 +5209,8 @@ function buildWorkbook() {
     'Radavstand (cm)', 'Planteavstand (cm)', 'Rader', 'Frø per klynge',
     'Antall planter totalt', 'Estimert verdi (kr)',
     'Pris pr/kg (kr)', 'Vekt per enhet (g)',
-    'Salgsenhet', 'Sådato', 'Sålogg (dato)', 'Plantedato', 'Plantelogg (dato)', 'Notater', 'Kategori'
+    'Salgsenhet', 'Stk/bunt/boks per plante', 'Vekt total (g)', 'Pris per enhet (kr)',
+    'Sådato', 'Sålogg (dato)', 'Plantedato', 'Plantelogg (dato)', 'Notater', 'Kategori'
   ];
   const cropRows = crops.map(c => [
     c.name, c.emoji, c.family,
@@ -5187,14 +5220,16 @@ function buildWorkbook() {
     calcPlants(c),
     calcValue(c) !== null ? calcValue(c) : '',
     c.pricePerKg || '', c.weightG || '',
-    c.unit || 'stk', fmtDate(c.sownDate), fmtDate(c.sowLog), fmtDate(c.plantedDate), fmtDate(c.plantLog), c.notes, c.category || 'Andre'
+    c.unit || 'stk', c.unitsPerPlant || '', c.vektTotal || '', c.pricePerUnit || '',
+    fmtDate(c.sownDate), fmtDate(c.sowLog), fmtDate(c.plantedDate), fmtDate(c.plantLog), c.notes, c.category || 'Andre'
   ]);
   const wsVekster = XLSX.utils.aoa_to_sheet([cropHeaders, ...cropRows]);
   wsVekster['!cols'] = [
     {wch:18},{wch:7},{wch:16},{wch:14},{wch:12},
     {wch:16},{wch:18},{wch:8},{wch:16},{wch:20},{wch:20},
     {wch:14},{wch:16},
-    {wch:14},{wch:16},{wch:14},{wch:18},{wch:30}
+    {wch:12},{wch:18},{wch:14},{wch:16},
+    {wch:14},{wch:16},{wch:14},{wch:18},{wch:30},{wch:16}
   ];
   styleHeaderRow(wsVekster, cropHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsVekster, 'Vekster');
@@ -5756,7 +5791,7 @@ function scheduleSync() {
   if (!syncConnected) return;
   saveToLocal();
   clearTimeout(syncTimer);
-  ['gist-btn','lev-gist-btn'].forEach(id=>{const b=document.getElementById(id);if(b){b.style.color='#fbbf24';b.title='Ulagrede endringer – lagrer snart...';b.textContent='☁';}})
+  ['gist-btn','lev-gist-btn'].forEach(id=>{const b=document.getElementById(id);if(b){b.style.color='#d97706';b.title='Ulagrede endringer – lagrer snart...';b.textContent='☁';}})
   syncTimer = setTimeout(syncSave, 3000);
 }
 
@@ -6402,7 +6437,7 @@ function renderLevKasse(el) {
 
   // Soft notice if no delivery schedule set
   if (noSchedule) {
-    html += '<div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:10px;padding:10px 12px;font-size:12px;color:#fbbf24;margin-bottom:14px">Ingen leveringsplan satt for denne kassetypen. Gå til ⚙ Oppsett for å definere uker og frekvens.</div>';
+    html += '<div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:10px;padding:10px 12px;font-size:12px;color:#d97706;margin-bottom:14px">Ingen leveringsplan satt for denne kassetypen. Gå til ⚙ Oppsett for å definere uker og frekvens.</div>';
   }
 
   // ════════════════════════════════
@@ -7897,13 +7932,13 @@ function renderLevOversikt(el) {
     + '</div>';
 
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
-    + statCard('💰', plannedSaleValue > 0 ? 'kr ' + Math.round(plannedSaleValue).toLocaleString('nb-NO') : '–',
+    + statCard('💰', plannedSaleValue > 0 ? '~' + fmtKr(plannedSaleValue) : '–',
         'Planlagte grønnsakskasser',
-        totalBoxesAllSeasons ? totalBoxesAllSeasons + ' kasser · sesongen' : 'Sett opp kunder og leveringsplan', '#fbbf24')
+        totalBoxesAllSeasons ? totalBoxesAllSeasons + ' kasser · sesongen' : 'Sett opp kunder og leveringsplan', '#d97706')
     + statCard('📦', harvestedBoxes + ' / ' + totalBoxesAllSeasons,
         'Kasseprogresjon',
         totalBoxesAllSeasons ? Math.round((harvestedBoxes / totalBoxesAllSeasons) * 100) + '% levert' : 'Sett opp leveringsplan', 'var(--accent-soft)')
-    + statCard('💚', totalValue > 0 ? 'kr ' + Math.round(totalValue).toLocaleString('nb-NO') : '–',
+    + statCard('💚', totalValue > 0 ? '~' + fmtKr(totalValue) : '–',
         'Gjennomførte salg',
         harvestLog.length ? harvestLog.length + ' registreringer' : 'Ingen logget ennå', '#f472b6')
     + statCard('🥬', Math.round(loggedQty) + ' / ' + plannedQty,
