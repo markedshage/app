@@ -2979,7 +2979,7 @@ function renderSenger() {
                       }, 0);
                       return sum + v;
                     }, 0);
-                    return totalVal > 0 ? `&nbsp;·&nbsp; <span style="color:#d97706;font-weight:700">~${fmtKr(totalVal)}</span>` : '';
+                    return totalVal > 0 ? `&nbsp;·&nbsp; <span style="color:#d97706;font-weight:700">~${(Math.round(totalVal/100)/10).toLocaleString('nb-NO')}k</span>` : '';
                   })()}
                 </div>
               </div>
