@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -370,6 +370,7 @@
       <div><label class="field-label">Navn</label><input class="field-input" id="c-name" placeholder="f.eks. Tomater"></div>
       <div><label class="field-label">Emoji</label><input class="field-input" id="c-emoji" value="🌱" maxlength="4"></div>
       <div><label class="field-label">Sort</label><input class="field-input" id="c-family" placeholder="f.eks. Nattskygge"></div>
+      <div><label class="field-label">Kategori</label><select class="field-input" id="c-category"></select></div>
       <div><label class="field-label">Senger (komma-separert, f.eks. A1, A1-1:5, B2-3)</label><input class="field-input" id="c-beds" placeholder="A1, A1-1:5, B2-3"><div id="c-beds-error" style="display:none;color:#f87171;font-size:12px;margin-top:4px"></div></div>
       <div><label class="field-label">Radavstand (cm)</label><input class="field-input" id="c-rowspacing" type="number" value="30"></div>
       <div><label class="field-label">Planteavstand (cm)</label><input class="field-input" id="c-plantspacing" type="number" value="20"></div>
@@ -390,7 +391,6 @@
         <option value="planlagt">Planlagt</option>
         <option value="sådd">Sådd</option>
         <option value="plantet">Plantet</option>
-        <option value="i_produksjon">I produksjon</option>
         <option value="høstet">Høstet</option>
       </select>
     </div>
@@ -505,7 +505,6 @@ const STATUS = {
   planlagt:     { label: "Planlagt",     color: "#a78bfa", bg: "rgba(167,139,250,0.15)" },
   sådd:         { label: "Sådd",         color: "#60a5fa", bg: "rgba(96,165,250,0.15)" },
   plantet:      { label: "Plantet",      color: "#34d399", bg: "rgba(52,211,153,0.15)" },
-  i_produksjon: { label: "I produksjon", color: "#86efac", bg: "rgba(134,239,172,0.15)" },
   høstet:       { label: "Høstet",       color: "#fbbf24", bg: "rgba(251,191,36,0.15)" },
 };
 
@@ -516,7 +515,7 @@ BED_IDS.forEach(id => { bedSizes[id] = { length: 11, width: 1.2 }; });
 let crops = [
   { id:1, name:"Tomater",   emoji:"🍅", family:"Nattskygge",   rowSpacing:60, plantSpacing:50, rows:2, beds:["A1"], sownDate:"15-03-2026", sowLog:"", plantedDate:"", plantLog:"", status:"plantet",      pricePerKg:0, weightG:0, notes:"Trenger staking" },
   { id:2, name:"Gulrøtter", emoji:"🥕", family:"Skjermplanter", rowSpacing:20, plantSpacing:5,  rows:4, beds:["B2"], sownDate:"01-04-2026", sowLog:"", plantedDate:"",  plantLog:"", status:"planlagt",     pricePerKg:0, weightG:0, notes:"" },
-  { id:3, name:"Salat",     emoji:"🥬", family:"Kurvplanter",   rowSpacing:30, plantSpacing:25, rows:3, beds:["C1","C2"], sownDate:"20-03-2026", sowLog:"", plantedDate:"", plantLog:"", status:"i_produksjon", pricePerKg:0, weightG:0, notes:"Successjonssåing hver 2. uke" },
+  { id:3, name:"Salat",     emoji:"🥬", family:"Kurvplanter",   rowSpacing:30, plantSpacing:25, rows:3, beds:["C1","C2"], sownDate:"20-03-2026", sowLog:"", plantedDate:"", plantLog:"", status:"plantet", pricePerKg:0, weightG:0, notes:"Successjonssåing hver 2. uke" },
   { id:4, name:"Erter",     emoji:"🫛", family:"Belgvekster",   rowSpacing:20, plantSpacing:10, rows:2, beds:["D1"], sownDate:"10-04-2026", sowLog:"", plantedDate:"",  plantLog:"", status:"planlagt",     pricePerKg:0, weightG:0, notes:"Nitrogenfixer" },
   { id:5, name:"Basilikum", emoji:"🌿", family:"Leppeblomster", rowSpacing:25, plantSpacing:20, rows:2, beds:["E1"], sownDate:"01-05-2026", sowLog:"", plantedDate:"",  plantLog:"", status:"planlagt",     pricePerKg:0, weightG:0, notes:"Ikke ut før varmt" },
 ];
@@ -541,6 +540,15 @@ let boxTypes = [];                 // [{id, name, type:'vasket'|'uvasket', weekd
 let boxWeeks = [];                 // [{id, boxTypeId, week, year, items:[{cropId,qty,unit}], count, customerAdj:{}}]
 let deliveryMarket = [];           // [{id, cropId, qty, unit}]
 let harvestLog = [];
+let cropCategories = (() => {
+  try {
+    const s = localStorage.getItem('mh_crop_categories');
+    return s ? JSON.parse(s) : ['Rotgrønnsak','Løk','Belgvekster','Kål','Salat','Gresskar','Drivhus','Urter','Blomster','Andre'];
+  } catch(e) { return ['Rotgrønnsak','Løk','Belgvekster','Kål','Salat','Gresskar','Drivhus','Urter','Blomster','Andre']; }
+})();
+function saveCropCategories() {
+  try { localStorage.setItem('mh_crop_categories', JSON.stringify(cropCategories)); } catch(e) {}
+}
 let levHistory = [];
 let levHistoryIndex = -1;
 const MAX_LEV_HISTORY = 30;               // [{id, date, cropId, bedId, qty, unit, dest, note}]
@@ -673,6 +681,8 @@ function showFloatingGearMenu(triggerBtn) {
     float.appendChild(rowToggle('🌿', 'Innhøsting', 'var(--text-head)', () => { toggleHarvestMode(); setTimeout(buildMenu, 60); }, inHarvest, '#ea580c'));
     float.appendChild(sep());
     float.appendChild(rowToggle(isLight ? '🌙' : '☀', isLight ? 'Mørkt tema' : 'Lyst tema', 'var(--text-head)', () => { toggleTheme(); setTimeout(buildMenu, 60); }, !isLight, '#3b82f6'));
+    float.appendChild(sep());
+    float.appendChild(row('🏷', 'Kategorier', 'var(--text-head)', () => { openCategorySettings(); float.remove(); }));
     float.appendChild(sep());
     float.appendChild(row('⬆', 'Importer fra Excel', '#60a5fa', () => { document.getElementById('excel-import-input')?.click(); float.remove(); }));
     float.appendChild(row('⬇', 'Eksporter til Excel', '#34d399', () => { exportToExcel(); float.remove(); }));
@@ -1168,7 +1178,7 @@ function openGardenMap() {
   overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;display:flex;flex-direction:column;background:#f5f0e8;';
 
   overlay.innerHTML = `
-    <div style="flex-shrink:0;display:flex;align-items:center;padding:6px 10px;gap:8px;
+    <div style="flex-shrink:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:6px 10px;gap:8px;
       background:var(--bg-header);border-bottom:1px solid var(--border-accent)">
       <!-- Logo left -->
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width:32px;height:32px;border-radius:8px;flex-shrink:0">
@@ -1190,14 +1200,18 @@ function openGardenMap() {
           <circle cx="236" cy="262" r="6" fill="#c9a84c" opacity="0.5"/>
           <circle cx="236" cy="238" r="6" fill="#c9a84c" opacity="0.5"/>
         </svg>
-      <!-- Centered buttons -->
-      <div style="flex:1;display:flex;justify-content:center;gap:6px;align-items:center">
-        <button onclick="openMapSettings()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:12px;font-family:inherit">Innstillinger</button>
-        <button id="draw-mode-btn" onclick="toggleDrawMode()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:12px;font-family:inherit">Tegning</button>
-        <button id="map-lock-btn" onclick="toggleMapLock()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit;filter:grayscale(1)" title="Låst – trykk for å låse opp">🔒</button>
+      <!-- Centered buttons — true center via grid -->
+      <div style="display:flex;justify-content:center;gap:4px;align-items:center">
+        <button onclick="openMapSettings()" title="Innstillinger" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button id="draw-mode-btn" onclick="toggleDrawMode()" title="Tegning" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        </button>
+        <button id="map-lock-btn" onclick="toggleMapLock()" title="Lås kart" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;filter:grayscale(1)">🔒</button>
       </div>
       <!-- Undo/redo + close right -->
-      <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+      <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
         <button id="map-undo-btn" onclick="mapUndoAction()" title="Angre (Ctrl+Z)" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
         <button id="map-redo-btn" onclick="mapRedoAction()" title="Gjør om (Ctrl+Y)" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
         <button onclick="closeGardenMap()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">✕</button>
@@ -2866,139 +2880,167 @@ function updateMapFieldSetting(letter, key, value) {
 function renderSenger() {
   const fields = ['alle', ...new Set(BED_IDS.map(id => id.match(/^([A-Za-z]+)/)?.[1] || id))].sort((a,b) => a==='alle'?-1:b==='alle'?1:a.localeCompare(b));
   const visibleBeds = bedFieldFilter === 'alle' ? BED_IDS : BED_IDS.filter(id => (id.match(/^([A-Za-z]+)/)?.[1] || '') === bedFieldFilter);
+  const isLight = document.body.classList.contains('light');
 
-  document.getElementById('tab-senger').innerHTML = `
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
-      <select onchange="setBedField(this.value)" style="flex:1;padding:7px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M0 0l5 6 5-6z%22 fill=%22%236b7280%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;padding-right:26px">
+  let html = `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:16px">
+      <select onchange="setBedField(this.value)" style="flex:1;padding:8px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M0 0l5 6 5-6z%22 fill=%22%236b7280%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;padding-right:26px">
         ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Alle felt':'Felt '+f}</option>`).join('')}
       </select>
-      <button onclick="openAddBed()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Legg til seng</button>
-      <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">🗺 Visuell oversikt</button>
-    </div>
-    <div class="bed-grid">
-      ${(() => {
-        const COLS = 3;
-        const rows = [];
-        for (let i = 0; i < visibleBeds.length; i += COLS) {
-          rows.push(visibleBeds.slice(i, i + COLS));
-        }
-        return rows.map(row => {
-          const selectedInRow = row.find(bed => bed === selectedBed);
+      <button onclick="openAddBed()" style="padding:8px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Legg til</button>
+      <button onclick="openGardenMap()" style="padding:8px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Visuell oversikt</button>
+    </div>`;
 
-          const cells = row.map(bed => {
-            const bedCropList = getCropsInBed(bed);
-            const sz = bedSizes[bed];
-            const occupied = bedCropList.length > 0;
-            const isSelected = bed === selectedBed;
-            const cls = ['bed-cell', occupied?'occupied':'', isSelected?'selected':''].join(' ');
+  // Group beds by field letter
+  const byField = {};
+  visibleBeds.forEach(id => {
+    const letter = id.match(/^([A-Za-z]+)/)?.[1] || id;
+    if (!byField[letter]) byField[letter] = [];
+    byField[letter].push(id);
+  });
 
-            if (bedCropList.length === 1) {
-              const c = bedCropList[0];
-              return `<div class="${cls}" onclick="selectBed('${bed}')">
-                <div><span class="bed-label">Seng ${bed}</span></div>
-                <div class="bed-name">${c.name}</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:6px">${sz.length}m × ${sz.width}m</div>
-              </div>`;
-            } else if (bedCropList.length > 1) {
-              const nameMap = {};
-              bedCropList.forEach(c => { nameMap[c.name] = (nameMap[c.name] || 0) + 1; });
-              const uniqueNames = Object.keys(nameMap);
-              const namesHtml = uniqueNames.map((n, i) =>
-                `<span style="font-size:13px;color:var(--text-head);white-space:nowrap">${n}</span>${i < uniqueNames.length-1 ? '<span style="color:var(--text-muted);font-size:12px;margin:0 3px">·</span>' : ''}`
-              ).join('');
-              return `<div class="${cls}" onclick="selectBed('${bed}')">
-                <div><span class="bed-label">Seng ${bed}</span></div>
-                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:1px;margin-top:4px;max-width:100%">${
-                  uniqueNames.map((n, i) => {
-                    const isLast = i === uniqueNames.length - 1;
-                    const lineBreak = (i % 2 === 1 && !isLast) ? '<div style="width:100%;height:0"></div>' : '';
-                    return `<span style="font-size:13px;color:var(--text-head);white-space:nowrap">${n}</span>${!isLast ? '<span style="color:var(--text-muted);font-size:12px;margin:0 3px">·</span>' : ''}${lineBreak}`;
-                  }).join('')
-                }</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${sz.length}m × ${sz.width}m</div>
-              </div>`;
-            } else {
-              return `<div class="${cls}" onclick="selectBed('${bed}')">
-                <div><span class="bed-label">Seng ${bed}</span></div>
-                <div class="bed-empty">Ledig</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:6px">${sz.length}m × ${sz.width}m</div>
-              </div>`;
-            }
-          }).join('');
+  const fieldKeys = Object.keys(byField).sort();
 
-          // Build detail panel if a bed in this row is selected
-          let detailHtml = '';
-          if (selectedInRow) {
-            const bed = selectedInRow;
-            const bs = bedSizes[bed];
-            const bedLen = bs.length;
-            const bedCropList = getCropsInBed(bed);
-            const occ = [];
-            bedCropList.forEach(crop => {
-              crop.beds.forEach(spec => {
-                const { bedId, start, end } = parseBedSpec(spec);
-                if (bedId !== bed) return;
-                occ.push({ start: start || 1, end: end || bedLen, crop, spec });
-              });
-            });
-            occ.sort((a,b) => a.start - b.start);
-            const free = [];
-            let pos = 1;
-            occ.forEach(o => {
-              if (o.start > pos) free.push({ start: pos, end: o.start - 1 });
-              pos = Math.max(pos, o.end + 1);
-            });
-            if (pos <= bedLen) free.push({ start: pos, end: bedLen });
+  fieldKeys.forEach(letter => {
+    const beds = byField[letter];
+    const fieldBeds = beds;
+    const occupied = fieldBeds.filter(id => getCropsInBed(id).length > 0).length;
+    const total = fieldBeds.length;
 
-            const cropRows = occ.map(o => {
-              const g = calcGang(o.crop, o.spec);
-              const segLen = o.end - o.start + 1;
-              const hasSegment = parseBedSpec(o.spec).start !== null;
-              return `<div style="padding:12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border);margin-bottom:8px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-                  <span style="font-size:24px">${o.crop.emoji}</span>
-                  <div style="flex:1">
-                    <div style="font-size:15px;color:var(--text-head)">${o.crop.family || o.crop.name}</div>
-                    ${o.crop.family ? `<div style="font-size:12px;color:var(--text-muted)">${o.crop.name}</div>` : ''}
-                    ${hasSegment ? `<div style="font-size:12px;color:#60a5fa">Meter ${o.start}–${o.end} (${segLen}m)</div>` : `<div style="font-size:12px;color:var(--text-muted)">Hele sengen (${bedLen}m)</div>`}
-                  </div>
-                  ${badge(o.crop.status)}
+    if (fields.length > 2) { // more than just 'alle' + one field
+      html += `<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:${letter === fieldKeys[0] ? '0' : '16px'} 0 8px;display:flex;align-items:center;justify-content:space-between">
+        <span>Felt ${letter}</span>
+        <span style="font-weight:400;letter-spacing:0">${occupied}/${total} i bruk</span>
+      </div>`;
+    }
+
+    beds.forEach(bed => {
+      const bedCropList = getCropsInBed(bed);
+      const sz = bedSizes[bed];
+      const occupied = bedCropList.length > 0;
+      const isSelected = bed === selectedBed;
+      const mainCrop = bedCropList[0];
+      const statusColor = occupied ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.1)');
+      const cardBg = isSelected
+        ? (isLight ? 'rgba(107,76,42,0.08)' : 'rgba(52,211,153,0.06)')
+        : (isLight ? '#fff8f0' : 'rgba(255,255,255,0.03)');
+      const cardBorder = isSelected
+        ? 'var(--accent)'
+        : (occupied ? (isLight ? 'rgba(107,76,42,0.25)' : 'rgba(52,211,153,0.2)') : 'var(--border)');
+
+      html += `<div onclick="selectBed('${bed}')" style="display:flex;align-items:stretch;border-radius:12px;border:1.5px solid ${cardBorder};background:${cardBg};margin-bottom:6px;cursor:pointer;overflow:hidden;transition:all 0.15s">
+        <!-- Color bar -->
+        <div style="width:4px;flex-shrink:0;background:${statusColor};border-radius:2px 0 0 2px"></div>
+        <!-- Main content -->
+        <div style="flex:1;padding:12px 12px 12px 10px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:8px">
+              ${mainCrop ? `<span style="font-size:20px">${mainCrop.emoji}</span>` : `<div style="width:20px;height:20px;border-radius:6px;background:${isLight?'rgba(0,0,0,0.08)':'rgba(255,255,255,0.08)'};display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>`}
+              <div>
+                <div style="font-size:14px;color:var(--text-head);font-weight:500">
+                  ${occupied
+                    ? (bedCropList.length === 1
+                        ? `<span>${mainCrop.name}</span>`
+                        : `<span>${bedCropList.map(c=>c.name).join(' · ')}</span>`)
+                    : `<span style="color:var(--text-muted)">Ledig</span>`}
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--text-muted)">
-                  <div>Sådato: <span style="color:var(--text-head)">${o.crop.sownDate||'–'}</span></div>
-                  <div>Plantedato: <span style="color:var(--text-head)">${o.crop.plantedDate||'–'}</span></div>
-                  <div>Radavstand: <span style="color:var(--text-head)">${o.crop.rowSpacing} cm</span></div>
-                  <div>Planteavstand: <span style="color:var(--text-head)">${o.crop.plantSpacing} cm</span></div>
-                  <div>Rader: <span style="color:var(--text-head)">${o.crop.rows}</span></div>
-                  <div>Antall planter: <span style="color:var(--accent);font-weight:bold">${calcPlants({...o.crop, beds:[o.spec]})}</span></div>
-                  ${g !== null ? `<div>Gangavstand: <span style="color:var(--text-head)">${g} cm</span></div>` : ''}
-                </div>
-                ${o.crop.notes ? `<div style="margin-top:8px;font-size:12px;color:var(--text-muted);font-style:italic">📝 ${o.crop.notes}</div>` : ''}
-              </div>`;
-            }).join('');
-
-            const freeRows = free.map(f =>
-              `<div style="padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.08);margin-bottom:8px;font-size:12px;color:var(--text-muted)">
-                Ledig: meter ${f.start}–${f.end} (${f.end - f.start + 1}m)
-              </div>`
-            ).join('');
-
-            detailHtml = `<div style="grid-column:1/-1;padding:14px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);margin-bottom:4px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                <div style="font-size:13px;color:var(--accent-soft)">Seng ${bed} — ${bs.length}m × ${bs.width}m</div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <button onclick="openBedSizeEdit('${bed}')" style="background:rgba(52,211,153,0.1);border:1px solid var(--border-accent);border-radius:8px;color:var(--accent-soft);cursor:pointer;padding:4px 10px;font-size:12px;font-family:inherit">Endre størrelse</button>
-                  ${getCropsInBed(bed).length === 0 ? `<button onclick="deleteBed('${bed}')" style="padding:4px 10px;border-radius:8px;border:1px solid rgba(248,113,113,0.4);background:rgba(248,113,113,0.08);color:#f87171;cursor:pointer;font-size:12px;font-family:inherit">🗑 Slett</button>` : ''}
+                <div style="font-size:11px;color:var(--text-muted);margin-top:1px">
+                  Seng ${bed} &nbsp;·&nbsp; ${sz.length}m × ${sz.width}m
+                  ${mainCrop ? `&nbsp;·&nbsp; <span style="color:${isLight?'#6b8c42':'#86efac'}">${STATUS[mainCrop.status]?.label||mainCrop.status}</span>` : ''}
                 </div>
               </div>
-              ${cropRows}${freeRows}
-            </div>`;
-          }
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </div>
+      </div>`;
 
-          return `${cells}${detailHtml ? `<div style="grid-column:1/-1">${detailHtml}</div>` : ''}`;
-        }).join('');
-      })()}
+      // Detail panel for selected bed
+      if (isSelected) {
+        const bs = bedSizes[bed];
+        const bedLen = bs.length;
+        const occ = [];
+        bedCropList.forEach(crop => {
+          crop.beds.forEach(spec => {
+            const { bedId, start, end } = parseBedSpec(spec);
+            if (bedId !== bed) return;
+            occ.push({ start: start || 1, end: end || bedLen, crop, spec });
+          });
+        });
+        occ.sort((a,b) => a.start - b.start);
+        const free = [];
+        let pos = 1;
+        occ.forEach(o => {
+          if (o.start > pos) free.push({ start: pos, end: o.start - 1 });
+          pos = Math.max(pos, o.end + 1);
+        });
+        if (pos <= bedLen) free.push({ start: pos, end: bedLen });
+
+        html += `<div style="margin:-6px 0 6px 4px;border-left:2px solid var(--accent);margin-left:2px;padding:0 0 0 12px">`;
+
+        occ.forEach(o => {
+          const g = calcGang(o.crop, o.spec);
+          const segLen = o.end - o.start + 1;
+          const hasSegment = parseBedSpec(o.spec).start !== null;
+          html += `<div style="padding:12px;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <span style="font-size:24px">${o.crop.emoji}</span>
+              <div style="flex:1">
+                <div style="font-size:15px;color:var(--text-head)">${o.crop.name}</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+                  ${hasSegment ? `Del ${o.start}–${o.end}m (${segLen}m)` : `${bedLen}m`} &nbsp;·&nbsp;
+                  <span style="color:${isLight?'#6b8c42':'#86efac'}">${STATUS[o.crop.status]?.label||o.crop.status}</span>
+                </div>
+              </div>
+              <button onclick="event.stopPropagation();openEditCrop(crops.indexOf(crops.find(c=>c.id===o.crop.id)))" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Planter</div>
+                <div style="font-size:16px;font-weight:300;color:var(--text-head)">${calcPlants({...o.crop, beds:[o.spec]})}</div>
+              </div>
+              ${g?.pct != null ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Vekst</div>
+                <div style="height:5px;border-radius:3px;background:${isLight?'rgba(0,0,0,0.1)':'rgba(255,255,255,0.1)'}">
+                  <div style="height:100%;border-radius:3px;background:var(--accent);width:${g.pct}%"></div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${g.label}</div>
+              </div>` : ''}
+              ${o.crop.sownDate ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Sådd</div>
+                <div style="font-size:13px;color:var(--text-head)">${o.crop.sownDate}</div>
+              </div>` : ''}
+              ${o.crop.plantedDate ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
+                <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Plantet</div>
+                <div style="font-size:13px;color:var(--text-head)">${o.crop.plantedDate}</div>
+              </div>` : ''}
+            </div>
+          </div>`;
+        });
+
+        free.forEach(f => {
+          html += `<div style="padding:10px 12px;border-radius:10px;border:1px dashed var(--border);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:13px;color:var(--text-muted)">Ledig strekning</div>
+              <div style="font-size:11px;color:var(--text-dim);margin-top:1px">${f.start}–${f.end}m</div>
+            </div>
+            <button onclick="event.stopPropagation();openAddCrop()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Vekst</button>
+          </div>`;
+        });
+
+        html += `<button onclick="event.stopPropagation();selectBed('${bed}');openAddBed('${bed}')" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;margin-bottom:4px">Rediger seng</button>`;
+        html += `</div>`;
+      }
+    });
+  });
+
+  if (visibleBeds.length === 0) {
+    html += `<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px">
+      Ingen senger ennå. Trykk «+ Legg til» for å komme i gang.
     </div>`;
+  }
+
+  document.getElementById('tab-senger').innerHTML = html;
 }
 
 function selectBed(bed) {
@@ -3132,7 +3174,18 @@ function renderVekster() {
               <div class="crop-family">${c.family ? c.name : ''}</div>            </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            ${badge(c.status)}
+            <div onclick="event.stopPropagation()" style="display:flex;gap:3px;flex-wrap:nowrap">
+              ${Object.entries(STATUS).map(([key, s]) => `
+                <button onclick="event.stopPropagation();setCropStatus(${c.id},'${key}')"
+                  title="${s.label}"
+                  style="padding:3px 6px;border-radius:20px;border:1.5px solid ${c.status===key ? s.color : 'transparent'};
+                  background:${c.status===key ? s.bg : 'transparent'};
+                  color:${c.status===key ? s.color : 'var(--text-dim)'};
+                  cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap;
+                  font-weight:${c.status===key ? '600' : '400'};
+                  transition:all 0.15s">${s.label.split(' ')[0]}</button>
+              `).join('')}
+            </div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--bg-card);border-radius:10px;border:1px solid var(--border)">
@@ -3542,6 +3595,9 @@ function openEditCrop(id) {
   document.getElementById('c-name').value = c.name;
   document.getElementById('c-emoji').value = c.emoji;
   document.getElementById('c-family').value = c.family;
+  const _catSel = document.getElementById('c-category');
+  _catSel.innerHTML = cropCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+  _catSel.value = c.category || 'Andre';
   document.getElementById('c-beds').value = c.beds.join(', ');
   document.getElementById('c-rowspacing').value = c.rowSpacing;
   document.getElementById('c-plantspacing').value = c.plantSpacing;
@@ -3568,6 +3624,9 @@ function openAddCrop() {
   document.getElementById('c-name').value = '';
   document.getElementById('c-emoji').value = '🌱';
   document.getElementById('c-family').value = '';
+  const _catSelA = document.getElementById('c-category');
+  _catSelA.innerHTML = cropCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+  _catSelA.value = 'Andre';
   document.getElementById('c-beds').value = '';
   document.getElementById('c-rowspacing').value = 30;
   document.getElementById('c-plantspacing').value = 20;
@@ -3631,6 +3690,7 @@ function saveCrop() {
     name,
     emoji: document.getElementById('c-emoji').value || '🌱',
     family: document.getElementById('c-family').value,
+    category: document.getElementById('c-category').value || 'Andre',
     rowSpacing: +document.getElementById('c-rowspacing').value || 30,
     plantSpacing: +document.getElementById('c-plantspacing').value || 20,
     rows: +document.getElementById('c-rows').value || 2,
@@ -4710,7 +4770,7 @@ function parseStatus(label) {
   const map = {
     'Planlagt':'planlagt','Sådd':'sådd',
     'Spiret':'plantet','Plantet':'plantet',
-    'I vekst':'i_produksjon','I produksjon':'i_produksjon',
+    'I vekst':'plantet','I produksjon':'plantet',
     'Høstet':'høstet'
   };
   return map[label] || 'planlagt';
@@ -4800,6 +4860,7 @@ function importFileObject(file, skipSave = false) {
             plantedDate:  parseImportDate(r[15]),
             plantLog:     parseImportDate(r[16]),
             notes:        String(r[17] || ''),
+            category:     String(r[18] || 'Andre'),
             pricePerKg:   parseFloat(r[11]) || 0,
             weightG:      parseFloat(r[12]) || 0,
           });
@@ -4988,7 +5049,7 @@ function buildWorkbook() {
     'Radavstand (cm)', 'Planteavstand (cm)', 'Rader', 'Frø per klynge',
     'Antall planter totalt', 'Estimert verdi (kr)',
     'Pris pr/kg (kr)', 'Vekt per enhet (g)',
-    'Sådato', 'Sålogg (dato)', 'Plantedato', 'Plantelogg (dato)', 'Notater'
+    'Sådato', 'Sålogg (dato)', 'Plantedato', 'Plantelogg (dato)', 'Notater', 'Kategori'
   ];
   const cropRows = crops.map(c => [
     c.name, c.emoji, c.family,
@@ -4998,7 +5059,7 @@ function buildWorkbook() {
     calcPlants(c),
     calcValue(c) !== null ? calcValue(c) : '',
     c.pricePerKg || '', c.weightG || '',
-    fmtDate(c.sownDate), fmtDate(c.sowLog), fmtDate(c.plantedDate), fmtDate(c.plantLog), c.notes
+    fmtDate(c.sownDate), fmtDate(c.sowLog), fmtDate(c.plantedDate), fmtDate(c.plantLog), c.notes, c.category || 'Andre'
   ]);
   const wsVekster = XLSX.utils.aoa_to_sheet([cropHeaders, ...cropRows]);
   wsVekster['!cols'] = [
@@ -6266,20 +6327,31 @@ function renderLevKasse(el) {
     html += '<button onclick="openDuplicateWeek(\'' + bt.id + '\',' + kasseViewWeek + ',' + kasseViewYear + ')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">⧉ Kopier</button>';
     html += '</div></div>';
 
-    // Vekst-grid (toggle)
+    // Vekst-grid (toggle) — grouped by kategori
     const selIds = new Set((bw.items||[]).map(i => i.cropId));
-    html += '<div id="kasse-crop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:16px">';
-    crops.forEach(cr => {
-      const sel = selIds.has(cr.id);
-      html += '<button onclick="toggleKasseCrop(\'' + bw.id + '\',' + cr.id + ')" data-cropid="' + cr.id + '"'
-        + ' style="padding:8px 4px;border-radius:10px;'
-        + 'border:2px solid ' + (sel ? 'var(--accent)' : 'var(--border)') + ';'
-        + 'background:' + (sel ? 'var(--accent-bg)' : 'transparent') + ';'
-        + 'cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;'
-        + 'color:' + (sel ? 'var(--accent-soft)' : 'var(--text-muted)') + ';font-family:inherit">'
-        + '<span style="font-size:22px">' + cr.emoji + '</span>'
-        + '<span style="font-size:10px;text-align:center;line-height:1.2">' + (cr.family || cr.name) + '</span>'
-        + '</button>';
+    const CATS = cropCategories;
+    const grouped = {};
+    CATS.forEach(c => grouped[c] = []);
+    crops.forEach(cr => { const cat = cr.category || 'Andre'; if (grouped[cat]) grouped[cat].push(cr); else (grouped['Andre']||grouped[CATS[CATS.length-1]]).push(cr); });
+    html += '<div id="kasse-crop-grid">';
+    CATS.forEach(cat => {
+      const catCrops = grouped[cat];
+      if (!catCrops.length) return;
+      html += '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:8px 0 6px">' + cat + '</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:4px">';
+      catCrops.forEach(cr => {
+        const sel = selIds.has(cr.id);
+        html += '<button onclick="toggleKasseCrop(\'' + bw.id + '\',' + cr.id + ')" data-cropid="' + cr.id + '"'
+          + ' style="padding:8px 4px;border-radius:10px;'
+          + 'border:2px solid ' + (sel ? 'var(--accent)' : 'var(--border)') + ';'
+          + 'background:' + (sel ? 'var(--accent-bg)' : 'transparent') + ';'
+          + 'cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;'
+          + 'color:' + (sel ? 'var(--accent-soft)' : 'var(--text-muted)') + ';font-family:inherit">'
+          + '<span style="font-size:22px">' + cr.emoji + '</span>'
+          + '<span style="font-size:10px;text-align:center;line-height:1.2">' + (cr.family || cr.name) + '</span>'
+          + '</button>';
+      });
+      html += '</div>';
     });
     html += '</div>';
 
@@ -7265,20 +7337,30 @@ function renderMarkedDetail(el, mktIdx) {
       + '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase">estimert</div></div>'
       + '</div>';
 
-    // ── Crop grid ──
+    // ── Crop grid — grouped by kategori ──
     const selIds = new Set(items.map(i => i.cropId));
-    html += '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Velg vekster</div>';
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:16px">';
-    crops.forEach(cr => {
-      const sel = selIds.has(cr.id);
-      html += '<button data-mkt-idx="' + mktIdx + '" data-crop-id="' + cr.id + '" onclick="markedToggleCrop(this)"'
-        + ' style="padding:8px 4px;border-radius:10px;border:2px solid ' + (sel?'var(--accent)':'var(--border)') + ';'
-        + 'background:' + (sel?'var(--accent-bg)':'transparent') + ';cursor:pointer;'
-        + 'display:flex;flex-direction:column;align-items:center;gap:3px;'
-        + 'color:' + (sel?'var(--accent-soft)':'var(--text-muted)') + ';font-family:inherit">'
-        + '<span style="font-size:22px">' + cr.emoji + '</span>'
-        + '<span style="font-size:10px;text-align:center;line-height:1.2">' + (cr.family||cr.name) + '</span>'
-        + '</button>';
+    const CATS = cropCategories;
+    const grouped = {};
+    CATS.forEach(c => grouped[c] = []);
+    crops.forEach(cr => { const cat = cr.category || 'Andre'; if (grouped[cat]) grouped[cat].push(cr); else (grouped['Andre']||grouped[CATS[CATS.length-1]]).push(cr); });
+    html += '<div>';
+    CATS.forEach(cat => {
+      const catCrops = grouped[cat];
+      if (!catCrops.length) return;
+      html += '<div style="font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin:8px 0 6px">' + cat + '</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;margin-bottom:4px">';
+      catCrops.forEach(cr => {
+        const sel = selIds.has(cr.id);
+        html += '<button data-mkt-idx="' + mktIdx + '" data-crop-id="' + cr.id + '" onclick="markedToggleCrop(this)"'
+          + ' style="padding:8px 4px;border-radius:10px;border:2px solid ' + (sel?'var(--accent)':'var(--border)') + ';'
+          + 'background:' + (sel?'var(--accent-bg)':'transparent') + ';cursor:pointer;'
+          + 'display:flex;flex-direction:column;align-items:center;gap:3px;'
+          + 'color:' + (sel?'var(--accent-soft)':'var(--text-muted)') + ';font-family:inherit">'
+          + '<span style="font-size:22px">' + cr.emoji + '</span>'
+          + '<span style="font-size:10px;text-align:center;line-height:1.2">' + (cr.family||cr.name) + '</span>'
+          + '</button>';
+      });
+      html += '</div>';
     });
     html += '</div>';
 
@@ -8007,6 +8089,60 @@ function updateLevUndoRedoBtns() {
   const rb = document.getElementById('lev-redo-btn');
   if (ub) ub.disabled = !canUndo;
   if (rb) rb.disabled = !canRedo;
+}
+
+function closeCatModal() { document.getElementById('cat-settings-modal')?.remove(); }
+function openCategorySettings() {
+  const modal = document.createElement('div');
+  modal.id = 'cat-settings-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+
+  function renderCatModal() {
+    modal.innerHTML = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+      + '<div style="font-size:15px;color:var(--accent-soft)">Kategorier</div>'
+      + '<button onclick="closeCatModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1">×</button>'
+      + '</div>'
+      + cropCategories.map((cat, i) =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="flex:1;font-size:14px;color:var(--text-head)">' + cat + '</div>'
+        + '<button onclick="moveCat(' + i + ',-1)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1" ' + (i===0?'disabled':'') + '>↑</button>'
+        + '<button onclick="moveCat(' + i + ',1)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1" ' + (i===cropCategories.length-1?'disabled':'') + '>↓</button>'
+        + '<button onclick="deleteCat(' + i + ')" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:14px;line-height:1">×</button>'
+        + '</div>'
+      ).join('')
+      + '<div style="display:flex;gap:8px;margin-top:14px">'
+      + '<input id="cat-new-input" placeholder="Ny kategori..." style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
+      + '<button onclick="addCatFromInput()" style="padding:10px 16px;border-radius:8px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Legg til</button>'
+      + '</div>'
+      + '</div>';
+  }
+
+  window.moveCat = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= cropCategories.length) return;
+    [cropCategories[i], cropCategories[j]] = [cropCategories[j], cropCategories[i]];
+    saveCropCategories();
+    renderCatModal();
+  };
+  window.deleteCat = (i) => {
+    if (cropCategories.length <= 1) return;
+    cropCategories.splice(i, 1);
+    saveCropCategories();
+    renderCatModal();
+  };
+  window.addCatFromInput = () => {
+    const input = document.getElementById('cat-new-input');
+    const val = input?.value.trim();
+    if (!val || cropCategories.includes(val)) return;
+    cropCategories.push(val);
+    saveCropCategories();
+    renderCatModal();
+  };
+
+  renderCatModal();
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
 function saveLevering() {
