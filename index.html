@@ -586,6 +586,13 @@ let boxTypes = [];                 // [{id, name, type:'vasket'|'uvasket', weekd
 let boxWeeks = [];                 // [{id, boxTypeId, week, year, items:[{cropId,qty,unit}], count, customerAdj:{}}]
 let deliveryMarket = [];           // [{id, cropId, qty, unit}]
 let harvestLog = [];
+let showBedStats = (() => { try { return localStorage.getItem('mh_bed_stats') !== '0'; } catch(e) { return true; } })();
+function toggleBedStats() {
+  showBedStats = !showBedStats;
+  try { localStorage.setItem('mh_bed_stats', showBedStats ? '1' : '0'); } catch(e) {}
+  renderSenger();
+}
+
 let cropCategories = (() => {
   try {
     const s = localStorage.getItem('mh_crop_categories');
@@ -2941,6 +2948,12 @@ function renderSenger() {
         <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Visuell oversikt</button>
       </div>
       <button onclick="openAddBed()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Legg til</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:12px;gap:8px">
+      <span style="font-size:12px;color:var(--text-muted)">Statistikk</span>
+      <div onclick="toggleBedStats()" style="width:40px;height:22px;border-radius:11px;background:${showBedStats?'var(--accent)':'rgba(128,128,128,0.3)'};position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0">
+        <div style="position:absolute;top:3px;left:${showBedStats?'21':'3'}px;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.2s"></div>
+      </div>
     </div>`;
 
   // Group beds by field letter
@@ -2969,8 +2982,14 @@ function renderSenger() {
       }, 0);
       const _fk = fieldTotalVal >= 1000 ? (fieldTotalVal >= 10000 ? Math.round(fieldTotalVal/1000) : Math.round(fieldTotalVal/100)/10) : null;
       const _fkStr = _fk !== null ? ' ~' + _fk.toLocaleString('nb-NO') + 'k' : '';
+      const _bedsWithVal = beds.filter(b => {
+        const bl = getCropsInBed(b);
+        return bl.some(crop => crop.beds.filter(sp => parseBedSpec(sp).bedId === b).some(spec => calcValue({...crop, beds:[spec]}) > 0));
+      }).length;
+      const _avgVal = _bedsWithVal > 0 ? fieldTotalVal / beds.length : 0;
+      const _avgStr = _avgVal >= 100 ? '~' + (Math.round(_avgVal/100)/10).toLocaleString('nb-NO') + 'k' : '';
       html += `<div style="margin:${letter === fieldKeys[0] ? '0' : '20px'} 0 10px;text-align:center">
-        <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${_fkStr ? `<span style="font-size:14px;color:#d97706;font-weight:700"> ${_fkStr}</span>` : ''}
+        <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${showBedStats && _fkStr ? `<span style="font-size:14px;color:#d97706;font-weight:700">${_fkStr}</span>` : ''}${showBedStats && _avgStr ? `<span style="font-size:12px;color:var(--text-muted)"> · snitt ${_avgStr}/seng</span>` : ''}
       </div>`;
     }
 
@@ -3015,7 +3034,7 @@ function renderSenger() {
                 }, 0);
                 return sum + v;
               }, 0);
-              return totalVal > 0
+              return totalVal > 0 && showBedStats
                 ? `<div style="text-align:right;flex-shrink:0">
                     <div style="font-size:18px;font-weight:300;color:#d97706;line-height:1">~${(Math.round(totalVal/100)/10).toLocaleString('nb-NO')}k</div>
                     <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div>
@@ -5985,7 +6004,7 @@ function scheduleGistSave() { scheduleSync(); }
 // LEVERING — state vars must be declared before init
 // ═══════════════════════════════════════════════════════════════
 
-let leveringTab = (() => { try { return localStorage.getItem('mh_lev_tab') || 'kasse'; } catch(e) { return 'kasse'; } })();
+let leveringTab = (() => { try { return localStorage.getItem('mh_lev_tab') || 'oversikt'; } catch(e) { return 'oversikt'; } })();
 let kasseViewWeek = (() => { try { return +localStorage.getItem('mh_kasse_week') || getCurrentWeek(); } catch(e) { return getCurrentWeek(); } })();
 let kasseViewYear = (() => { try { return +localStorage.getItem('mh_kasse_year') || getCurrentYear(); } catch(e) { return getCurrentYear(); } })();
 let kasseViewTypeId = (() => { try { return localStorage.getItem('mh_kasse_type') || null; } catch(e) { return null; } })();
@@ -8008,8 +8027,8 @@ function renderLevOversikt(el) {
     + statCard('📦', harvestedBoxes + ' / ' + totalBoxesAllSeasons,
         'Kasseprogresjon',
         totalBoxesAllSeasons ? Math.round((harvestedBoxes / totalBoxesAllSeasons) * 100) + '% levert' : 'Sett opp leveringsplan', 'var(--accent-soft)')
-    + statCard('💚', totalValue > 0 ? '~' + fmtKr(totalValue) : '–',
-        'Gjennomførte salg',
+    + statCard('💚', totalValue > 0 ? '~' + fmtKr(totalValue) : '0',
+        'Salg',
         harvestLog.length ? harvestLog.length + ' registreringer' : 'Ingen logget ennå', '#f472b6')
     + statCard('🥬', Math.round(loggedQty) + ' / ' + plannedQty,
         'Grønnsaker høstet',
