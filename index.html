@@ -36,6 +36,16 @@
     --accent-bg: rgba(52,211,153,0.12);
     --task-bg: rgba(255,255,255,0.05);
     --task-border: rgba(255,255,255,0.07);
+    /* Semantic colors */
+    --color-value: var(--color-value);
+    --color-danger: var(--color-danger);
+    --color-info: var(--color-info);
+    --color-export: #34d399;
+    --color-priority-high: var(--color-danger);
+    --color-priority-mid: var(--color-value);
+    --color-priority-low: #6ee7b7;
+    --color-harvest-toggle: #ea580c;
+    --color-theme-toggle: #3b82f6;
   }
   body.harvest {
     --accent: #c2410c;
@@ -68,6 +78,10 @@
     --accent-bg: rgba(107,76,42,0.1);
     --task-bg: #fff8f0;
     --task-border: rgba(214,201,176,0.8);
+    /* Semantic colors - light overrides */
+    --color-value: #b45309;
+    --color-danger: #ef4444;
+    --color-info: #3b82f6;
   }
 
   body {
@@ -77,6 +91,51 @@
     font-family: Georgia, 'Times New Roman', serif;
     color: var(--text-main);
     overflow-x: hidden;
+  }
+
+  /* ── Unified hover effect ── */
+  button,
+  [onclick],
+  [role="button"],
+  label[for],
+  select,
+  .tab-btn,
+  .crop-card,
+  .bed-cell,
+  .priority-btn,
+  .badge,
+  .map-tool-btn {
+    transition: filter 0.15s, background 0.15s;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled),
+  [onclick]:hover,
+  [role="button"]:hover,
+  select:hover,
+  .tab-btn:hover,
+  .crop-card:hover,
+  .bed-cell:hover,
+  .priority-btn:hover,
+  .map-tool-btn:hover {
+    filter: brightness(1.10);
+  }
+  body.light button:hover:not(:disabled),
+  body.light [onclick]:hover,
+  body.light [role="button"]:hover,
+  body.light select:hover,
+  body.light .tab-btn:hover,
+  body.light .crop-card:hover,
+  body.light .bed-cell:hover,
+  body.light .priority-btn:hover,
+  body.light .map-tool-btn:hover {
+    filter: brightness(0.93) !important;
+  }
+  button:hover:not(:disabled),
+  [onclick]:hover,
+  .tab-btn:hover,
+  .crop-card:hover,
+  .bed-cell:hover {
+    filter: brightness(1.10) !important;
   }
 
   /* HEADER */
@@ -122,7 +181,7 @@
   .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
   .stat-card {
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: none;
     border-radius: 14px; padding: 14px 16px;
   }
   .stat-icon { font-size: 20px; margin-bottom: 6px; }
@@ -132,7 +191,7 @@
   /* CARDS */
   .card {
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: none;
     border-radius: 14px; padding: 16px; margin-bottom: 14px;
   }
   .card-title { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent-soft); margin-bottom: 12px; }
@@ -148,13 +207,13 @@
   .bed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .bed-cell {
     border-radius: 10px; padding: 12px 10px; cursor: pointer;
-    transition: all 0.2s; min-height: 80px;
+    transition: background 0.15s; min-height: 80px;
     background: rgba(255,255,255,0.03);
-    border: 1.5px solid rgba(255,255,255,0.08);
+    border: none;
   }
-  .bed-cell.occupied { background: rgba(52,211,153,0.07); border-color: rgba(52,211,153,0.25); }
-  body.light .bed-cell.occupied { background: rgba(107,76,42,0.08); border-color: rgba(107,76,42,0.25); }
-  .bed-cell.selected { border-color: #34d399 !important; }
+  .bed-cell.occupied { background: rgba(52,211,153,0.07); }
+  body.light .bed-cell.occupied { background: rgba(107,76,42,0.08); }
+  .bed-cell.selected { background: rgba(52,211,153,0.12) !important; }
   .bed-label { font-size: 10px; color: #6b7280; letter-spacing: 0.12em; text-transform: uppercase; }
   .bed-emoji { float: right; font-size: 16px; }
   .bed-name { font-size: 13px; color: var(--text-head); margin-top: 8px; }
@@ -178,7 +237,7 @@
   }
 
   /* end removed */
-  .crop-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .crop-card { background: var(--bg-card); border: none; border-radius: 14px; padding: 16px; margin-bottom: 10px; transition: filter 0.15s; }
   .crop-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
   .crop-info { display: flex; gap: 10px; align-items: center; }
   .crop-name { font-size: 15px; color: var(--text-head); }
@@ -201,8 +260,9 @@
   .task-priority-label { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 8px; }
   .task-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--task-bg); border: 1px solid var(--task-border); border-radius: 10px; margin-bottom: 7px; transition: opacity 0.2s; }
   .task-row.done { opacity: 0.45; }
-  .check-btn { width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,0.2); background: transparent; cursor: pointer; flex-shrink: 0; font-size: 13px; display: flex; align-items: center; justify-content: center; color: #0d1a0e; transition: all 0.15s; }
-  .check-btn.checked { background: var(--accent); border-color: var(--accent); }
+  .check-btn { width: 20px; height: 20px; border-radius: 6px; border: none; outline: 1.5px solid rgba(255,255,255,0.3); outline-offset: -1px; background: transparent; cursor: pointer; flex-shrink: 0; font-size: 11px; display: flex; align-items: center; justify-content: center; color: var(--bg-main); transition: outline-color 0.2s; }
+  .check-btn.checked { background: var(--accent); outline-color: var(--accent); }
+  .check-btn:hover:not(.checked) { outline-color: var(--accent); }
   .task-text { flex: 1; font-size: 13px; color: var(--text-head); }
   .task-row.done .task-text { text-decoration: line-through; }
   .task-date { font-size: 11px; color: #6b7280; margin-top: 2px; }
@@ -211,9 +271,9 @@
   /* BUTTONS */
   .add-btn {
     width: 100%; padding: 13px; border-radius: 12px;
-    border: 1px solid var(--accent); background: var(--accent-bg);
-    color: var(--accent-soft); cursor: pointer; font-size: 14px; font-family: inherit;
-    margin-bottom: 16px; transition: background 0.15s;
+    background: var(--bg-card);
+    color: var(--text-muted); cursor: pointer; font-size: 14px; font-family: inherit;
+    margin-bottom: 16px; transition: filter 0.15s;
   }
   .add-btn:active { background: rgba(52,211,153,0.22); }
 
@@ -222,38 +282,38 @@
   .modal { background: var(--bg-modal); border: 1px solid rgba(52,211,153,0.3); border-radius: 20px 20px 0 0; padding: 24px 20px 36px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
   .modal-title { font-size: 17px; font-weight: 400; color: var(--accent-soft); margin-bottom: 18px; }
   .field-label { font-size: 10px; color: #6b7280; display: block; margin-bottom: 4px; letter-spacing: 0.1em; text-transform: uppercase; }
-  .field-input { width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text-head); font-size: 15px; font-family: inherit; }
+  .field-input { width: 100%; background: var(--bg-input); border: none; border-radius: 8px; padding: 10px 12px; color: var(--text-head); font-size: 15px; font-family: inherit; outline: none; transition: box-shadow 0.15s; }
+  .field-input:focus { box-shadow: 0 0 0 2px var(--accent); }
   .field-input:focus { outline: none; border-color: rgba(52,211,153,0.4); }
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .form-full { margin-bottom: 12px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
-  .btn-primary { flex: 1; padding: 13px; border-radius: 12px; border: 1px solid #34d399; background: rgba(52,211,153,0.2); color: #6ee7b7; cursor: pointer; font-size: 14px; font-family: inherit; }
-  .btn-secondary { flex: 1; padding: 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #6b7280; cursor: pointer; font-size: 14px; font-family: inherit; }
+  .btn-primary { flex: 1; padding: 13px; border-radius: 12px; background: rgba(52,211,153,0.2); color: #6ee7b7; cursor: pointer; font-size: 14px; font-family: inherit; }
+  .btn-secondary { flex: 1; padding: 13px; border-radius: 12px; background: transparent; color: #6b7280; cursor: pointer; font-size: 14px; font-family: inherit; }
   .priority-row { display: flex; gap: 8px; }
-  .priority-btn { flex: 1; padding: 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: transparent; cursor: pointer; font-size: 12px; font-family: inherit; color: #6b7280; transition: all 0.15s; }
+  .priority-btn { flex: 1; padding: 9px; border-radius: 8px; background: transparent; cursor: pointer; font-size: 12px; font-family: inherit; color: #6b7280; transition: filter 0.15s; }
 
   /* LIGHT MODE BORDER FIXES */
   body.light .bed-cell { border-color: rgba(0,0,0,0.15) !important; background: rgba(0,0,0,0.02); }
   body.light .bed-cell.occupied { background: rgba(107,76,42,0.08); border-color: rgba(107,76,42,0.3) !important; }
   body.light .bed-cell.selected { border-color: var(--accent) !important; }
-  body.light .check-btn { border-color: rgba(0,0,0,0.3); }
+  body.light .check-btn { outline-color: rgba(0,0,0,0.3); }
   body.light .filter-btn { border-color: rgba(0,0,0,0.2); color: var(--text-muted); }
   body.light .filter-btn.active { border-color: var(--accent); }
   body.light .status-btn { border-color: rgba(0,0,0,0.15); color: var(--text-muted); }
-  body.light .btn-secondary { border-color: rgba(0,0,0,0.2); color: var(--text-muted); }
-  body.light .priority-btn { border-color: rgba(0,0,0,0.2); color: var(--text-muted); }
+  body.light .btn-secondary { color: var(--text-muted); }
+  body.light .priority-btn { color: var(--text-muted); }
   body.light .cal-clear { border-color: rgba(0,0,0,0.2); color: var(--text-muted); }
   body.light .crop-notes { border-top-color: rgba(0,0,0,0.1); }
   body.light #undo-btn, body.light #redo-btn { border-color: rgba(0,0,0,0.2) !important; }
   body.light .date-display { border-color: rgba(0,0,0,0.2); color: var(--text-head); }
-  body.light .field-input { border-color: rgba(0,0,0,0.2) !important; }
   body.light .task-row { border-color: rgba(0,0,0,0.1) !important; }
   body.light .modal { border-color: rgba(0,0,0,0.15); }
   body.light .map-tool-btn { border-color: rgba(0,0,0,0.2) !important; color: var(--text-muted) !important; }
   body.light .map-tool-btn.active { border-color: var(--accent) !important; color: var(--accent) !important; background: var(--accent-bg) !important; }
 
   /* MAP */
-  .map-tool-btn { padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;transition:all 0.15s; }
+  .map-tool-btn { padding:6px 12px;border-radius:8px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;transition:all 0.15s; }
   .map-tool-btn.active { border-color:var(--accent);background:rgba(52,211,153,0.15);color:var(--accent-soft); }
   body.light .map-tool-btn { border-color:rgba(0,0,0,0.15);background:rgba(255,255,255,0.6);color:#4b7a52; }
   body.light .map-tool-btn.active { border-color:#16a34a;background:rgba(22,163,74,0.12);color:#15803d; }
@@ -295,6 +355,54 @@
   body.light .cal-day { color: var(--text-head); }
   body.light .cal-day.today { color: var(--accent); }
   .cal-clear { margin-top: 10px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #6b7280; font-family: inherit; font-size: 12px; cursor: pointer; }
+
+  input[type="checkbox"] { opacity: 1 !important; visibility: visible !important; }
+  /* ══ GLOBAL: Remove borders from interactive elements ══ */
+  button:not(.check-btn), select, .tab-btn, .btn-primary, .btn-secondary,
+  .priority-btn, .crop-card, .bed-cell, .map-tool-btn, .add-btn {
+    border: none !important;
+  }
+
+  /* ══ GLOBAL: Hover — semi-transparent overlay on all interactive ══ */
+  button, select, .tab-btn, .crop-card, .bed-cell,
+  .priority-btn, .map-tool-btn, .btn-primary, .btn-secondary, .add-btn {
+    transition: background 0.15s, filter 0.15s !important;
+  }
+
+  /* Dark mode hover */
+  button:hover:not(:disabled), select:hover,
+  .tab-btn:hover, .crop-card:hover, .bed-cell:hover,
+  .priority-btn:hover, .map-tool-btn:hover,
+  .btn-primary:hover, .btn-secondary:hover, .add-btn:hover {
+    background-image: linear-gradient(rgba(255,255,255,0.07), rgba(255,255,255,0.07)) !important;
+  }
+
+  /* Light mode hover */
+  body.light button:hover:not(:disabled), body.light select:hover,
+  body.light .tab-btn:hover, body.light .crop-card:hover,
+  body.light .bed-cell:hover, body.light .priority-btn:hover,
+  body.light .map-tool-btn:hover, body.light .btn-primary:hover,
+  body.light .btn-secondary:hover, body.light .add-btn:hover {
+    background-image: linear-gradient(rgba(0,0,0,0.06), rgba(0,0,0,0.06)) !important;
+  }
+
+  /* ══ div[onclick] elements (Innhøsting, Oppsett overlays) ══ */
+  div[onclick], span[onclick] {
+    cursor: pointer;
+    transition: background 0.15s !important;
+  }
+  div[onclick]:hover {
+    background-image: linear-gradient(rgba(255,255,255,0.07), rgba(255,255,255,0.07)) !important;
+  }
+  body.light div[onclick]:hover {
+    background-image: linear-gradient(rgba(0,0,0,0.06), rgba(0,0,0,0.06)) !important;
+  }
+
+  /* ══ Focus ══ */
+  .field-input:focus {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -331,19 +439,17 @@
         </div>
       </div>
       <div style="display:flex;gap:5px;align-items:center;position:relative">
-        <button id="undo-btn" onclick="undo()" title="Angre (Ctrl+Z)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
-        <button id="redo-btn" onclick="redo()" title="Gjør om (Ctrl+Y)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
-        <button id="gist-btn" onclick="gistBtnClick(event)" title="Sky-synkronisering" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">☁</button>
-        <button onclick="toggleGearMenu()" id="gear-btn" title="Innstillinger" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">⚙</button>
-        <div id="gear-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:16px;padding:8px;min-width:220px;z-index:200;box-shadow:0 12px 40px rgba(0,0,0,0.5)">
-          <button onclick="closeGearMenu();toggleHarvestMode()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-head);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.08)'" onmouseout="this.style.background='transparent'"><span style="font-size:16px;width:20px;text-align:center">🌿</span><span style="flex:1">Innhøsting</span><div id="harvest-toggle-inline" style="width:36px;height:20px;border-radius:10px;position:relative;background:rgba(128,128,128,0.3);flex-shrink:0"><div style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div></div></button>
+        <button id="undo-btn" onclick="undo()" title="Angre (Ctrl+Z)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
+        <button id="redo-btn" onclick="redo()" title="Gjør om (Ctrl+Y)" disabled style="padding:4px 8px;padding-top:6px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
+        <button id="gist-btn" onclick="gistBtnClick(event)" title="Sky-synkronisering" style="padding:4px 8px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">☁</button>
+        <button onclick="toggleGearMenu()" id="gear-btn" title="Innstillinger" style="padding:4px 8px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">⚙</button>
+        <div id="gear-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-modal);border:none;border-radius:16px;padding:8px;min-width:220px;z-index:200;box-shadow:0 12px 40px rgba(0,0,0,0.5)">
+          <button onclick="closeGearMenu();toggleHarvestMode()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-head);font-family:inherit;text-align:left"><span style="font-size:16px;width:20px;text-align:center">🌿</span><span style="flex:1">Innhøsting</span><div id="harvest-toggle-inline" style="width:36px;height:20px;border-radius:10px;position:relative;background:rgba(128,128,128,0.3);flex-shrink:0"><div style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div></div></button>
           <div style="height:1px;background:var(--border);margin:4px 0"></div>
-          <button onclick="toggleTheme()" id="theme-menu-btn" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-head);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.08)'" onmouseout="this.style.background='transparent'"><span style="font-size:16px;width:20px;text-align:center">☀</span><span style="flex:1" id="theme-menu-label">Lyst tema</span><div id="theme-menu-toggle" style="width:36px;height:20px;border-radius:10px;position:relative;flex-shrink:0;background:rgba(128,128,128,0.3)"><div style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div></div></button>
+          <button onclick="toggleTheme()" id="theme-menu-btn" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-head);font-family:inherit;text-align:left"><span style="font-size:16px;width:20px;text-align:center">☀</span><span style="flex:1" id="theme-menu-label">Lyst tema</span><div id="theme-menu-toggle" style="width:36px;height:20px;border-radius:10px;position:relative;flex-shrink:0;background:rgba(128,128,128,0.3)"><div style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div></div></button>
           <div style="height:1px;background:var(--border);margin:4px 0"></div>
-          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:#60a5fa;font-family:inherit" onmouseover="this.style.background='rgba(128,128,128,0.08)'" onmouseout="this.style.background='transparent'"><span style="font-size:16px;width:20px;text-align:center">⬆</span><span>Importer fra Excel</span><input type="file" accept=".xlsx" onchange="importFromExcel(event);closeGearMenu()" style="display:none"></label>
-          <button onclick="exportToExcel();closeGearMenu()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--accent-soft);font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.08)'" onmouseout="this.style.background='transparent'"><span style="font-size:16px;width:20px;text-align:center">⬇</span><span>Eksporter til Excel</span></button>
-          <div style="height:1px;background:var(--border);margin:4px 0"></div>
-          <button onclick="nullstill();closeGearMenu()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:#f87171;font-family:inherit;text-align:left" onmouseover="this.style.background='rgba(128,128,128,0.08)'" onmouseout="this.style.background='transparent'"><span style="font-size:16px;width:20px;text-align:center">🗑</span><span>Nullstill alt</span></button>
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:var(--text-head);font-family:inherit"><span style="font-size:16px;width:20px;text-align:center">⬆</span><span>Importer fra Excel</span><input type="file" accept=".xlsx" onchange="importFromExcel(event);closeGearMenu()" style="display:none"></label>
+          <button onclick="exportToExcel();closeGearMenu()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--accent-soft);font-family:inherit;text-align:left"><span style="font-size:16px;width:20px;text-align:center">⬇</span><span>Eksporter til Excel</span></button>
         </div>
       </div>
     </div>
@@ -398,7 +504,7 @@
       <div><label class="field-label">Emoji</label><input class="field-input" id="c-emoji" value="🌱" maxlength="4"></div>
       <div><label class="field-label">Sort</label><input class="field-input" id="c-family" placeholder="f.eks. Nattskygge"></div>
       <div><label class="field-label">Kategori</label><select class="field-input" id="c-category"></select></div>
-      <div><label class="field-label">Senger (komma-separert, f.eks. A1, A1-1:5, B2-3)</label><input class="field-input" id="c-beds" placeholder="A1, A1-1:5, B2-3"><div id="c-beds-error" style="display:none;color:#f87171;font-size:12px;margin-top:4px"></div></div>
+      <div><label class="field-label">Senger (komma-separert, f.eks. A1, A1-1:5, B2-3)</label><input class="field-input" id="c-beds" placeholder="A1, A1-1:5, B2-3"><div id="c-beds-error" style="display:none;color:var(--color-danger);font-size:12px;margin-top:4px"></div></div>
       <div><label class="field-label">Radavstand (cm)</label><input class="field-input" id="c-rowspacing" type="number" value="30"></div>
       <div><label class="field-label">Planteavstand (cm)</label><input class="field-input" id="c-plantspacing" type="number" value="20"></div>
       <div><label class="field-label">Rader (per bed)</label><input class="field-input" id="c-rows" type="number" value="2"></div>
@@ -437,7 +543,7 @@
       <button class="btn-secondary" onclick="closeModal('modal-crop')">Avbryt</button>
     </div>
     <div id="modal-crop-delete-wrap" style="display:none;margin-top:10px">
-      <button onclick="deleteCrop()" style="width:100%;padding:11px;border-radius:12px;border:1px solid rgba(248,113,113,0.4);background:rgba(248,113,113,0.08);color:#f87171;cursor:pointer;font-size:14px;font-family:inherit">🗑 Fjern denne veksten</button>
+      <button onclick="deleteCrop()" style="width:100%;padding:11px;border-radius:12px;background:rgba(248,113,113,0.08);color:var(--color-danger);cursor:pointer;font-size:14px;font-family:inherit">🗑 Fjern denne veksten</button>
     </div>
   </div>
 </div>
@@ -464,8 +570,8 @@
     <div class="form-full"><label class="field-label">Dato</label><button type="button" class="date-display empty" id="t-date-btn" onclick="openCal('t-date-btn','t-date-val')">Velg dato 📅</button><input type="hidden" id="t-date-val"></div>
     <div class="form-full"><label class="field-label">Prioritet</label>
       <div class="priority-row" id="priority-btns">
-        <button class="priority-btn" onclick="setPriority('høy')" style="color:#f87171;border-color:#f87171">Høy</button>
-        <button class="priority-btn active" onclick="setPriority('middels')" style="color:#d97706;border-color:#d97706">Middels</button>
+        <button class="priority-btn" onclick="setPriority('høy')" style="color:var(--color-danger);border-color:var(--color-danger)">Høy</button>
+        <button class="priority-btn active" onclick="setPriority('middels')" style="color:var(--color-value);border-color:var(--color-value)">Middels</button>
         <button class="priority-btn" onclick="setPriority('lav')" style="color:var(--accent-soft);border-color:var(--accent-soft)">Lav</button>
       </div>
     </div>
@@ -480,7 +586,7 @@
   <div class="modal">
     <div class="modal-title">Importer fra Excel</div>
     <div id="import-preview" style="font-size:13px;color:var(--text-muted);margin-bottom:16px"></div>
-    <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#d97706">
+    <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--color-value)">
       ⚠️ Dette vil erstatte all eksisterende data med innholdet fra filen.
     </div>
     <div class="modal-actions">
@@ -499,7 +605,7 @@
       <div><label class="field-label">Lengde (m)</label><input class="field-input" id="ab-length" type="number" step="0.1" value="11"></div>
       <div><label class="field-label">Bredde (m)</label><input class="field-input" id="ab-width" type="number" step="0.1" value="1.2"></div>
     </div>
-    <div id="ab-error" style="font-size:12px;color:#f87171;margin-bottom:8px;display:none"></div>
+    <div id="ab-error" style="font-size:12px;color:var(--color-danger);margin-bottom:8px;display:none"></div>
     <div class="modal-actions">
       <button class="btn-primary" onclick="addBed()">Legg til</button>
       <button class="btn-secondary" onclick="closeModal('modal-addbed')">Avbryt</button>
@@ -509,10 +615,10 @@
 
 <div id="modal-confirm-delete" class="modal-overlay" style="display:none">
   <div class="modal">
-    <div class="modal-title" style="color:#f87171">⚠️ Fjern vekst</div>
+    <div class="modal-title" style="color:var(--color-danger)">⚠️ Fjern vekst</div>
     <div id="confirm-delete-body" style="font-size:13px;color:var(--text-head);margin-bottom:16px;line-height:1.6"></div>
     <div class="modal-actions">
-      <button onclick="confirmDeleteCrop()" style="flex:1;padding:13px;border-radius:12px;border:1px solid rgba(248,113,113,0.5);background:rgba(248,113,113,0.15);color:#f87171;cursor:pointer;font-size:14px;font-family:inherit">Ja, fjern veksten</button>
+      <button onclick="confirmDeleteCrop()" style="flex:1;padding:13px;border-radius:12px;background:rgba(248,113,113,0.15);color:var(--color-danger);cursor:pointer;font-size:14px;font-family:inherit">Ja, fjern veksten</button>
       <button class="btn-secondary" onclick="closeModal('modal-confirm-delete')">Avbryt</button>
     </div>
   </div>
@@ -549,9 +655,9 @@ function fmtKr(val) {
 
 const STATUS = {
   planlagt:     { label: "Planlagt",     color: "#a78bfa", bg: "rgba(167,139,250,0.15)" },
-  sådd:         { label: "Sådd",         color: "#60a5fa", bg: "rgba(96,165,250,0.15)" },
+  sådd:         { label: "Sådd",         color: "var(--color-info)", bg: "rgba(96,165,250,0.15)" },
   plantet:      { label: "Plantet",      color: "#34d399", bg: "rgba(52,211,153,0.15)" },
-  høstet:       { label: "Høstet",       color: "#d97706", bg: "rgba(251,191,36,0.15)" },
+  høstet:       { label: "Høstet",       color: "var(--color-value)", bg: "rgba(251,191,36,0.15)" },
 };
 
 let BED_IDS = ["A1","A2","A3","B1","B2","B3","C1","C2","C3","D1","D2","D3","E1","E2","E3","F1","F2","F3"];
@@ -709,7 +815,7 @@ function showFloatingGearMenu(triggerBtn) {
     float.id = 'gear-menu-float';
     const isLight = document.body.classList.contains('light');
     const inHarvest = document.body.classList.contains('harvest');
-    float.style.cssText = 'position:fixed;right:12px;top:70px;background:' + (isLight ? '#fffbf5' : '#1a2e1b') + ';border:1px solid var(--border-accent);border-radius:16px;padding:8px;min-width:220px;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,0.5)';
+    float.style.cssText = 'position:fixed;right:12px;top:70px;background:' + (isLight ? '#fffbf5' : '#1a2e1b') + ';border:none;border-radius:16px;padding:8px;min-width:220px;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,0.5)';
     const row = (icon, label, color, fn) => {
       const b = document.createElement('button');
       b.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:' + color + ';font-family:inherit;text-align:left';
@@ -737,10 +843,9 @@ function showFloatingGearMenu(triggerBtn) {
     float.appendChild(sep());
     float.appendChild(row('🏷', 'Kategorier', 'var(--text-head)', () => { openCategorySettings(); float.remove(); }));
     float.appendChild(sep());
-    float.appendChild(row('⬆', 'Importer fra Excel', '#60a5fa', () => { document.getElementById('excel-import-input')?.click(); float.remove(); }));
-    float.appendChild(row('⬇', 'Eksporter til Excel', '#34d399', () => { exportToExcel(); float.remove(); }));
-    float.appendChild(sep());
-    float.appendChild(row('🗑', 'Nullstill alt', '#f87171', () => { nullstill(); float.remove(); }));
+    float.appendChild(row('⬆', 'Importer fra Excel', 'var(--text-head)', () => { document.getElementById('excel-import-input')?.click(); float.remove(); }));
+    float.appendChild(row('⬇', 'Eksporter til Excel', 'var(--text-head)', () => { exportToExcel(); float.remove(); }));
+
     document.body.appendChild(float);
     // Auto-close when clicking outside — but exclude trigger buttons
     setTimeout(() => {
@@ -942,9 +1047,9 @@ function renderOversikt() {
   const totalBeds = BED_IDS.length;
 
   const stats = [
-    { label:"Sålogg",     val:`${sowingDone}/${sowingTotal}`,    icon:"🌱",  color:"#60a5fa" },
+    { label:"Sålogg",     val:`${sowingDone}/${sowingTotal}`,    icon:"🌱",  color:"var(--color-info)" },
     { label:"Plantelogg", val:`${plantingDone}/${plantingTotal}`,icon:"🪴",  color:"#34d399" },
-    { label:"Senger",     val:`${filledBeds}/${totalBeds}`,      icon:"🌿",  color:"#d97706" },
+    { label:"Senger",     val:`${filledBeds}/${totalBeds}`,      icon:"🌿",  color:"var(--color-value)" },
     { label:"Verdi",      val:valueDisplay,                      icon:"💰",  color:"#f472b6" },
   ];
 
@@ -963,7 +1068,7 @@ function renderOversikt() {
       <div class="card-title">Kommende oppgaver</div>
       ${upcoming.length === 0 ? '<p style="color:var(--text-muted);font-size:13px">Ingen åpne oppgaver 🎉</p>' : ''}
       ${upcoming.map(t => {
-        const pc = {høy:"#f87171",middels:"#d97706",lav:"#6ee7b7"}[t.priority];
+        const pc = {høy:"var(--color-danger)",middels:"var(--color-value)",lav:"#6ee7b7"}[t.priority];
         return `<div class="list-row">
           <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${pc}"></div>
           <div style="flex:1">
@@ -972,7 +1077,7 @@ function renderOversikt() {
           </div>
           ${typeof t.id === 'string' && t.id.startsWith('crop-')
             ? `<div style="font-size:12px;color:var(--text-muted);padding:5px 10px">🔒</div>`
-            : `<button onclick="toggleTask(${typeof t.id === 'string' ? `'${t.id}'` : t.id})" style="background:rgba(52,211,153,0.1);border:1px solid var(--border-accent);border-radius:8px;color:var(--accent);cursor:pointer;padding:5px 10px;font-size:12px;font-family:inherit">Ferdig</button>`
+            : `<button onclick="toggleTask(${typeof t.id === 'string' ? `'${t.id}'` : t.id})" style="background:rgba(52,211,153,0.1);border:none;border-radius:8px;color:var(--accent);cursor:pointer;padding:5px 10px;font-size:12px;font-family:inherit">Ferdig</button>`
           }
         </div>`;
       }).join('')}
@@ -1035,13 +1140,13 @@ function calcValue(crop) {
 const MAP_PX_PER_M = 28;   // px per meter (base scale)
 const MAP_PAD_M    = 1.5;  // padding in meters
 
-const MAP_FIELD_ACCENTS = ['#34d399','#60a5fa','#f87171','#d97706','#a78bfa','#fb923c'];
+const MAP_FIELD_ACCENTS = ['#34d399','var(--color-info)','var(--color-danger)','var(--color-value)','#a78bfa','#fb923c'];
 const MAP_FIELD_FILLS   = [
   'rgba(52,211,153,0.13)','rgba(96,165,250,0.13)','rgba(248,113,113,0.13)',
   'rgba(251,191,36,0.13)', 'rgba(167,139,250,0.13)','rgba(251,146,60,0.13)'
 ];
 const MAP_STATUS_COLORS = {
-  planlagt:'#6b7280', sådd:'#60a5fa', plantet:'#34d399', høstet:'#d97706', avsluttet:'#4b5563'
+  planlagt:'#6b7280', sådd:'var(--color-info)', plantet:'#34d399', høstet:'var(--color-value)', avsluttet:'#4b5563'
 };
 
 function mapFieldLetters() {
@@ -1259,19 +1364,19 @@ function openGardenMap() {
         </svg>
       <!-- Centered buttons — true center via grid -->
       <div style="display:flex;justify-content:center;gap:4px;align-items:center">
-        <button onclick="openMapSettings()" title="Innstillinger" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <button onclick="openMapSettings()" title="Innstillinger" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
-        <button id="draw-mode-btn" onclick="toggleDrawMode()" title="Tegning" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <button id="draw-mode-btn" onclick="toggleDrawMode()" title="Tegning" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
         </button>
-        <button id="map-lock-btn" onclick="toggleMapLock()" title="Lås kart" style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;filter:grayscale(1)">🔒</button>
+        <button id="map-lock-btn" onclick="toggleMapLock()" title="Lås kart" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;filter:grayscale(1)">🔒</button>
       </div>
       <!-- Undo/redo + close right -->
       <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
-        <button id="map-undo-btn" onclick="mapUndoAction()" title="Angre (Ctrl+Z)" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
-        <button id="map-redo-btn" onclick="mapRedoAction()" title="Gjør om (Ctrl+Y)" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
-        <button onclick="closeGardenMap()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">✕</button>
+        <button id="map-undo-btn" onclick="mapUndoAction()" title="Angre (Ctrl+Z)" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
+        <button id="map-redo-btn" onclick="mapRedoAction()" title="Gjør om (Ctrl+Y)" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
+        <button onclick="closeGardenMap()" style="padding:5px 10px;border-radius:8px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">✕</button>
       </div>
     </div>
     <!-- Drawing toolbar (hidden by default) -->
@@ -1293,17 +1398,17 @@ function openGardenMap() {
       <!-- Brush shape buttons -->
       <div style="display:flex;gap:4px;align-items:center">
         <button onclick="setDrawBrush('round')" data-brush="round"
-          title="Rund" style="width:30px;height:30px;border-radius:6px;border:1px solid #4a3830;
+          title="Rund" style="width:30px;height:30px;border-radius:6px;
           background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
           <svg width="20" height="20"><line x1="3" y1="17" x2="17" y2="3" stroke="#c4b89a" stroke-width="4" stroke-linecap="round"/></svg>
         </button>
         <button onclick="setDrawBrush('square')" data-brush="square"
-          title="Firkantet" style="width:30px;height:30px;border-radius:6px;border:1px solid #4a3830;
+          title="Firkantet" style="width:30px;height:30px;border-radius:6px;
           background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
           <svg width="20" height="20"><line x1="3" y1="17" x2="17" y2="3" stroke="#c4b89a" stroke-width="4" stroke-linecap="square"/></svg>
         </button>
         <button onclick="setDrawBrush('calligraphy')" data-brush="calligraphy"
-          title="Kalligrafi" style="width:30px;height:30px;border-radius:6px;border:1px solid #4a3830;
+          title="Kalligrafi" style="width:30px;height:30px;border-radius:6px;
           background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
           <svg width="20" height="20">
             <path d="M 3 17 Q 8 12 10 8 Q 12 4 17 3" stroke="#c4b89a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
@@ -1316,7 +1421,7 @@ function openGardenMap() {
 
       <!-- Color swatch + panel toggle -->
       <button id="draw-btn-color" onclick="toggleDrawPanel('color')"
-        style="width:30px;height:30px;border-radius:6px;border:2px solid #4a3830;
+        style="width:30px;height:30px;border-radius:6px;
         background:transparent;cursor:pointer;padding:2px;position:relative">
         <div id="draw-color-dot" style="width:100%;height:100%;border-radius:4px;background:#1c1410"></div>
       </button>
@@ -1337,14 +1442,14 @@ function openGardenMap() {
 
       <!-- Fill, Eraser, Clear -->
       <button id="fill-tool-btn" onclick="toggleFillTool()"
-        style="padding:5px 11px;border-radius:7px;border:1px solid #4a3830;background:rgba(0,0,0,0.3);color:#e8ddd0;cursor:pointer;font-size:12px;font-family:inherit">Fyll</button>
+        style="padding:5px 11px;border-radius:7px;background:rgba(0,0,0,0.3);color:#e8ddd0;cursor:pointer;font-size:12px;font-family:inherit">Fyll</button>
       <button id="draw-eraser-btn" onclick="toggleEraser()"
-        style="padding:5px 11px;border-radius:7px;border:1px solid #4a3830;background:rgba(0,0,0,0.3);color:#e8ddd0;cursor:pointer;font-size:12px;font-family:inherit">Viskelær</button>
+        style="padding:5px 11px;border-radius:7px;background:rgba(0,0,0,0.3);color:#e8ddd0;cursor:pointer;font-size:12px;font-family:inherit">Viskelær</button>
       <button onclick="clearDrawing()"
-        style="padding:5px 11px;border-radius:7px;border:1px solid #4a3830;background:rgba(0,0,0,0.3);color:#e87070;cursor:pointer;font-size:12px;font-family:inherit">Slett alt</button>
+        style="padding:5px 11px;border-radius:7px;background:rgba(0,0,0,0.3);color:#e87070;cursor:pointer;font-size:12px;font-family:inherit">Slett alt</button>
 
       <button onclick="toggleDrawToolbar()"
-        style="padding:5px 9px;border-radius:7px;border:1px solid #6b5a50;
+        style="padding:5px 9px;border-radius:7px;
         background:transparent;color:#e8ddd0;cursor:pointer;font-size:11px;
         font-family:inherit">▲ Skjul</button>
     </div>
@@ -1355,14 +1460,14 @@ function openGardenMap() {
       padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.5)">
       <div style="display:flex;flex-wrap:wrap;gap:6px;max-width:220px">
         ${['#000000','#1c1410','#3d2b1f','#5c3d2a','#8b5e3c','#c4960c',
-           '#d97706','#ea580c','#dc2626','#be185d','#9333ea','#7c3aed',
+           'var(--color-value)','#ea580c','#dc2626','#be185d','#9333ea','#7c3aed',
            '#4f46e5','#2563eb','#0284c7','#0891b2','#0d9488','#16a34a',
            '#15803d','#4d7c0f','#78350f','#44403c','#6b7280','#9ca3af',
            '#ffffff','#fef9c3','#fde68a','#bbf7d0','#bfdbfe','#e9d5ff',
            '#fecaca','#fed7aa'].map(c =>
           `<div onclick="setDrawColor('${c}')" data-color="${c}"
             style="width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;
-            border:2px solid transparent;flex-shrink:0;
+            ;flex-shrink:0;
             box-shadow:0 0 0 1px rgba(255,255,255,0.15);transition:transform 0.1s"
             onmouseover="this.style.transform='scale(1.2)'"
             onmouseout="this.style.transform='scale(1)'"></div>`
@@ -1394,7 +1499,7 @@ function openGardenMap() {
     <div id="map-compass" onclick="openMapSettings()" title="Innstillinger"
       style="position:absolute;bottom:60px;right:10px;z-index:100;
       width:56px;height:56px;border-radius:50%;
-      background:var(--bg-card);border:1px solid var(--border);
+      background:var(--bg-card);border:none;
       display:flex;align-items:center;justify-content:center;
       cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2)">
     </div>
@@ -1804,7 +1909,7 @@ function showBedPopup(bedId) {
     left:${popLeft}px;top:${popTop}px;
     width:${popW}px;max-height:${maxH}px;
     display:flex;flex-direction:column;
-    background:var(--bg-modal);border:1px solid var(--border-accent);
+    background:var(--bg-modal);border:none;
     border-radius:14px;padding:0;box-shadow:0 8px 32px rgba(0,0,0,0.4);
     font-family:Georgia,serif`;
 
@@ -1844,7 +1949,7 @@ function showBedPopup(bedId) {
     <div style="padding:8px 14px;border-top:1px solid var(--border);flex-shrink:0">
       <button onclick="document.getElementById('map-bed-popup').remove();closeGardenMap();showTab('senger');setTimeout(()=>selectBed('${bedId}'),150)"
         style="width:100%;padding:8px;border-radius:8px;
-        border:1px solid var(--accent);background:var(--accent-bg);
+        border:none;background:var(--accent-bg);
         color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">
         Åpne i Senger →
       </button>
@@ -2731,7 +2836,7 @@ function showMapBedInfo(bedId) {
       ${bedCrops.length ? bedCrops.map(c=>c.emoji+' '+c.name).join(', ') : '— Ledig'}
     </span>
     <button onclick="closeGardenMap();showTab('senger');setTimeout(()=>selectBed('${bedId}'),100)"
-      style="padding:4px 10px;border-radius:6px;border:1px solid rgba(52,211,153,0.4);
+      style="padding:4px 10px;border-radius:6px;
       background:rgba(52,211,153,0.1);color:#6ee7b7;cursor:pointer;font-size:12px;
       font-family:inherit;flex-shrink:0">Åpne seng →</button>`;
 }
@@ -2751,7 +2856,7 @@ function openMapSettings() {
       <div style="width:52px;font-size:13px;color:var(--accent-soft);font-weight:700">Felt ${letter}</div>
       <div style="font-size:12px;color:var(--text-muted);flex-shrink:0">${beds.length} senger</div>
       <select onchange="updateMapFieldSetting('${letter}','orientation',this.value)"
-        style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);
+        style="padding:5px 8px;border-radius:6px;border:none;
         background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">
         <option value="landscape" ${fs.orientation==='landscape'?'selected':''}>↔ Liggende</option>
         <option value="portrait"  ${fs.orientation==='portrait' ?'selected':''}>↕ Stående</option>
@@ -2760,7 +2865,7 @@ function openMapSettings() {
         <span style="font-size:12px;color:var(--text-muted)">Gangvei:</span>
         <input type="number" min="0.3" max="3" step="0.1" value="${fs.gangvei}"
           onchange="updateMapFieldSetting('${letter}','gangvei',+this.value)"
-          style="width:55px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);
+          style="width:55px;padding:5px 7px;border-radius:6px;border:none;
           background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">
         <span style="font-size:12px;color:var(--text-muted)">m</span>
       </div>
@@ -2768,7 +2873,7 @@ function openMapSettings() {
         <span style="font-size:12px;color:var(--text-muted)">Senger per rad:</span>
         <input type="number" min="0" max="50" step="1" value="${fs.bedsPerRow||0}"
           onchange="updateMapFieldSetting('${letter}','bedsPerRow',+this.value)"
-          style="width:52px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);
+          style="width:52px;padding:5px 7px;border-radius:6px;border:none;
           background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">
         <span style="font-size:12px;color:var(--text-dim)">(0 = alle i én rad)</span>
       </div>
@@ -2781,7 +2886,7 @@ function openMapSettings() {
   const bedLabel = gardenMap.bedLabel || 'emoji';
 
   modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;
+    <div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;
       padding:20px;width:100%;max-width:600px;max-height:88vh;overflow-y:auto">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div style="font-size:15px;color:var(--accent-soft)">⚙ Innstillinger</div>
@@ -2797,12 +2902,12 @@ function openMapSettings() {
         <span style="font-size:13px;color:var(--text-head);flex:1">Vis i senger</span>
         <div style="display:flex;gap:6px">
           <button onclick="setMapBedLabel('emoji')" id="lbl-emoji"
-            style="padding:5px 14px;border-radius:8px;border:1px solid var(--border);
+            style="padding:5px 14px;border-radius:8px;border:none;
             background:${bedLabel==='emoji'?'var(--accent-bg)':'transparent'};
             color:${bedLabel==='emoji'?'var(--accent-soft)':'var(--text-muted)'};
             cursor:pointer;font-size:12px;font-family:inherit">Emoji</button>
           <button onclick="setMapBedLabel('name')" id="lbl-name"
-            style="padding:5px 14px;border-radius:8px;border:1px solid var(--border);
+            style="padding:5px 14px;border-radius:8px;border:none;
             background:${bedLabel==='name'?'var(--accent-bg)':'transparent'};
             color:${bedLabel==='name'?'var(--accent-soft)':'var(--text-muted)'};
             cursor:pointer;font-size:12px;font-family:inherit">Navn</button>
@@ -2815,12 +2920,12 @@ function openMapSettings() {
         <div style="display:flex;align-items:center;gap:6px">
           <input type="number" min="1" max="500" step="1" value="${areaW}" placeholder="Bredde"
             onchange="gardenMap.areaW=+this.value;saveGardenMap();renderMapWorld()"
-            style="width:70px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);
+            style="width:70px;padding:5px 7px;border-radius:6px;border:none;
             background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">
           <span style="font-size:12px;color:var(--text-muted)">×</span>
           <input type="number" min="1" max="500" step="1" value="${areaH}" placeholder="Lengde"
             onchange="gardenMap.areaH=+this.value;saveGardenMap();renderMapWorld()"
-            style="width:70px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);
+            style="width:70px;padding:5px 7px;border-radius:6px;border:none;
             background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">
           <span style="font-size:12px;color:var(--text-muted)">meter</span>
         </div>
@@ -2859,7 +2964,7 @@ function openMapSettings() {
 
       <button onclick="applyAndCloseMapSettings()"
         style="width:100%;margin-top:16px;padding:12px;border-radius:10px;
-        border:1px solid var(--accent);background:var(--accent-bg);
+        border:none;background:var(--accent-bg);
         color:var(--accent-soft);cursor:pointer;font-size:14px;font-family:inherit">
         ✓ Bruk innstillinger
       </button>
@@ -2941,17 +3046,12 @@ function renderSenger() {
 
   let html = `
     <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px">
-      <select onchange="setBedField(this.value)" style="padding:7px 28px 7px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M0 0l5 6 5-6z%22 fill=%22%236b7280%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;width:auto">
-        ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Alle':'Felt '+f}</option>`).join('')}
+      <select onchange="setBedField(this.value)" style="padding:6px 10px;border-radius:20px;background:var(--bg-card);color:var(--text-muted);font-size:12px;font-family:inherit;cursor:pointer;outline:none;">
+        ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Felt':'Felt '+f}</option>`).join('')}
       </select>
-      <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Visuell oversikt</button>
-      <button onclick="openAddBed()" style="padding:7px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Legg til</button>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">Statistikk</span>
-        <div onclick="toggleBedStats()" style="width:40px;height:22px;border-radius:11px;background:${showBedStats?'var(--accent)':'rgba(128,128,128,0.3)'};position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0">
-          <div style="position:absolute;top:3px;left:${showBedStats?'21':'3'}px;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.2s"></div>
-        </div>
-      </div>
+      <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Kart</button>
+      <button onclick="openAddBed()" style="padding:7px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Ny seng</button>
+      <button onclick="toggleBedStats()" style="padding:7px 12px;border-radius:20px;border:none;background:${showBedStats?'var(--accent-bg)':'var(--bg-card)'};color:${showBedStats?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Statistikk</button>
     </div>`;
 
   // Group beds by field letter
@@ -2987,7 +3087,7 @@ function renderSenger() {
       const _avgVal = _bedsWithVal > 0 ? fieldTotalVal / beds.length : 0;
       const _avgStr = _avgVal >= 100 ? '~' + (Math.round(_avgVal/100)/10).toLocaleString('nb-NO') + 'k' : '';
       html += `<div style="margin:${letter === fieldKeys[0] ? '0' : '20px'} 0 10px;text-align:center">
-        <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${showBedStats && _fkStr ? `<span style="font-size:14px;color:#d97706;font-weight:700">${_fkStr}</span>` : ''}${showBedStats && _avgStr ? `<span style="font-size:12px;color:var(--text-muted)"> · snitt ${_avgStr}/seng</span>` : ''}
+        <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${showBedStats && _fkStr ? `<span style="font-size:14px;color:var(--color-value);font-weight:700">${_fkStr}</span>` : ''}${showBedStats && _avgStr ? `<span style="font-size:12px;color:var(--text-muted)"> · snitt ${_avgStr}/seng</span>` : ''}
       </div>`;
     }
 
@@ -3005,7 +3105,7 @@ function renderSenger() {
         ? 'var(--accent)'
         : (occupied ? (isLight ? 'rgba(107,76,42,0.25)' : 'rgba(52,211,153,0.2)') : 'var(--border)');
 
-      html += `<div onclick="selectBed('${bed}')" style="display:flex;align-items:stretch;border-radius:12px;border:1.5px solid ${cardBorder};background:${cardBg};margin-bottom:6px;cursor:pointer;overflow:hidden;transition:all 0.15s">
+      html += `<div onclick="selectBed('${bed}')" style="display:flex;align-items:stretch;border-radius:12px;border:none;background:${cardBg};margin-bottom:6px;cursor:pointer;overflow:hidden;transition:background 0.15s">
         <!-- Color bar -->
         <div style="width:4px;flex-shrink:0;background:${statusColor};border-radius:2px 0 0 2px"></div>
         <!-- Main content -->
@@ -3035,7 +3135,7 @@ function renderSenger() {
               }, 0);
               return totalVal > 0 && showBedStats
                 ? `<div style="text-align:right;flex-shrink:0">
-                    <div style="font-size:18px;font-weight:300;color:#d97706;line-height:1">~${(Math.round(totalVal/100)/10).toLocaleString('nb-NO')}k</div>
+                    <div style="font-size:18px;font-weight:300;color:var(--color-value);line-height:1">~${(Math.round(totalVal/100)/10).toLocaleString('nb-NO')}k</div>
                     <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div>
                   </div>`
                 : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>`;
@@ -3071,7 +3171,7 @@ function renderSenger() {
           const g = calcGang(o.crop, o.spec);
           const segLen = o.end - o.start + 1;
           const hasSegment = parseBedSpec(o.spec).start !== null;
-          html += `<div style="padding:12px;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);margin-bottom:8px">
+          html += `<div style="padding:12px;border-radius:10px;background:var(--bg-card);border:none;margin-bottom:8px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
               <span style="font-size:24px">${o.crop.emoji}</span>
               <div style="flex:1">
@@ -3081,7 +3181,7 @@ function renderSenger() {
                   <span style="color:${isLight?'#6b8c42':'#86efac'}">${STATUS[o.crop.status]?.label||o.crop.status}</span>
                 </div>
               </div>
-              <button onclick="event.stopPropagation();openEditCrop(crops.indexOf(crops.find(c=>c.id===o.crop.id)))" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
+              <button onclick="event.stopPropagation();openEditCrop(crops.indexOf(crops.find(c=>c.id===o.crop.id)))" style="padding:6px 12px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
               <div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
@@ -3093,7 +3193,7 @@ function renderSenger() {
                 const v = calcValue(segCrop);
                 return v !== null && v > 0 ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
                   <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Verdi</div>
-                  <div style="font-size:16px;font-weight:300;color:#d97706">~${fmtKr(v)}</div>
+                  <div style="font-size:16px;font-weight:300;color:var(--color-value)">~${fmtKr(v)}</div>
                 </div>` : '';
               })()}
               ${g?.pct != null ? `<div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
@@ -3121,11 +3221,11 @@ function renderSenger() {
               <div style="font-size:13px;color:var(--text-muted)">Ledig strekning</div>
               <div style="font-size:11px;color:var(--text-dim);margin-top:1px">${f.start}–${f.end}m</div>
             </div>
-            <button onclick="event.stopPropagation();openAddCrop()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Vekst</button>
+            <button onclick="event.stopPropagation();openAddCrop()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Vekst</button>
           </div>`;
         });
 
-        html += `<button onclick="event.stopPropagation();selectBed('${bed}');openAddBed('${bed}')" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;margin-bottom:4px">Rediger seng</button>`;
+        html += `<button onclick="event.stopPropagation();selectBed('${bed}');openAddBed('${bed}')" style="width:100%;padding:10px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;margin-bottom:4px">Rediger seng</button>`;
         html += `</div>`;
       }
     });
@@ -3244,15 +3344,15 @@ function renderVekster() {
   document.getElementById('tab-vekster').innerHTML = `
     <button class="add-btn" onclick="openAddCrop()">+ Legg til vekst</button>
     <div style="display:flex;align-items:stretch;gap:6px;margin-bottom:14px">
-      <div style="display:flex;flex-shrink:0;border-radius:20px;border:1px solid var(--border);overflow:hidden">
+      <div style="display:flex;flex-shrink:0;border-radius:20px;border:none;overflow:hidden">
         <button onclick="toggleFilterMenu(event)" id="filter-btn" style="padding:0 10px;background:var(--bg-card);color:${cropFilter==='alle'?'#9ca3af':'#6ee7b7'};cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap">${cropFilter==='alle'?'Alle statuser':STATUS[cropFilter].label}</button>
       </div>
-      <div style="flex:1;display:flex;align-items:center;background:var(--task-bg);border:1px solid var(--border);border-radius:20px;padding:4px 10px;gap:6px">
+      <div style="flex:1;display:flex;align-items:center;background:var(--task-bg);border:none;border-radius:20px;padding:4px 10px;gap:6px">
         <span style="color:var(--text-dim);font-size:12px">⌕</span>
         <input id="search-input" type="text" placeholder="Søk…" value="${cropSearch}" oninput="onSearchInput()" onkeydown="onSearchKey(event)" style="background:transparent;border:none;outline:none;color:var(--text-head);font-size:12px;font-family:inherit;width:100%;caret-color:var(--accent)" autocomplete="off">
         ${cropSearch ? `<button onclick="clearSearch()" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0;line-height:1">✕</button>` : ''}
       </div>
-      <div style="display:flex;flex-shrink:0;border-radius:20px;border:1px solid var(--border);overflow:hidden">
+      <div style="display:flex;flex-shrink:0;border-radius:20px;border:none;overflow:hidden">
         <button onclick="toggleSortDir()" style="padding:0 7px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;border-right:1px solid rgba(255,255,255,0.15)">${dirSymbol}</button>
         <button onclick="toggleSortMenu(event)" id="sort-btn" style="padding:0 8px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap">${currentSortLabel}</button>
       </div>
@@ -3276,17 +3376,17 @@ function renderVekster() {
                 const active = c.status===key;
                 return `<button onclick="event.stopPropagation();setCropStatus(${c.id},'${key}')"
                   title="${s.label}"
-                  style="padding:3px 4px;border-radius:20px;border:1.5px solid ${active ? s.color : 'transparent'};
+                  style="padding:3px 4px;border-radius:20px;
                   background:${active ? s.bg : 'transparent'};
                   color:${active ? s.color : 'var(--text-dim)'};
                   cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap;text-align:center;
                   font-weight:${active ? '600' : '400'};
-                  transition:all 0.15s">${s.label.split(' ')[0]}</button>`;
+                  transition:background 0.15s,border-color 0.15s,color 0.15s">${s.label.split(' ')[0]}</button>`;
               }).join('')}
             </div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--bg-card);border-radius:10px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--bg-card);border-radius:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,0.12)">
           <span style="font-size:20px">🌿</span>
           <div>
             <div style="font-size:22px;font-weight:300;color:var(--accent);line-height:1">${plantCount}</div>
@@ -3294,7 +3394,7 @@ function renderVekster() {
           </div>
           ${calcValue(c) !== null ? `
           <div style="margin-left:auto;text-align:right">
-            <div style="font-size:18px;font-weight:300;color:#d97706;line-height:1">~${fmtKr(calcValue(c))}</div>
+            <div style="font-size:18px;font-weight:300;color:var(--color-value);line-height:1">~${fmtKr(calcValue(c))}</div>
             <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div>
           </div>` : ''}
           ${c.beds.length > 1 && calcValue(c) === null ? `<div style="margin-left:auto;font-size:12px;color:var(--text-muted)">${c.beds.map(b => {
@@ -3317,7 +3417,7 @@ function renderVekster() {
         ${c.notes ? `<div class="crop-notes">📝 ${c.notes}</div>` : ''}
         ` : ''}
         ${isExpanded ? `<div style="display:flex;gap:8px;margin-top:8px">
-          <button onclick="event.stopPropagation();openEditCrop(${c.id})" style="flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>
+          <button onclick="event.stopPropagation();openEditCrop(${c.id})" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>
         </div>` : ''}
       </div>`;
     }).join('')}
@@ -3547,7 +3647,7 @@ function renderCropListOnly() {
       </div>
       ${c.notes ? `<div class="crop-notes">📝 ${c.notes}</div>` : ''}
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button onclick="event.stopPropagation();openEditCrop(${c.id})" style="flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>
+        <button onclick="event.stopPropagation();openEditCrop(${c.id})" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>
       </div>` : ''}
     </div>`;
   }).join('') + (filtered.length===0 ? '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen vekster i denne kategorien</p>' : '');
@@ -3575,7 +3675,7 @@ function toggleFilterMenu(e) {
 
   menu = document.createElement('div');
   menu.id = 'filter-menu';
-  menu.style.cssText = 'position:fixed;background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:4px;min-width:150px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6)';
+  menu.style.cssText = 'position:fixed;background:var(--bg-modal);border:none;border-radius:12px;padding:4px;min-width:150px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6)';
   menu.innerHTML = filterOptions.map(f => `
     <button onclick="setCropFilter('${f.key}');document.getElementById('filter-menu')?.remove()" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:7px 10px;border-radius:8px;border:none;background:${cropFilter===f.key?'rgba(255,255,255,0.07)':'transparent'};color:${cropFilter===f.key?'#6ee7b7':'#9ca3af'};cursor:pointer;font-size:12px;font-family:inherit;text-align:left">
       ${f.label}${cropFilter===f.key?'<span style="color:var(--accent);margin-left:8px">✓</span>':''}
@@ -3614,7 +3714,7 @@ function toggleSortMenu(e) {
 
   menu = document.createElement('div');
   menu.id = 'sort-menu';
-  menu.style.cssText = 'position:fixed;background:var(--bg-modal);border:1px solid var(--border);border-radius:12px;padding:4px;min-width:170px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);max-height:360px;overflow-y:auto';
+  menu.style.cssText = 'position:fixed;background:var(--bg-modal);border:none;border-radius:12px;padding:4px;min-width:170px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);max-height:360px;overflow-y:auto';
   menu.innerHTML = SORT_FIELDS.map(f => `
     <button onclick="setSortField('${f.key}')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:7px 10px;border-radius:8px;border:none;background:${cropSortField===f.key?'rgba(255,255,255,0.07)':'transparent'};color:${cropSortField===f.key?'#d1fae5':'#9ca3af'};cursor:pointer;font-size:12px;font-family:inherit;text-align:left">
       ${f.label}${cropSortField===f.key ? `<span style="color:var(--accent);margin-left:8px">${dirSymbol}</span>` : ''}
@@ -3999,11 +4099,11 @@ function toggleFocusTask(id) {
 
 function openFocusModal() {
   const focused = tasks.filter(t => focusTaskIds.has(t.id));
-  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
+  const pColors = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
   const MONTHS_SHORT = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
 
   const buildInner = () => `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px;padding:24px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
+    <div style="background:var(--bg-modal);border:none;border-radius:20px;padding:24px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div style="font-size:16px;color:var(--accent-soft);font-weight:400">🎯 Fokus</div>
         <button onclick="document.getElementById('focus-modal').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;line-height:1">×</button>
@@ -4013,13 +4113,13 @@ function openFocusModal() {
         : focused.map(t => {
             const tid = typeof t.id === 'string' ? `'${t.id}'` : t.id;
             const dateDisplay = t.date ? (() => { const [d,m] = t.date.split('-'); return `${+d}. ${MONTHS_SHORT[+m-1]}`; })() : '';
-            return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--task-bg);border:1px solid ${pColors[t.priority]||'#d97706'}44;border-radius:12px;margin-bottom:10px;${t.done?'opacity:0.6':''}">
-              <button onclick="toggleTask(${tid});openFocusModal()" style="width:24px;height:24px;border-radius:6px;border:2px solid ${pColors[t.priority]||'#d97706'};background:${t.done?(pColors[t.priority]||'#d97706'):'transparent'};cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">${t.done?'✓':''}</button>
+            return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--task-bg);border-left:3px solid ${pColors[t.priority]||'var(--color-value)'};border:none;border-radius:12px;margin-bottom:10px;${t.done?'opacity:0.6':''}">
+              <button onclick="toggleTask(${tid});openFocusModal()" style="width:24px;height:24px;border-radius:6px;background:${t.done?(pColors[t.priority]||'var(--color-value)'):'rgba(128,128,128,0.15)'};cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">${t.done?'✓':''}</button>
               <div style="flex:1">
                 <div style="font-size:15px;color:var(--text-head);${t.done?'text-decoration:line-through':''}">${t.text}</div>
                 ${dateDisplay ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">📅 ${dateDisplay}</div>` : ''}
               </div>
-              <div style="width:10px;height:10px;border-radius:50%;background:${pColors[t.priority]||'#d97706'};flex-shrink:0"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:${pColors[t.priority]||'var(--color-value)'};flex-shrink:0"></div>
             </div>`;
           }).join('')
       }
@@ -4040,7 +4140,7 @@ function openFocusModal() {
 
 
 function renderPriorityDots(taskId, currentPriority) {
-  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
+  const pColors = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
   const priorities = ['høy','middels','lav'];
   const tid = typeof taskId === 'string' ? `'${taskId}'` : taskId;
   return `<div style="display:flex;flex-direction:column;gap:4px;align-items:center;padding:2px 4px">
@@ -4126,16 +4226,16 @@ function initTaskDragDrop() {
 
 function renderOppgaver() {
   const priorities = ['høy','middels','lav'];
-  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
+  const pColors = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
   const pLabels = {høy:'Høy',middels:'Middels',lav:'Lav'};
   const MONTHS_SHORT = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
   const focusCount = tasks.filter(t => focusTaskIds.has(t.id)).length;
 
   document.getElementById('tab-oppgaver').innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button onclick="openFocusModal()" style="padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:${focusCount>0?'#d97706':'var(--text-muted)'};cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Fokus">🎯${focusCount>0?` ${focusCount}`:''}</button>
+      <button onclick="openFocusModal()" style="padding:13px 16px;border-radius:12px;border:none;background:var(--bg-card);color:${focusCount>0?'var(--color-value)':'var(--text-muted)'};cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Fokus">🎯${focusCount>0?` ${focusCount}`:''}</button>
       <button class="add-btn" style="margin-bottom:0;flex:1" onclick="document.getElementById('modal-task').style.display='flex'">+ Ny oppgave</button>
-      <button onclick="openHistoryModal()" style="padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Historikk">📋</button>
+      <button onclick="openHistoryModal()" style="padding:13px 16px;border-radius:12px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Historikk">📋</button>
     </div>
     ${priorities.map(p => {
       const pts = getOrderedTasks(p);
@@ -4156,7 +4256,7 @@ function renderOppgaver() {
               <div class="task-text" onclick="startEditTaskText(${tid}, this)" style="cursor:text;min-height:20px" title="Trykk for å redigere">${t.text}</div>
               <div class="task-date" onclick="startEditTaskDate(${tid}, event)" style="cursor:pointer;color:${t.date?'var(--text-muted)':'rgba(107,114,128,0.4)'}">📅 ${dateDisplay}</div>
             </div>
-            <button onclick="toggleFocusTask(${tid})" title="Fokus" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:${isFocused?'#d97706':'rgba(107,114,128,0.4)'}">⊙</button>
+            <button onclick="toggleFocusTask(${tid})" title="Fokus" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:${isFocused?'var(--color-value)':'rgba(107,114,128,0.4)'}">⊙</button>
             ${renderPriorityDots(t.id, p)}
             <button class="delete-btn" onclick="deleteTask(${tid})">×</button>
           </div>`;
@@ -4219,7 +4319,7 @@ function openHistoryModal() {
 
   // Sort newest first (already unshifted, but re-sort to be safe)
   const sorted = [...taskHistory].sort((a,b) => new Date(b.completedAt||0) - new Date(a.completedAt||0));
-  const pColors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
+  const pColors = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
 
   const rows = sorted.length
     ? sorted.map((t, i) => {
@@ -4239,7 +4339,7 @@ function openHistoryModal() {
     : '<div style="color:var(--text-muted);padding:30px 0;text-align:center;font-size:13px">Ingen historikk ennå.<br>Fullførte oppgaver vises her.</div>';
 
   modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px;
+    <div style="background:var(--bg-modal);border:none;border-radius:20px;
       padding:24px;max-width:420px;width:100%;max-height:80vh;
       display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0">
@@ -4340,7 +4440,7 @@ function addTask() {
 
 function setPriority(p) {
   newPriority = p;
-  const colors = {høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'};
+  const colors = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
   document.querySelectorAll('.priority-btn').forEach((b,i) => {
     const pp = ['høy','middels','lav'][i];
     b.style.background = pp===p ? `rgba(255,255,255,0.08)` : 'transparent';
@@ -4393,16 +4493,16 @@ function getCalEvents() {
     map[k].push({ label, emoji, color, ...extra });
   };
   crops.forEach(c => {
-    if (c.sownDate && !c.sowLog) add(c.sownDate, 'Sådato: '+(c.family||c.name), c.emoji, '#60a5fa', { cropId: c.id });
+    if (c.sownDate && !c.sowLog) add(c.sownDate, 'Sådato: '+(c.family||c.name), c.emoji, 'var(--color-info)', { cropId: c.id });
     if (c.plantedDate && !c.plantLog) {
       const segSpecs = c.beds.filter(s => parseBedSpec(s).start !== null);
       const segLabel = segSpecs.length > 0 ? ` (${segSpecs.join(', ')})` : '';
       add(c.plantedDate, 'Plantedato: '+(c.family||c.name)+segLabel, c.emoji, '#34d399', { cropId: c.id });
     }
   });
-  const pColors = {høy:'#f87171', middels:'#d97706', lav:'#6ee7b7'};
+  const pColors = {høy:'var(--color-danger)', middels:'var(--color-value)', lav:'#6ee7b7'};
   tasks.filter(t => t.date && !t.done && !String(t.id).startsWith('crop-')).forEach(t => {
-    add(t.date, t.text, '📋', pColors[t.priority] || '#d97706', { taskId: t.id, priority: t.priority });
+    add(t.date, t.text, '📋', pColors[t.priority] || 'var(--color-value)', { taskId: t.id, priority: t.priority });
   });
 
   return map;
@@ -4445,7 +4545,7 @@ function renderKalender() {
       const dots = ev.slice(0,3).map(e => '<div style="width:5px;height:5px;border-radius:50%;background:'+e.color+'"></div>').join('');
       return '<div onclick="selectKalenderDay(\''+key+'\')" style="min-height:52px;padding:5px 4px;border-radius:8px;cursor:pointer;'
         +'background:'+(isSel?'var(--accent-bg)':isToday?'rgba(96,165,250,0.12)':'var(--bg-card)')
-        +';border:1px solid '+(isSel?'var(--accent)':isToday?'rgba(96,165,250,0.4)':'var(--border)')+'">'
+        +'">'
         +'<div style="font-size:12px;font-weight:'+(isToday?600:400)+';color:'+(isToday?'var(--accent-soft)':'var(--text-head)')+';margin-bottom:3px">'+d+'</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:2px">'+dots+'</div>'
         +(ev.length ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">'+ev.length+'</div>' : '')
@@ -4471,7 +4571,7 @@ function renderKalender() {
     const k = toDateKey(d);
     if (!weekKeys.includes(k)) return; // only show in their own week
     if (!overdueEvents[k]) overdueEvents[k] = [];
-    overdueEvents[k].push({ label: t.text, emoji: '📋', color: ({høy:'#f87171',middels:'#d97706',lav:'#6ee7b7'})[t.priority]||'#d97706', taskId: t.id, priority: t.priority });
+    overdueEvents[k].push({ label: t.text, emoji: '📋', color: ({høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'})[t.priority]||'var(--color-value)', taskId: t.id, priority: t.priority });
   });
   const ukelisteItems = weekKeys.map((key, i) => {
     const ev = [...(events[key] || [])];
@@ -4481,7 +4581,7 @@ function renderKalender() {
     return '<div style="margin-bottom:10px">'
       +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;letter-spacing:0.05em">'+DAYS_FULL[i]+' '+parseInt(parts[2])+'. '+monthName+'</div>'
       +ev.map(e => {
-        const isSow   = e.color === '#60a5fa';
+        const isSow   = e.color === 'var(--color-info)';
         const isPlant = e.color === '#34d399';
         // Use cropId stored directly on event, fallback to name lookup
         let cropId = e.cropId || '';
@@ -4491,9 +4591,9 @@ function renderKalender() {
           if (found) cropId = found.id;
         }
         const actionBtn = cropId && isSow
-          ? '<button onclick="startModus(\'saa\','+cropId+')" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:#60a5fa;cursor:pointer;font-size:12px;font-family:inherit;flex-shrink:0">Så nå</button>'
+          ? '<button onclick="startModus(\'saa\','+cropId+')" style="padding:4px 10px;border-radius:20px;background:rgba(96,165,250,0.1);color:var(--color-info);cursor:pointer;font-size:12px;font-family:inherit;flex-shrink:0">Så nå</button>'
           : cropId && isPlant
-          ? '<button onclick="startModus(\'plant\','+cropId+')" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(52,211,153,0.4);background:rgba(52,211,153,0.1);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;flex-shrink:0">Plant nå</button>'
+          ? '<button onclick="startModus(\'plant\','+cropId+')" style="padding:4px 10px;border-radius:20px;background:rgba(52,211,153,0.1);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;flex-shrink:0">Plant nå</button>'
           : '';
         if (e.taskId !== undefined) {
           // Task event
@@ -4519,7 +4619,7 @@ function renderKalender() {
     +(ukelisteItems || '<div style="color:var(--text-muted);font-size:13px">Ingen hendelser denne uken.</div>')
     +'</div>';
 
-  const btnStyle = 'background:var(--task-bg);border:1px solid var(--border);border-radius:10px;color:var(--text-head);cursor:pointer;font-size:18px;padding:5px 13px;font-family:inherit';
+  const btnStyle = 'background:var(--task-bg);border:none;border-radius:10px;color:var(--text-head);cursor:pointer;font-size:18px;padding:5px 13px;font-family:inherit';
 
   document.getElementById('tab-kalender').innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
@@ -4529,10 +4629,10 @@ function renderKalender() {
     +'</div>'
     +headerRow+gridRows
     +'<div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap">'
-    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#60a5fa"></div>Sådato</div>'
+    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:var(--color-info)"></div>Sådato</div>'
     +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#34d399"></div>Plantedato</div>'
-    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#f87171"></div>Høy</div>'
-    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#d97706"></div>Middels</div>'
+    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:var(--color-danger)"></div>Høy</div>'
+    +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:var(--color-value)"></div>Middels</div>'
     +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)"><div style="width:7px;height:7px;border-radius:50%;background:#6ee7b7"></div>Lav</div>'
     +'</div>'
     +ukeliste;
@@ -4753,7 +4853,7 @@ function renderModus() {
   if (!crop) return;
   const isSaa = modusType === 'saa';
   const title = isSaa ? '&#127807; Såguide' : '&#9978;&#65039; Planteguide';
-  const accentColor = isSaa ? '#60a5fa' : '#34d399';
+  const accentColor = isSaa ? 'var(--color-info)' : '#34d399';
   const accentBg    = isSaa ? 'rgba(96,165,250,0.12)' : 'rgba(52,211,153,0.12)';
   const accentBorder= isSaa ? 'rgba(96,165,250,0.35)' : 'rgba(52,211,153,0.35)';
   const logDateVal = modusLogDate[crop.id] || '';
@@ -4778,7 +4878,7 @@ function renderModus() {
   const logLabel = isSaa ? 'Logg sådato' : 'Logg plantedato';
   const logSection = '<div style="margin-bottom:18px">'
     +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">'+logLabel+'</div>'
-    +'<button type="button" id="modus-date-btn" onclick="openModusDatePicker()" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:'+(logDateVal?'#d1fae5':'#6b7280')+';cursor:pointer;font-size:14px;font-family:inherit;text-align:left">'+logDateDisplay+'</button>'
+    +'<button type="button" id="modus-date-btn" onclick="openModusDatePicker()" style="width:100%;padding:12px;border-radius:12px;border:none;background:var(--bg-card);color:'+(logDateVal?'#d1fae5':'#6b7280')+';cursor:pointer;font-size:14px;font-family:inherit;text-align:left">'+logDateDisplay+'</button>'
     +'<input type="hidden" id="modus-date-val" value="'+logDateVal+'">'
     +'</div>';
 
@@ -4787,7 +4887,7 @@ function renderModus() {
     const plants = calcPlants(crop);
     const sownDateVal = crop.sownDate || '–';
     const infoCell = (label, val) =>
-      '<div style="padding:12px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border)">'
+      '<div style="padding:12px;border-radius:12px;background:var(--bg-card)">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">'+label+'</div>'
       +'<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
       +'</div>';
@@ -4798,7 +4898,7 @@ function renderModus() {
       +'</div>';
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
-      +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
+      +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
       +'</div>';
     details += logSection;
   } else {
@@ -4815,7 +4915,7 @@ function renderModus() {
         ['Antall planter', calcPlants(crop)],
         ['Rader', crop.rows],
       ].map(([label, val]) =>
-        '<div style="padding:12px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border)">'
+        '<div style="padding:12px;border-radius:12px;background:var(--bg-card)">'
         +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">'+label+'</div>'
         +'<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
         +'</div>'
@@ -4823,16 +4923,16 @@ function renderModus() {
       +'</div>';
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
-      +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
+      +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
       +'</div>';
     details += logSection;
   }
 
   const finishLabel = isSaa ? '✓ Ferdig' : '✓ Ferdig';
   const actions = '<div style="display:flex;gap:10px">'
-    +'<button onclick="modusLogAndNext()" style="flex:1;padding:13px;border-radius:12px;border:1px solid '+accentBorder+';background:'+accentBg+';color:'+accentColor+';cursor:pointer;font-size:14px;font-family:inherit;font-weight:600">'+finishLabel+'</button>'
+    +'<button onclick="modusLogAndNext()" style="flex:1;padding:13px;border-radius:12px;background:'+accentBg+';color:'+accentColor+';cursor:pointer;font-size:14px;font-family:inherit;font-weight:600">'+finishLabel+'</button>'
     +'</div>'
-    +'<button onclick="closeModal(\'modal-modus\')" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Avbryt</button>';
+    +'<button onclick="closeModal(\'modal-modus\')" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Avbryt</button>';
 
   document.getElementById('modal-modus-inner').innerHTML = header + details + actions;
 }
@@ -4915,7 +5015,7 @@ function showModusFeedback() {
     else if (earliest === 'late')   feedbackMsg = '«Herren er tålmodig, og for ham er tusen år som én dag. Han er ikke sen med å oppfylle løfter, men gir tid» [2. Peter 3,8-9]';
   }
 
-  const accentColor = isSaa ? '#60a5fa' : '#34d399';
+  const accentColor = isSaa ? 'var(--color-info)' : '#34d399';
   const accentBg    = isSaa ? 'rgba(96,165,250,0.1)' : 'rgba(52,211,153,0.1)';
   const accentBorder= isSaa ? 'rgba(96,165,250,0.3)' : 'rgba(52,211,153,0.3)';
 
@@ -4929,7 +5029,7 @@ function showModusFeedback() {
     +'<div style="font-size:52px;margin-bottom:16px">'+(isSaa?'🌱':'🪴')+'</div>'
     +'<div style="font-size:22px;color:var(--text-head);margin-bottom:10px">'+feedbackIntro+'</div>'
     +(feedbackMsg ? '<div style="font-size:14px;color:'+accentColor+';margin-bottom:24px;line-height:1.6;font-style:italic">'+feedbackMsg+'</div>' : '<div style="margin-bottom:24px"></div>')
-    +'<button onclick="closeModal(\'modal-modus\')" style="padding:13px 32px;border-radius:12px;border:1px solid '+accentBorder+';background:'+accentBg+';color:'+accentColor+';cursor:pointer;font-size:14px;font-family:inherit;font-weight:600">Lukk</button>'
+    +'<button onclick="closeModal(\'modal-modus\')" style="padding:13px 32px;border-radius:12px;background:'+accentBg+';color:'+accentColor+';cursor:pointer;font-size:14px;font-family:inherit;font-weight:600">Lukk</button>'
     +'</div>';
   document.getElementById('modal-modus').style.display = 'flex';
 }
@@ -5551,10 +5651,10 @@ function showLeveringOverlay() {
           </div>
         </div>
         <div style="display:flex;gap:5px;align-items:center">
-          <button onclick="undoLev()" id="lev-undo-btn" title="Angre" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
-          <button onclick="redoLev()" id="lev-redo-btn" title="Gjør om" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
-          <button id="lev-gist-btn" title="Sky-synkronisering" style="padding:4px 8px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">☁</button>
-          <button id="lev-gear-btn" onclick="toggleGearMenu(this)" title="Innstillinger" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">⚙</button>
+          <button onclick="undoLev()" id="lev-undo-btn" title="Angre" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↩</button>
+          <button onclick="redoLev()" id="lev-redo-btn" title="Gjør om" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">↪</button>
+          <button id="lev-gist-btn" title="Sky-synkronisering" style="padding:4px 8px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1">☁</button>
+          <button id="lev-gear-btn" onclick="toggleGearMenu(this)" title="Innstillinger" style="padding:4px 8px;padding-top:6px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:15px;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">⚙</button>
         </div>
       </div>
     </div>
@@ -5673,27 +5773,27 @@ function gistSetup() {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
 
   modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
+    <div style="background:var(--bg-modal);border:none;border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
       <h2 style="font-size:16px;color:var(--accent-soft);margin-bottom:16px;font-weight:400">☁ JSONBin synkronisering</h2>
 
       <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:6px">
         Master Key
-        <a href="https://jsonbin.io" target="_blank" style="color:#60a5fa;margin-left:8px;font-size:12px">Hent fra jsonbin.io →</a>
+        <a href="https://jsonbin.io" target="_blank" style="color:var(--color-info);margin-left:8px;font-size:12px">Hent fra jsonbin.io →</a>
       </label>
       <input id="sync-modal-key" type="text" placeholder="$2b$10$..." value="${syncKey||''}"
-        style="width:100%;padding:10px 12px;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text-main);font-size:13px;font-family:monospace;margin-bottom:16px;outline:none">
+        style="width:100%;padding:10px 12px;background:var(--bg-main);border:none;border-radius:8px;color:var(--text-main);font-size:13px;font-family:monospace;margin-bottom:16px;outline:none">
 
       <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:6px">
         Bin ID <span style="color:var(--text-muted);font-size:12px">(la stå tomt for å opprette ny)</span>
       </label>
       <input id="sync-modal-bin" type="text" placeholder="69b16698c3097a1dd517a6bf" value="${syncBinId||''}"
-        style="width:100%;padding:10px 12px;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text-main);font-size:13px;font-family:monospace;margin-bottom:8px;outline:none">
+        style="width:100%;padding:10px 12px;background:var(--bg-main);border:none;border-radius:8px;color:var(--text-main);font-size:13px;font-family:monospace;margin-bottom:8px;outline:none">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px">
         Finn Bin ID i ☁-menyen på en annen enhet, eller på jsonbin.io under Bins.
       </p>
 
       <div style="display:flex;gap:10px">
-        <button id="sync-modal-cancel" style="flex:1;padding:11px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px">Avbryt</button>
+        <button id="sync-modal-cancel" style="flex:1;padding:11px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px">Avbryt</button>
         <button id="sync-modal-save" style="flex:2;padding:11px;border-radius:8px;border:none;background:#16a34a;color:white;cursor:pointer;font-size:14px;font-weight:500">Lagre</button>
       </div>
     </div>`;
@@ -5879,7 +5979,7 @@ function scheduleSync() {
   if (!syncConnected) return;
   saveToLocal();
   clearTimeout(syncTimer);
-  ['gist-btn','lev-gist-btn'].forEach(id=>{const b=document.getElementById(id);if(b){b.style.color='#d97706';b.title='Ulagrede endringer – lagrer snart...';b.textContent='☁';}})
+  ['gist-btn','lev-gist-btn'].forEach(id=>{const b=document.getElementById(id);if(b){b.style.color='var(--color-value)';b.title='Ulagrede endringer – lagrer snart...';b.textContent='☁';}})
   syncTimer = setTimeout(syncSave, 3000);
 }
 
@@ -5921,7 +6021,7 @@ function gistShowMenu() {
   menu = document.createElement('div');
   menu.id = 'gist-menu';
   const isLight = document.body.classList.contains('light');
-  menu.style.cssText = 'position:fixed;background:' + (isLight?'#fffbf5':'#1a2e1b') + ';border:1px solid var(--border-accent);border-radius:16px;padding:8px;min-width:220px;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,0.5)';
+  menu.style.cssText = 'position:fixed;background:' + (isLight?'#fffbf5':'#1a2e1b') + ';border:none;border-radius:16px;padding:8px;min-width:220px;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,0.5)';
 
   const row = (icon, label, color, fn) => {
     const b = document.createElement('button');
@@ -5944,7 +6044,7 @@ function gistShowMenu() {
   menu.appendChild(row('⬆', 'Lagre til sky', '#34d399', () => syncSave()));
   menu.appendChild(sep());
   menu.appendChild(row('🔑', 'Endre innstillinger', 'var(--text-muted)', () => gistSetup()));
-  menu.appendChild(row('🔓', 'Koble fra', '#f87171', () => syncDisconnect()));
+  menu.appendChild(row('🔓', 'Koble fra', 'var(--color-danger)', () => syncDisconnect()));
 
   document.body.appendChild(menu);
   const gistBtn = (document.getElementById('lev-overlay') && document.getElementById('lev-gist-btn'))
@@ -5986,7 +6086,7 @@ function showSyncToast(msg) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'sync-toast';
-    t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px;padding:8px 16px;font-size:12px;color:var(--accent-soft);z-index:9999;pointer-events:none;transition:opacity 0.3s;white-space:nowrap';
+    t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--bg-modal);border:none;border-radius:20px;padding:8px 16px;font-size:12px;color:var(--accent-soft);z-index:9999;pointer-events:none;transition:opacity 0.3s;white-space:nowrap';
     document.body.appendChild(t);
   }
   t.textContent = msg;
@@ -6045,7 +6145,7 @@ function renderLevering() {
   el.innerHTML = `
     <div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
       ${TABS.map(t => `<button onclick="leveringTab='${t.id}';renderLevering()"
-        style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);
+        style="padding:8px 14px;border-radius:20px;border:none;
         background:${leveringTab===t.id?'var(--accent-bg)':'transparent'};
         color:${leveringTab===t.id?'var(--accent-soft)':'var(--text-muted)'};
         cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;flex-shrink:0">${t.label}</button>`
@@ -6067,15 +6167,15 @@ function renderLevKunder(el) {
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:8px">
-        <button onclick="leveringTab='kasse';renderLeveringInto(document.getElementById('lev-overlay-content'))" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Kasse</button>
+        <button onclick="leveringTab='kasse';renderLeveringInto(document.getElementById('lev-overlay-content'))" style="padding:5px 10px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Kasse</button>
         <div style="font-size:13px;color:var(--text-muted)">${deliveryCustomers.length} kunder · ${totalBoxes} kasser</div>
       </div>
-      <button onclick="openAddCustomer()" style="padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Legg til</button>
+      <button onclick="openAddCustomer()" style="padding:7px 14px;border-radius:20px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Ny seng</button>
     </div>
     ${deliveryCustomers.length === 0
       ? `<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px 0">Ingen kunder ennå.<br>Legg til kunder for å komme i gang.</p>`
       : deliveryCustomers.map((cu,i) => `
-        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">
+        <div style="background:var(--bg-card);border:none;border-radius:12px;padding:14px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
               <div style="font-size:15px;color:var(--text-head);font-weight:400">${cu.name}</div>
@@ -6085,8 +6185,8 @@ function renderLevKunder(el) {
               </div>
             </div>
             <div style="display:flex;gap:6px">
-              <button onclick="openEditCustomer(${i})" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
-              <button onclick="deleteCustomer(${i})" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px;font-family:inherit">×</button>
+              <button onclick="openEditCustomer(${i})" style="padding:5px 10px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
+              <button onclick="deleteCustomer(${i})" style="padding:5px 10px;border-radius:8px;background:transparent;color:var(--color-danger);cursor:pointer;font-size:12px;font-family:inherit">×</button>
             </div>
           </div>
           ${(cu.custom && Object.keys(cu.custom).length > 0) ? `<div style="margin-top:8px;font-size:11px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px">Tilpasninger: ${Object.entries(cu.custom).map(([cid,v])=>{const cr=crops.find(c=>c.id==cid);return cr?`${cr.emoji} ${cr.family||cr.name}: ${v.qty}${v.unit}`:''}).filter(Boolean).join(', ')}</div>` : ''}
@@ -6101,18 +6201,18 @@ function openAddCustomer(editIdx) {
   modal.id = 'cust-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;display:flex;align-items:flex-end;justify-content:center';
   modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
+    <div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
       <div style="font-size:15px;color:var(--accent-soft);margin-bottom:16px">${editIdx!==undefined?'Rediger':'Ny'} kunde</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <input id="cu-name" placeholder="Navn" value="${cu.name}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        <input id="cu-phone" placeholder="Telefon" value="${cu.phone||''}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        <select id="cu-boxtype" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <input id="cu-name" placeholder="Navn" value="${cu.name}" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <input id="cu-phone" placeholder="Telefon" value="${cu.phone||''}" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="cu-boxtype" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="">Velg kassetype...</option>
           ${boxTypes.map(bt=>'<option value="'+bt.id+'" '+(cu.boxTypeId==bt.id?'selected':'')+'>'+bt.name+'</option>').join('')}
         </select>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button onclick="document.getElementById('cust-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="document.getElementById('cust-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
         <button onclick="saveCustomer(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
       </div>
     </div>`;
@@ -6185,26 +6285,26 @@ function openKasseOppsett() {
     // Kassetyper section
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kassetyper</div>'
-      + '<button onclick="openAddBoxType()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny kassetype</button>'
+      + '<button onclick="openAddBoxType()" style="padding:5px 12px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny kassetype</button>'
       + '</div>';
 
     if (!boxTypes.length) {
       html += '<p style="font-size:13px;color:var(--text-muted);padding:8px 0 16px">Ingen kassetyper ennå.</p>';
     } else {
       boxTypes.forEach((bt,i) => {
-        html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">'
+        html += '<div style="background:var(--bg-card);border:none;border-radius:10px;padding:12px;margin-bottom:8px">'
           + '<div style="display:flex;justify-content:space-between;align-items:center">'
           + '<div><div style="font-size:14px;color:var(--text-head)">' + bt.name + '</div>'
           + '<div style="font-size:12px;color:var(--text-muted)">' + (bt.items||[]).length + ' vekster</div></div>'
           + '<div style="display:flex;gap:6px">'
-          + '<button onclick="openEditBoxType(' + i + ')" style="padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
-          + '<button onclick="deleteBoxType(' + i + ')" style="padding:4px 8px;border-radius:7px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px">×</button>'
+          + '<button onclick="openEditBoxType(' + i + ')" style="padding:4px 10px;border-radius:7px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
+          + '<button onclick="deleteBoxType(' + i + ')" style="padding:4px 8px;border-radius:7px;background:transparent;color:var(--color-danger);cursor:pointer;font-size:12px">×</button>'
           + '</div></div></div>';
       });
     }
 
     // Kunder section
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:10px">'      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kunder</div>'      + '<div style="display:flex;gap:6px;align-items:center">'      + '<label style="padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:#60a5fa;cursor:pointer;font-size:12px;font-family:inherit">⬆ Importer<input type="file" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none"></label>'      + '<button onclick="exportCustomersToExcel()" style="padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">⬇ Eksporter</button>'      + '<button onclick="openAddCustomer()" style="padding:5px 12px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny</button>'      + '</div></div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;margin-bottom:10px">'      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kunder</div>'      + '<div style="display:flex;gap:6px;align-items:center">'      + '<label style="padding:5px 10px;border-radius:16px;border:none;background:transparent;color:var(--color-info);cursor:pointer;font-size:12px;font-family:inherit">⬆ Importer<input type="file" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none"></label>'      + '<button onclick="exportCustomersToExcel()" style="padding:5px 10px;border-radius:16px;border:none;background:transparent;color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">⬇ Eksporter</button>'      + '<button onclick="openAddCustomer()" style="padding:5px 12px;border-radius:16px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">+ Ny</button>'      + '</div></div>';
 
 
     if (!deliveryCustomers.length) {
@@ -6216,7 +6316,7 @@ function openKasseOppsett() {
         const dayStr = (dp.weekdays||[]).map(d=>DAYS[d]).join(', ') || '–';
         const weekStr = dp.startWeek && dp.endWeek ? 'Uke ' + dp.startWeek + '–' + dp.endWeek : '';
         const freqStr = FREQ_LABELS[dp.frequency] || '';
-        html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">'
+        html += '<div style="background:var(--bg-card);border:none;border-radius:10px;padding:12px;margin-bottom:8px">'
           + '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
           + '<div>'
           + '<div style="font-size:14px;color:var(--text-head)">' + cu.name + '</div>'
@@ -6229,8 +6329,8 @@ function openKasseOppsett() {
           + (freqStr ? '<span style="font-size:11px;color:var(--text-muted)">' + freqStr + '</span>' : '')
           + '</div></div>'
           + '<div style="display:flex;gap:6px">'
-          + '<button onclick="openEditCustomer(' + i + ')" style="padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
-          + '<button onclick="deleteCustomer(' + i + ')" style="padding:4px 8px;border-radius:7px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:12px">×</button>'
+          + '<button onclick="openEditCustomer(' + i + ')" style="padding:4px 10px;border-radius:7px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
+          + '<button onclick="deleteCustomer(' + i + ')" style="padding:4px 8px;border-radius:7px;background:transparent;color:var(--color-danger);cursor:pointer;font-size:12px">×</button>'
           + '</div></div></div>';
       });
     }
@@ -6328,31 +6428,31 @@ function openAddBoxType(editIdx) {
   modal.id = 'box-type-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;display:flex;align-items:flex-end;justify-content:center';
   modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto">
+    <div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto">
       <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">${editIdx!==undefined?'Rediger':'Ny'} kassetype</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <input id="bt-name" placeholder="Navn (f.eks. Stor kasse)" value="${bt.name}" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <input id="bt-name" placeholder="Navn (f.eks. Stor kasse)" value="${bt.name}" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
 
           <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:8px">Kassepris (kr)</div>
           <div style="display:flex;align-items:center;gap:8px">
-            <input id="bt-sale-price" type="number" min="0" step="1" placeholder="f.eks. 250" value="${bt.salePrice||''}" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+            <input id="bt-sale-price" type="number" min="0" step="1" placeholder="f.eks. 250" value="${bt.salePrice||''}" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
             <span style="font-size:13px;color:var(--text-muted);white-space:nowrap">kr per kasse</span>
           </div>
 
           <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:8px">Leveringsplan</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap" id="bt-days-wrap">
           ${['Man','Tir','Ons','Tor','Fre','Lør','Søn'].map((d,i)=>`<button type="button" onclick="toggleBtDay(${i})" id="bt-day-${i}"
-            style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);
+            style="padding:6px 10px;border-radius:8px;border:none;
             background:${(bt.weekdays||[]).includes(i)?'var(--accent-bg)':'transparent'};
             color:${(bt.weekdays||[]).includes(i)?'var(--accent-soft)':'var(--text-muted)'};
             cursor:pointer;font-size:13px;font-family:inherit">${d}</button>`).join('')}
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <label style="font-size:13px;color:var(--text-muted);white-space:nowrap">Uke fra–til:</label>
-          <input id="bt-week-start" type="number" min="1" max="52" placeholder="Fra" value="${bt.startWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-          <input id="bt-week-end" type="number" min="1" max="52" placeholder="Til" value="${bt.endWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <input id="bt-week-start" type="number" min="1" max="52" placeholder="Fra" value="${bt.startWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <input id="bt-week-end" type="number" min="1" max="52" placeholder="Til" value="${bt.endWeek||''}" style="flex:1;padding:8px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
         </div>
-        <select id="bt-freq" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="bt-freq" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="weekly" ${(bt.frequency||'weekly')==='weekly'?'selected':''}>Ukentlig</option>
           <option value="biweekly" ${(bt.frequency||'')==='biweekly'?'selected':''}>Annenhver uke</option>
           <option value="monthly" ${(bt.frequency||'')==='monthly'?'selected':''}>Månedlig</option>
@@ -6360,7 +6460,7 @@ function openAddBoxType(editIdx) {
         <input type="hidden" id="bt-days-val" value="${JSON.stringify(bt.weekdays||[])}">
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button onclick="document.getElementById('box-type-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="document.getElementById('box-type-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
         <button onclick="saveBoxType(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
       </div>
     </div>`;
@@ -6458,7 +6558,7 @@ function renderLevKasse(el) {
   if (!boxTypes.length) {
     el.innerHTML = '<div style="padding:20px 0">'
       + '<p style="color:var(--text-muted);font-size:13px;text-align:center;margin-bottom:16px">Ingen kassetyper ennå.<br>Gå til Oppsett for å legge til.</p>'
-      + '<button onclick="openKasseOppsett()" style="display:block;margin:0 auto;padding:10px 24px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">⚙ Oppsett</button>'
+      + '<button onclick="openKasseOppsett()" style="display:block;margin:0 auto;padding:10px 24px;border-radius:20px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">⚙ Oppsett</button>'
       + '</div>';
     return;
   }
@@ -6471,13 +6571,13 @@ function renderLevKasse(el) {
     const sel = String(kasseViewTypeId) == String(bt.id);
     html += '<button onclick="kasseSetType(' + bt.id + ')"'
       + ' style="padding:7px 16px;border-radius:20px;flex-shrink:0;'
-      + 'border:2px solid ' + (sel ? 'var(--accent)' : 'var(--border)') + ';'
+      + ';'
       + 'background:' + (sel ? 'var(--accent-bg)' : 'transparent') + ';'
       + 'color:' + (sel ? 'var(--accent-soft)' : 'var(--text-muted)') + ';'
       + 'cursor:pointer;font-size:13px;font-family:inherit;font-weight:' + (sel ? '600' : '400') + '">'
       + bt.name + '</button>';
   });
-  html += '<button onclick="openKasseOppsett()" style="padding:7px 12px;border-radius:20px;flex-shrink:0;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;font-size:12px;font-family:inherit;margin-left:auto">⚙</button>';
+  html += '<button onclick="openKasseOppsett()" style="padding:7px 12px;border-radius:20px;flex-shrink:0;border:none;background:transparent;color:var(--text-dim);cursor:pointer;font-size:12px;font-family:inherit;margin-left:auto">⚙</button>';
   html += '</div>';
 
   const bt = boxTypes.find(t => t.id == kasseViewTypeId);
@@ -6513,19 +6613,19 @@ function renderLevKasse(el) {
   const isCurrentWeek = kasseViewWeek === getCurrentWeek() && kasseViewYear === getCurrentYear();
 
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
-    + '<button ' + (prevW ? 'onclick="kasseNavWeek(' + prevW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (prevW ? 1 : 0.25) + '">‹</button>'
+    + '<button ' + (prevW ? 'onclick="kasseNavWeek(' + prevW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (prevW ? 1 : 0.25) + '">‹</button>'
     + '<div style="flex:1;text-align:center">'
     + '<div style="font-size:18px;font-weight:600;color:var(--text-head)">Uke ' + kasseViewWeek + '</div>'
     + '<div style="font-size:11px;color:' + (isCurrentWeek ? 'var(--accent-soft)' : 'var(--text-muted)') + ';margin-top:1px">' + (isCurrentWeek ? '● Denne uken' : kasseViewYear + ' · ' + (vIdx + 1) + '/' + displayWeeks.length) + '</div>'
     + '</div>'
-    + '<button ' + (nextW ? 'onclick="kasseNavWeek(' + nextW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (nextW ? 1 : 0.25) + '">›</button>'
+    + '<button ' + (nextW ? 'onclick="kasseNavWeek(' + nextW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (nextW ? 1 : 0.25) + '">›</button>'
     + '</div>';
 
   const bw = getOrCreateBoxWeek(kasseViewTypeId, kasseViewWeek, kasseViewYear);
 
   // Soft notice if no delivery schedule set
   if (noSchedule) {
-    html += '<div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:10px;padding:10px 12px;font-size:12px;color:#d97706;margin-bottom:14px">Ingen leveringsplan satt for denne kassetypen. Gå til ⚙ Oppsett for å definere uker og frekvens.</div>';
+    html += '<div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--color-value);margin-bottom:14px">Ingen leveringsplan satt for denne kassetypen. Gå til ⚙ Oppsett for å definere uker og frekvens.</div>';
   }
 
   // ════════════════════════════════
@@ -6544,11 +6644,11 @@ function renderLevKasse(el) {
     const contentTotal = boxVal2 * totalKasser;
     const saleTotal = salePerBox ? salePerBox * totalKasser : null;
     const deltaPerBox = salePerBox !== null ? contentPerBox - salePerBox : null;
-    const deltaColor = deltaPerBox === null ? '' : deltaPerBox >= 0 ? '#34d399' : '#f87171';
+    const deltaColor = deltaPerBox === null ? '' : deltaPerBox >= 0 ? '#34d399' : 'var(--color-danger)';
     const isLight2 = isLight;
 
     // ── Antall kasser button (clean — no value clutter) ──
-    html += '<button data-bwid="' + bw.id + '" onclick="openKassekundePanel(this.dataset.bwid)" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:' + (salePerBox !== null ? '8' : '16') + 'px;cursor:pointer;text-align:left;font-family:inherit">'
+    html += '<button data-bwid="' + bw.id + '" onclick="openKassekundePanel(this.dataset.bwid)" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:none;border-radius:14px;margin-bottom:' + (salePerBox !== null ? '8' : '16') + 'px;cursor:pointer;text-align:left;font-family:inherit">'
       + '<div style="display:flex;align-items:center;gap:12px">'
       + '<div style="font-size:22px">📦</div>'
       + '<div>'
@@ -6567,10 +6667,10 @@ function renderLevKasse(el) {
     // ── Pris vs innhold kort (kun hvis kassepris er satt) ──
     if (salePerBox !== null) {
       const pct = salePerBox > 0 ? Math.min(100, Math.round((contentPerBox / salePerBox) * 100)) : 100;
-      const barColor = deltaPerBox >= 0 ? '#34d399' : '#f87171';
+      const barColor = deltaPerBox >= 0 ? '#34d399' : 'var(--color-danger)';
       const bgTrack = isLight2 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
 
-      html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:16px">'
+      html += '<div style="background:var(--bg-card);border:none;border-radius:14px;padding:14px 16px;margin-bottom:16px">'
         // Header row
         + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">'
         + '<div style="flex:1;text-align:center">'
@@ -6608,9 +6708,9 @@ function renderLevKasse(el) {
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Innhold i kassen</div>'
       + '<div style="display:flex;gap:6px">';
     if (bt.baseItems && bt.baseItems.length) {
-      html += '<button onclick="importBaseItems(\'' + bw.id + '\')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">↓ Basis</button>';
+      html += '<button onclick="importBaseItems(\'' + bw.id + '\')" style="padding:4px 10px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">↓ Basis</button>';
     }
-    html += '<button onclick="openDuplicateWeek(\'' + bt.id + '\',' + kasseViewWeek + ',' + kasseViewYear + ')" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">⧉ Kopier</button>';
+    html += '<button onclick="openDuplicateWeek(\'' + bt.id + '\',' + kasseViewWeek + ',' + kasseViewYear + ')" style="padding:4px 10px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:inherit">⧉ Kopier</button>';
     html += '</div></div>';
 
     // Vekst-grid (toggle) — grouped by kategori
@@ -6629,7 +6729,7 @@ function renderLevKasse(el) {
         const sel = selIds.has(cr.id);
         html += '<button onclick="toggleKasseCrop(\'' + bw.id + '\',' + cr.id + ')" data-cropid="' + cr.id + '"'
           + ' style="padding:8px 4px;border-radius:10px;'
-          + 'border:2px solid ' + (sel ? 'var(--accent)' : 'var(--border)') + ';'
+          + ';'
           + 'background:' + (sel ? 'var(--accent-bg)' : 'transparent') + ';'
           + 'cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;'
           + 'color:' + (sel ? 'var(--accent-soft)' : 'var(--text-muted)') + ';font-family:inherit">'
@@ -6665,9 +6765,9 @@ function renderLevKasse(el) {
           + '</div>'
           + '<input type="number" min="0" step="1" value="' + (item.qty||'') + '" placeholder="0"'
           + ' oninput="updateKasseItem(\'' + bw.id + '\',' + ii + ',\'qty\',+this.value)"'
-          + ' style="width:60px;padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;text-align:center">'
+          + ' style="width:60px;padding:8px 6px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;text-align:center">'
           + '<select onchange="updateKasseItem(\'' + bw.id + '\',' + ii + ',\'unit\',this.value)"'
-          + ' style="padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+          + ' style="padding:8px 6px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
           + ['stk','kg','bunt','boks'].map(u => '<option value="' + u + '"' + (item.unit===u?' selected':'') + '>' + u + '</option>').join('')
           + '</select>'
           + '<button onclick="removeKasseItem(\'' + bw.id + '\',' + ii + ')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:2px;line-height:1">×</button>'
@@ -6720,7 +6820,7 @@ function renderLevKasse(el) {
     if (!items.length) {
       html += '<div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px">'
         + 'Ingen vekster lagt til i Plan-modus ennå.<br>'
-        + '<button onclick="kasseSwitchModus(\'plan\')" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Gå til Plan</button>'
+        + '<button onclick="kasseSwitchModus(\'plan\')" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Gå til Plan</button>'
         + '</div>';
     } else {
       // Sjekkliste – store touch-targets
@@ -6732,7 +6832,7 @@ function renderLevKasse(el) {
         html += '<div onclick="kassePakkCheck(\'' + bw.id + '\',' + ii + ',this)" data-done="' + done + '"'
           + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
           + 'background:' + (done ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)') + ';'
-          + 'border:2px solid ' + (done ? (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') : 'var(--border)') + ';'
+          + ';'
           + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
           + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
           + 'background:' + (done ? 'var(--accent)' : 'transparent') + ';'
@@ -6755,12 +6855,12 @@ function renderLevKasse(el) {
       const hasNewDelta = bwHasUnloggedDelta(bw);
       const wasLogged = bw.harvested && !hasNewDelta;
       if (wasLogged) {
-        html += '<button id="kasse-log-btn-' + bw.id + '" disabled style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:default;font-size:14px;font-family:inherit;opacity:0.5">✓ Ferdiglogget</button>';
+        html += '<button id="kasse-log-btn-' + bw.id + '" disabled style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:none;background:transparent;color:var(--text-muted);cursor:default;font-size:14px;font-family:inherit;opacity:0.5">✓ Ferdiglogget</button>';
       } else if (hasNewDelta) {
         // Has unlogged changes — show active "Logg endringer" button
         html += '<button id="kasse-log-btn-' + bw.id + '" data-bwid="' + bw.id + '" onclick="autoHarvestBoxWeek(this.dataset.bwid)" style="width:100%;margin-top:8px;padding:16px;border-radius:14px;border:none;background:var(--accent);color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';cursor:pointer;font-size:15px;font-family:inherit;font-weight:600">' + (bw.harvested ? '↑ Logg endringer' : '✓ Logg ' + totalBoxes + ' kasser som høstet') + '</button>';
       } else {
-        html += '<button id="kasse-log-btn-' + bw.id + '" data-bwid="' + bw.id + '" onclick="autoHarvestBoxWeek(this.dataset.bwid)" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
+        html += '<button id="kasse-log-btn-' + bw.id + '" data-bwid="' + bw.id + '" onclick="autoHarvestBoxWeek(this.dataset.bwid)" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
       }
     }
   } else if (isLevering) {
@@ -6814,11 +6914,11 @@ function renderLevKasse(el) {
         const cbBd = delivered ? 'var(--accent)' : (isLight2 ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)');
         html += '<div data-lev-bwid="' + bw.id + '" data-lev-idx="' + cuIdx + '" onclick="kasseLeveringCheckByIdx(this)"'
           + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
-          + 'background:' + bg + ';border:2px solid ' + bd + ';'
+          + 'background:' + bg + ';'
           + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;'
           + 'transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
           + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
-          + 'background:' + cbBg + ';border:2px solid ' + cbBd + ';'
+          + 'background:' + cbBg + ';'
           + 'color:' + (isLight2 ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
           + (delivered ? '✓' : '') + '</div>'
           + '<div style="width:36px;height:36px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;' + (delivered ? 'opacity:0.4' : '') + '">👤</div>'
@@ -6835,9 +6935,9 @@ function renderLevKasse(el) {
     html += '<div style="display:flex;align-items:center;justify-content:space-between;margin:' + (activeCuLev.length > 0 ? '12' : '0') + 'px 0 8px">'
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">Ekstra kasser</div>'
       + '<div style="display:flex;align-items:center;gap:8px">'
-      + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,-1)" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">−</button>'
+      + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,-1)" style="width:26px;height:26px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">−</button>'
       + '<span style="font-size:14px;color:var(--text-head);min-width:20px;text-align:center">' + (bw.extraBoxes||0) + '</span>'
-      + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,1)" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">+</button>'
+      + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,1)" style="width:26px;height:26px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">+</button>'
       + '</div></div>';
     for (let xi = 0; xi < (bw.extraBoxes||0); xi++) {
       const delivered = !!bw.extraCheck[xi];
@@ -6847,11 +6947,11 @@ function renderLevKasse(el) {
       const cbBd = delivered ? 'var(--accent)' : (isLight2 ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)');
       html += '<div data-lev-bwid="' + bw.id + '" data-lev-extra="' + xi + '" onclick="kasseLeveringCheckExtra(this)"'
         + ' style="display:flex;align-items:center;gap:14px;padding:14px 14px;'
-        + 'background:' + bg + ';border:2px solid ' + bd + ';'
+        + 'background:' + bg + ';'
         + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;'
         + 'transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
         + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
-        + 'background:' + cbBg + ';border:2px solid ' + cbBd + ';'
+        + 'background:' + cbBg + ';'
         + 'color:' + (isLight2 ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
         + (delivered ? '✓' : '') + '</div>'
         + '<div style="width:36px;height:36px;border-radius:50%;background:' + (isLight2 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;' + (delivered ? 'opacity:0.4' : '') + '">📦</div>'
@@ -6893,7 +6993,7 @@ function openKassekundePanel(bwId) {
     const activeCu = btCustomers.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
     const total = activeCu.length + (bw.extraBoxes || 0);
 
-    let html = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:600px;max-height:80vh;overflow-y:auto">'
+    let html = '<div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:600px;max-height:80vh;overflow-y:auto">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
       + '<div style="font-size:15px;color:var(--accent-soft)">📦 Kasser uke ' + bw.week + '</div>'
       + '<div style="display:flex;align-items:center;gap:10px">'
@@ -6912,7 +7012,7 @@ function openKassekundePanel(bwId) {
           + '<div data-kk-bwid="' + bwId + '" data-kk-cukey="' + String(cuKey).replace(/"/g, '&quot;') + '" onclick="toggleKassekundePlan(this)"'
           + ' style="width:24px;height:24px;border-radius:6px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;'
           + 'background:' + (active ? 'var(--accent)' : 'transparent') + ';'
-          + 'border:2px solid ' + (active ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)')) + ';'
+          + ';'
           + 'color:' + (isLight ? '#1c1410' : '#0d1a0e') + '">'
           + (active ? '✓' : '') + '</div>'
           + '<div style="flex:1;' + (active ? '' : 'opacity:0.45') + '">'
@@ -6928,9 +7028,9 @@ function openKassekundePanel(bwId) {
     html += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">'
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Ekstra kasser (uspesifiserte)</div>'
       + '<div style="display:flex;align-items:center;gap:10px">'
-      + '<button data-kk-bwid="' + bwId + '" onclick="adjustExtraBoxes(this.dataset.kkBwid,-1)" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-head);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">−</button>'
+      + '<button data-kk-bwid="' + bwId + '" onclick="adjustExtraBoxes(this.dataset.kkBwid,-1)" style="width:32px;height:32px;border-radius:8px;border:none;background:transparent;color:var(--text-head);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">−</button>'
       + '<div id="extra-boxes-disp-' + bwId + '" style="font-size:22px;font-weight:300;color:var(--text-head);min-width:30px;text-align:center">' + (bw.extraBoxes || 0) + '</div>'
-      + '<button data-kk-bwid="' + bwId + '" onclick="adjustExtraBoxes(this.dataset.kkBwid,1)" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-head);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">+</button>'
+      + '<button data-kk-bwid="' + bwId + '" onclick="adjustExtraBoxes(this.dataset.kkBwid,1)" style="width:32px;height:32px;border-radius:8px;border:none;background:transparent;color:var(--text-head);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">+</button>'
       + '<div style="font-size:13px;color:var(--text-muted);margin-left:4px">ekstra kasse' + ((bw.extraBoxes||0) !== 1 ? 'r' : '') + '</div>'
       + '</div></div>';
 
@@ -6990,7 +7090,7 @@ function refreshKassePriceCard(bwId) {
   const contentTotal = boxVal * totalKasser;
   const salePerBox = bt.salePrice || null;
   const deltaPerBox = salePerBox !== null ? contentPerBox - salePerBox : null;
-  const barColor = deltaPerBox !== null ? (deltaPerBox >= 0 ? '#34d399' : '#f87171') : 'var(--accent)';
+  const barColor = deltaPerBox !== null ? (deltaPerBox >= 0 ? '#34d399' : 'var(--color-danger)') : 'var(--accent)';
   const pct = salePerBox > 0 ? Math.min(100, Math.round((contentPerBox / salePerBox) * 100)) : 100;
 
   // Update button total
@@ -7289,7 +7389,7 @@ function openDuplicateWeek(boxTypeId, currentWeek, currentYear) {
   modal.id = 'dup-week-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:center;justify-content:center;padding:20px';
 
-  let html = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:16px;padding:20px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto">'
+  let html = '<div style="background:var(--bg-modal);border:none;border-radius:16px;padding:20px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
     + '<div style="font-size:15px;color:var(--accent-soft)">⧉ Kopier innhold fra</div>'
     + '<button onclick="document.getElementById(\'dup-week-modal\').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;line-height:1">×</button>'
@@ -7301,7 +7401,7 @@ function openDuplicateWeek(boxTypeId, currentWeek, currentYear) {
     baseItemSources.forEach(bt => {
       const isCurrent = String(bt.id) === String(boxTypeId);
       html += '<button data-src-base="' + bt.id + '" data-bt-id="' + boxTypeId + '" data-week="' + currentWeek + '" data-year="' + currentYear + '" onclick="doDuplicateFromBase(this.dataset.srcBase,this.dataset.btId,+this.dataset.week,+this.dataset.year)"'
-        + ' style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;margin-bottom:5px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">'
+        + ' style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;margin-bottom:5px;border-radius:8px;border:none;background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">'
         + '<span>' + bt.name + (isCurrent ? ' <span style="color:var(--text-muted);font-size:11px">(denne)</span>' : '') + '</span>'
         + '<span style="font-size:12px;color:var(--accent-soft)">Basis · ' + bt.baseItems.length + ' vekster</span>'
         + '</button>';
@@ -7335,8 +7435,7 @@ function openDuplicateWeek(boxTypeId, currentWeek, currentYear) {
       [...grouped[btId]].sort((a,b) => b.year - a.year || b.week - a.week).forEach(bw => {
         const isCurrentWeek = bw.week == currentWeek && bw.year == currentYear;
         html += '<button data-src-id="' + bw.id + '" data-bt-id="' + boxTypeId + '" data-week="' + currentWeek + '" data-year="' + currentYear + '" onclick="doDuplicateWeek(this.dataset.srcId,this.dataset.btId,+this.dataset.week,+this.dataset.year)"'
-          + ' style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;margin-bottom:5px;border-radius:8px;border:1px solid '
-          + (isCurrentWeek ? 'var(--accent)' : 'var(--border)') + ';background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">'
+          + ' style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;margin-bottom:5px;border-radius:8px;background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:13px;font-family:inherit;text-align:left">'
           + '<span>Uke ' + bw.week + ' · ' + bw.year + (isCurrentWeek ? ' <span style="color:var(--accent-soft);font-size:11px">← inneværende</span>' : '') + '</span>'
           + '<span style="font-size:12px;color:var(--text-muted)">' + bw.items.length + ' vekster</span>'
           + '</button>';
@@ -7471,20 +7570,20 @@ function openAddBoxItem(editIdx) {
   const modal = document.createElement('div');
   modal.id = 'box-item-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:7000;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML = `<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
-    <select id="bi-crop" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;margin-bottom:10px">
+  modal.innerHTML = `<div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
+    <select id="bi-crop" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;margin-bottom:10px">
       ${crops.map(c => `<option value="${c.id}" ${item.cropId===c.id?'selected':''}>${c.emoji} ${c.family||c.name}</option>`).join('')}
     </select>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <input id="bi-qty" type="number" min="0.1" step="0.1" value="${item.qty}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-      <select id="bi-unit" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+      <input id="bi-qty" type="number" min="0.1" step="0.1" value="${item.qty}" style="flex:1;padding:8px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+      <select id="bi-unit" style="padding:8px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
         <option value="stk" ${item.unit==='stk'?'selected':''}>stk</option>
         <option value="kg" ${item.unit==='kg'?'selected':''}>kg</option>
         <option value="g" ${item.unit==='g'?'selected':''}>g</option>
       </select>
     </div>
     <div style="display:flex;gap:8px">
-      <button onclick="document.getElementById('box-item-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+      <button onclick="document.getElementById('box-item-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
       <button onclick="saveBoxItem(${editIdx})" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>
     </div>
   </div>`;
@@ -7537,7 +7636,7 @@ function renderLevMarked(el) {
 
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
     + '<div style="font-size:13px;color:var(--text-muted)">' + deliveryMarket.length + ' marked' + (deliveryMarket.length!==1?'er':'') + '</div>'
-    + '<button onclick="openNewMarket()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Nytt marked</button>'
+    + '<button onclick="openNewMarket()" style="padding:7px 16px;border-radius:20px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Nytt marked</button>'
     + '</div>';
 
   if (!upcoming.length && !past.length) {
@@ -7550,7 +7649,7 @@ function renderLevMarked(el) {
       const doneCount = (mkt.items||[]).filter(item => item.harvested).length;
       const pct = n > 0 ? Math.round(doneCount/n*100) : 0;
       html += '<div onclick="markedViewIdx=' + i + ';renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
-        + ' style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">'
+        + ' style="background:var(--bg-card);border:none;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">'
         + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:' + (n > 0 ? '10' : '0') + 'px">'
         + '<div>'
         + '<div style="font-size:15px;color:var(--text-head)">' + (mkt.name||'Marked') + '</div>'
@@ -7569,7 +7668,7 @@ function renderLevMarked(el) {
       past.forEach(mkt => {
         const i = mkt._idx;
         html += '<div onclick="markedViewIdx=' + i + ';renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
-          + ' style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:6px;opacity:0.55;cursor:pointer">'
+          + ' style="background:var(--bg-card);border:none;border-radius:10px;padding:12px;margin-bottom:6px;opacity:0.55;cursor:pointer">'
           + '<div style="font-size:14px;color:var(--text-muted)">' + (mkt.name||'Marked') + '</div>'
           + (mkt.date ? '<div style="font-size:11px;color:var(--text-muted)">' + fmtDate(mkt.date) + '</div>' : '')
           + '</div>';
@@ -7596,7 +7695,7 @@ function renderMarkedDetail(el, mktIdx) {
     + '<div style="font-size:16px;color:var(--text-head)">' + (mkt.name||'Marked') + '</div>'
     + (mkt.date ? '<div style="font-size:12px;color:var(--text-muted)">📅 ' + fmtDate(mkt.date) + '</div>' : '')
     + '</div>'
-    + '<button onclick="markedOpenEdit(' + mktIdx + ')" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
+    + '<button onclick="markedOpenEdit(' + mktIdx + ')" style="padding:5px 12px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>'
     + '</div>';
 
   // ── Plan / Plukk toggle ──
@@ -7616,7 +7715,7 @@ function renderMarkedDetail(el, mktIdx) {
 
   if (markedModus === 'plan') {
     // ── Summary card ──
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px">'
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border:none;border-radius:14px;margin-bottom:16px">'
       + '<div><div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px">Vekster planlagt</div>'
       + '<div style="font-size:26px;font-weight:300;color:var(--text-head)">' + items.length + '</div></div>'
       + '<div style="text-align:right"><div style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + totalVal.toFixed(0) + '</div>'
@@ -7638,7 +7737,7 @@ function renderMarkedDetail(el, mktIdx) {
       catCrops.forEach(cr => {
         const sel = selIds.has(cr.id);
         html += '<button data-mkt-idx="' + mktIdx + '" data-crop-id="' + cr.id + '" onclick="markedToggleCrop(this)"'
-          + ' style="padding:8px 4px;border-radius:10px;border:2px solid ' + (sel?'var(--accent)':'var(--border)') + ';'
+          + ' style="padding:8px 4px;border-radius:10px;'
           + 'background:' + (sel?'var(--accent-bg)':'transparent') + ';cursor:pointer;'
           + 'display:flex;flex-direction:column;align-items:center;gap:3px;'
           + 'color:' + (sel?'var(--accent-soft)':'var(--text-muted)') + ';font-family:inherit">'
@@ -7664,9 +7763,9 @@ function renderMarkedDetail(el, mktIdx) {
           + '</div>'
           + '<input type="number" min="0" step="1" value="' + (item.qty||'') + '" placeholder="0"'
           + ' data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" oninput="markedUpdateQty(this)"'
-          + ' style="width:60px;padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;text-align:center">'
+          + ' style="width:60px;padding:8px 6px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;text-align:center">'
           + '<select data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" onchange="markedUpdateUnit(this)"'
-          + ' style="padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
+          + ' style="padding:8px 6px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:12px;font-family:inherit">'
           + ['stk','kg','bunt','boks'].map(u => '<option value="' + u + '"' + (item.unit===u?' selected':'') + '>' + u + '</option>').join('')
           + '</select>'
           + '<button data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" onclick="markedRemoveItem(this)"'
@@ -7697,7 +7796,7 @@ function renderMarkedDetail(el, mktIdx) {
     if (!items.length) {
       html += '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Ingen vekster ennå.<br>'
         + '<button onclick="markedModus=\'plan\';renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
-        + ' style="margin-top:10px;padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Gå til Plan</button></div>';
+        + ' style="margin-top:10px;padding:8px 20px;border-radius:20px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Gå til Plan</button></div>';
     } else {
       items.forEach((item, ii) => {
         const cr = crops.find(c => c.id === item.cropId);
@@ -7707,7 +7806,7 @@ function renderMarkedDetail(el, mktIdx) {
         html += '<div data-mkt-idx="' + mktIdx + '" data-item-idx="' + ii + '" onclick="markedToggleHarvest(this)"'
           + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
           + 'background:' + (done?(isLight?'rgba(0,0,0,0.03)':'rgba(255,255,255,0.03)'):'var(--bg-card)') + ';'
-          + 'border:2px solid ' + (done?(isLight?'rgba(0,0,0,0.1)':'rgba(255,255,255,0.1)'):'var(--border)') + ';'
+          + ';'
           + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:all 0.15s">'
           + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
           + 'background:' + (done?'var(--accent)':'transparent') + ';'
@@ -7725,7 +7824,7 @@ function renderMarkedDetail(el, mktIdx) {
       if (allDone) {
         html += '<button data-mkt-idx="' + mktIdx + '" onclick="markedLogHarvest(this)" style="width:100%;margin-top:8px;padding:16px;border-radius:14px;border:none;background:var(--accent);color:' + (isLight?'#1c1410':'#0d1a0e') + ';cursor:pointer;font-size:15px;font-family:inherit;font-weight:600">✓ Logg som høstet</button>';
       } else {
-        html += '<button data-mkt-idx="' + mktIdx + '" onclick="markedLogHarvest(this)" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
+        html += '<button data-mkt-idx="' + mktIdx + '" onclick="markedLogHarvest(this)" style="width:100%;margin-top:8px;padding:14px;border-radius:14px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Logg som høstet</button>';
       }
     }
   }
@@ -7815,17 +7914,17 @@ function markedOpenEdit(mktIdx) {
   const modal = document.createElement('div');
   modal.id = 'market-edit-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">'
+  modal.innerHTML = '<div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">'
     + '<div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Rediger marked</div>'
     + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
-    + '<input id="mkt-edit-name" value="' + (mkt.name||'') + '" placeholder="Navn" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
-    + '<button type="button" id="mkt-edit-date-btn" onclick="event.stopPropagation();openMarketDatePicker()" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer">' + (mkt.date ? '📅 ' + mkt.date : 'Velg dato 📅') + '</button>'
+    + '<input id="mkt-edit-name" value="' + (mkt.name||'') + '" placeholder="Navn" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
+    + '<button type="button" id="mkt-edit-date-btn" onclick="event.stopPropagation();openMarketDatePicker()" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer">' + (mkt.date ? '📅 ' + mkt.date : 'Velg dato 📅') + '</button>'
     + '<input type="hidden" id="mkt-edit-date-val" value="' + (mkt.date||'') + '">'
     + '</div>'
     + '<div style="display:flex;gap:8px">'
-    + '<button onclick="markedConfirmDelete(' + mktIdx + ',this)" style="padding:11px;border-radius:10px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:14px;font-family:inherit">× Slett</button>'
+    + '<button onclick="markedConfirmDelete(' + mktIdx + ',this)" style="padding:11px;border-radius:10px;background:transparent;color:var(--color-danger);cursor:pointer;font-size:14px;font-family:inherit">× Slett</button>'
     + '<button onclick="markedSaveEdit(' + mktIdx + ')" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>'
-    + '<button onclick="document.getElementById(\'market-edit-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>'
+    + '<button onclick="document.getElementById(\'market-edit-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>'
     + '</div></div>';
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
@@ -7867,15 +7966,15 @@ function openNewMarket() {
   const modal = document.createElement('div');
   modal.id = 'new-market-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">'
+  modal.innerHTML = '<div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">'
     + '<div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Nytt marked</div>'
     + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
-    + '<input id="mkt-name" placeholder="Navn på marked" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
-    + '<button type="button" id="mkt-date-btn" onclick="event.stopPropagation();openNewMarketDatePicker(this)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer;width:100%">Velg dato 📅</button>'
+    + '<input id="mkt-name" placeholder="Navn på marked" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
+    + '<button type="button" id="mkt-date-btn" onclick="event.stopPropagation();openNewMarketDatePicker(this)" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-muted);font-size:14px;font-family:inherit;text-align:left;cursor:pointer;width:100%">Velg dato 📅</button>'
     + '<input type="hidden" id="mkt-date-val">'
     + '</div>'
     + '<div style="display:flex;gap:8px">'
-    + '<button onclick="document.getElementById(\'new-market-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>'
+    + '<button onclick="document.getElementById(\'new-market-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>'
     + '<button onclick="saveNewMarket()" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Opprett</button>'
     + '</div></div>';
   document.body.appendChild(modal);
@@ -8012,7 +8111,7 @@ function renderLevOversikt(el) {
 
   // ── Stat cards ──
   const statCard = (icon, val, label, sublabel, color) =>
-    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px">'
+    '<div style="background:var(--bg-card);border:none;border-radius:14px;padding:14px 16px">'
     + '<div style="font-size:20px;margin-bottom:6px">' + icon + '</div>'
     + '<div style="font-size:26px;font-weight:300;line-height:1;color:' + color + '">' + val + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);margin-top:4px;letter-spacing:0.08em;text-transform:uppercase">' + label + '</div>'
@@ -8022,7 +8121,7 @@ function renderLevOversikt(el) {
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
     + statCard('💰', plannedSaleValue > 0 ? '~' + fmtKr(plannedSaleValue) : '–',
         'Planlagte grønnsakskasser',
-        totalBoxesAllSeasons ? totalBoxesAllSeasons + ' kasser · sesongen' : 'Sett opp kunder og leveringsplan', '#d97706')
+        totalBoxesAllSeasons ? totalBoxesAllSeasons + ' kasser · sesongen' : 'Sett opp kunder og leveringsplan', 'var(--color-value)')
     + statCard('📦', harvestedBoxes + ' / ' + totalBoxesAllSeasons,
         'Kasseprogresjon',
         totalBoxesAllSeasons ? Math.round((harvestedBoxes / totalBoxesAllSeasons) * 100) + '% levert' : 'Sett opp leveringsplan', 'var(--accent-soft)')
@@ -8035,7 +8134,7 @@ function renderLevOversikt(el) {
     + '</div>';
 
   if (!harvestLog.length) {
-    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:14px">'
+    html += '<div style="background:var(--bg-card);border:none;border-radius:14px;padding:20px;text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:14px">'
       + '🌱 Ingen høsting logget ennå.<br><span style="font-size:12px">Logg kasser og markeder for å se statistikk.</span>'
       + '</div>';
   }
@@ -8044,7 +8143,7 @@ function renderLevOversikt(el) {
   // ── Ukentlig trend ──
   if (weekTrend.some(w => w.value > 0)) {
 
-    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+    html += '<div style="background:var(--bg-card);border:none;border-radius:14px;padding:14px 16px;margin-bottom:14px">'
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">Ukentlig trend</div>'
       + '<div style="display:flex;align-items:flex-end;gap:4px;height:56px">';
     weekTrend.forEach(w => {
@@ -8062,7 +8161,7 @@ function renderLevOversikt(el) {
   // ── Fordeling per destinasjon ──
   if (Object.keys(byDest).length) {
     const destLabels = { kasse: '📦 Kasse', marked: '🛒 Marked', annet: '📦 Annet' };
-    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+    html += '<div style="background:var(--bg-card);border:none;border-radius:14px;padding:14px 16px;margin-bottom:14px">'
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Fordeling</div>';
     const destTotal = Object.values(byDest).reduce((s,v) => s+v, 0) || 1;
     Object.entries(byDest).sort(([,a],[,b]) => b-a).forEach(([dest, val]) => {
@@ -8082,7 +8181,7 @@ function renderLevOversikt(el) {
 
   // ── Topp vekster ──
   if (topCrops.length) {
-    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+    html += '<div style="background:var(--bg-card);border:none;border-radius:14px;padding:14px 16px;margin-bottom:14px">'
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Mest høstet (verdi)</div>';
     topCrops.forEach(([cropId, data], i) => {
       const cr = crops.find(c => c.id == cropId);
@@ -8109,7 +8208,7 @@ function renderLevHoestLogg(el) {
 
   // Header with Ny registrering button
   let html = '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
-    + '<button onclick="openNyRegistrering()" style="padding:7px 16px;border-radius:20px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Ny registrering</button>'
+    + '<button onclick="openNyRegistrering()" style="padding:7px 16px;border-radius:20px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Ny registrering</button>'
     + '</div>';
 
   if (!harvestLog.length) {
@@ -8120,7 +8219,7 @@ function renderLevHoestLogg(el) {
 
   // Totals
   const totalValue = harvestLog.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
-  html += '<div style="background:var(--accent-bg);border:1px solid var(--border-accent);border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">'
+  html += '<div style="background:var(--accent-bg);border:none;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">'
     + '<div style="font-size:12px;color:var(--text-muted)">' + harvestLog.length + ' registreringer</div>'
     + '<div style="font-size:18px;color:var(--accent-soft);font-weight:300">kr ' + totalValue.toFixed(0) + '</div>'
     + '</div>';
@@ -8140,7 +8239,7 @@ function renderLevHoestLogg(el) {
       + '</div>';
     entries.forEach(h => {
       const cr = crops.find(c => c.id === h.cropId);
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:9px;margin-bottom:4px">'
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg-card);border:none;border-radius:9px;margin-bottom:4px">'
         + '<span style="font-size:18px">' + (cr?.emoji||'🌱') + '</span>'
         + '<div style="flex:1">'
         + '<div style="font-size:13px;color:var(--text-head)">' + (cr?cr.family||cr.name:'') + '</div>'
@@ -8160,33 +8259,33 @@ function openNyRegistrering() {
   modal.id = 'ny-reg-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:6000;display:flex;align-items:flex-end;justify-content:center';
   modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
+    <div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px">
       <div style="font-size:15px;color:var(--accent-soft);margin-bottom:14px">Registrer høsting</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <select id="hoest-crop" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="hoest-crop" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           ${crops.map(c => '<option value="'+c.id+'">'+c.emoji+' '+(c.family||c.name)+'</option>').join('')}
         </select>
-        <select id="hoest-bed" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="hoest-bed" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="">Velg seng (valgfritt)</option>
           ${BED_IDS.map(b => '<option value="'+b+'">'+b+'</option>').join('')}
         </select>
         <div style="display:flex;gap:8px">
-          <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-          <select id="hoest-unit" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <select id="hoest-unit" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
             <option value="stk">stk</option>
               <option value="bunt">bunt</option>
             <option value="boks">boks</option>
           </select>
         </div>
-        <select id="hoest-dest" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="hoest-dest" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="kasse">Grønnsakskasse</option>
           <option value="marked">Marked</option>
           <option value="annet">Annet</option>
         </select>
-        <input id="hoest-note" placeholder="Notat (valgfritt)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <input id="hoest-note" placeholder="Notat (valgfritt)" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
       </div>
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button onclick="document.getElementById('ny-reg-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
+        <button onclick="document.getElementById('ny-reg-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
         <button onclick="saveHarvest()" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Registrer</button>
       </div>
     </div>`;
@@ -8198,28 +8297,28 @@ function renderLevHoest(el) {
   const today = new Date().toISOString().split('T')[0];
   el.innerHTML = `
     <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Registrer høsting</div>
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
+    <div style="background:var(--bg-card);border:none;border-radius:12px;padding:14px;margin-bottom:14px">
       <div style="display:flex;flex-direction:column;gap:10px">
-        <select id="hoest-crop" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="hoest-crop" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           ${crops.map(c => `<option value="${c.id}">${c.emoji} ${c.family||c.name}</option>`).join('')}
         </select>
-        <select id="hoest-bed" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="hoest-bed" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="">Velg seng (valgfritt)</option>
           ${BED_IDS.map(b => `<option value="${b}">${b}</option>`).join('')}
         </select>
         <div style="display:flex;gap:8px">
-          <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-          <select id="hoest-unit" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <input id="hoest-qty" type="number" min="0.1" step="0.1" placeholder="Mengde" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+          <select id="hoest-unit" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
             <option value="stk">stk</option>
               <option value="g">g</option>
           </select>
         </div>
-        <select id="hoest-dest" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="hoest-dest" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="kasse">Grønnsakskasse</option>
           <option value="marked">Marked</option>
           <option value="annet">Annet</option>
         </select>
-        <input id="hoest-note" placeholder="Notat (valgfritt)" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <input id="hoest-note" placeholder="Notat (valgfritt)" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
         <button onclick="saveHarvest()" style="padding:12px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Registrer høsting</button>
       </div>
     </div>
@@ -8227,7 +8326,7 @@ function renderLevHoest(el) {
       <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Høstet i dag</div>
       ${harvestLog.filter(h => h.date === today).map((h,i) => {
         const cr = crops.find(c => c.id === h.cropId);
-        return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        return `<div style="background:var(--bg-card);border:none;border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
           <span style="font-size:18px">${cr?.emoji||'🌱'}</span>
           <div style="flex:1;font-size:13px;color:var(--text-head)">${cr?cr.family||cr.name:''} · ${h.qty} ${h.unit} · ${h.dest}</div>
           ${h.bedId ? `<span style="font-size:11px;color:var(--text-muted)">${h.bedId}</span>` : ''}
@@ -8274,7 +8373,7 @@ function renderLevLogg(el) {
   const totalValue = harvestLog.reduce((s,h) => s + calcItemValue(crops.find(c=>c.id===h.cropId), h.qty, h.unit), 0);
 
   el.innerHTML = `
-    <div style="background:var(--accent-bg);border:1px solid var(--border-accent);border-radius:12px;padding:14px;margin-bottom:16px">
+    <div style="background:var(--accent-bg);border:none;border-radius:12px;padding:14px;margin-bottom:16px">
       <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Totaloversikt</div>
       <div style="font-size:20px;color:var(--accent-soft);font-weight:300">kr ${totalValue.toFixed(0)}</div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${harvestLog.length} høstinger registrert</div>
@@ -8285,7 +8384,7 @@ function renderLevLogg(el) {
       if (!cr) return '';
       const val = Object.entries(units).reduce((s,[unit,qty]) => s + calcItemValue(cr, qty, unit), 0);
       const summary = Object.entries(units).map(([u,q]) => `${q} ${u}`).join(', ');
-      return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+      return `<div style="background:var(--bg-card);border:none;border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
         <span style="font-size:20px">${cr.emoji}</span>
         <div style="flex:1">
           <div style="font-size:13px;color:var(--text-head)">${cr.family||cr.name}</div>
@@ -8306,7 +8405,7 @@ function renderLevLogg(el) {
         </div>
         ${entries.map(h => {
           const cr = crops.find(c => c.id === h.cropId);
-          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;font-size:12px;color:var(--text-muted)">
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg-card);border:none;border-radius:8px;margin-bottom:4px;font-size:12px;color:var(--text-muted)">
             <span style="font-size:16px">${cr?.emoji||'🌱'}</span>
             <span style="flex:1;color:var(--text-head)">${cr?cr.family||cr.name:''}</span>
             <span>${h.qty} ${h.unit}</span>
@@ -8382,7 +8481,7 @@ function openCategorySettings() {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
 
   function renderCatModal() {
-    modal.innerHTML = '<div style="background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto">'
+    modal.innerHTML = '<div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
       + '<div style="font-size:15px;color:var(--accent-soft)">Kategorier</div>'
       + '<button onclick="closeCatModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1">×</button>'
@@ -8390,13 +8489,13 @@ function openCategorySettings() {
       + cropCategories.map((cat, i) =>
         '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'
         + '<div style="flex:1;font-size:14px;color:var(--text-head)">' + cat + '</div>'
-        + '<button onclick="moveCat(' + i + ',-1)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1" ' + (i===0?'disabled':'') + '>↑</button>'
-        + '<button onclick="moveCat(' + i + ',1)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1" ' + (i===cropCategories.length-1?'disabled':'') + '>↓</button>'
-        + '<button onclick="deleteCat(' + i + ')" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(248,113,113,0.3);background:transparent;color:#f87171;cursor:pointer;font-size:14px;line-height:1">×</button>'
+        + '<button onclick="moveCat(' + i + ',-1)" style="width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1" ' + (i===0?'disabled':'') + '>↑</button>'
+        + '<button onclick="moveCat(' + i + ',1)" style="width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;line-height:1" ' + (i===cropCategories.length-1?'disabled':'') + '>↓</button>'
+        + '<button onclick="deleteCat(' + i + ')" style="width:28px;height:28px;border-radius:6px;background:transparent;color:var(--color-danger);cursor:pointer;font-size:14px;line-height:1">×</button>'
         + '</div>'
       ).join('')
       + '<div style="display:flex;gap:8px;margin-top:14px">'
-      + '<input id="cat-new-input" placeholder="Ny kategori..." style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
+      + '<input id="cat-new-input" placeholder="Ny kategori..." style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
       + '<button onclick="addCatFromInput()" style="padding:10px 16px;border-radius:8px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Legg til</button>'
       + '</div>'
       + '</div>';
