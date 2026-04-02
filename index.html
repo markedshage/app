@@ -363,40 +363,34 @@
     border: none !important;
   }
 
-  /* ══ GLOBAL: Hover — semi-transparent overlay on all interactive ══ */
+  /* ══ GLOBAL: Fade transition on all interactive elements ══ */
   button, select, .tab-btn, .crop-card, .bed-cell,
-  .priority-btn, .map-tool-btn, .btn-primary, .btn-secondary, .add-btn {
-    transition: background 0.15s, filter 0.15s !important;
+  .priority-btn, .map-tool-btn, .btn-primary, .btn-secondary,
+  .add-btn, div[onclick], span[onclick] {
+    transition: background-image 0.15s, background-color 0.15s, filter 0.15s !important;
   }
 
-  /* Dark mode hover */
+  /* Dark mode hover — fade in white overlay */
   button:hover:not(:disabled), select:hover,
   .tab-btn:hover, .crop-card:hover, .bed-cell:hover,
   .priority-btn:hover, .map-tool-btn:hover,
-  .btn-primary:hover, .btn-secondary:hover, .add-btn:hover {
+  .btn-primary:hover, .btn-secondary:hover, .add-btn:hover,
+  div[onclick]:hover, span[onclick]:hover {
     background-image: linear-gradient(rgba(255,255,255,0.07), rgba(255,255,255,0.07)) !important;
   }
 
-  /* Light mode hover */
+  /* Light mode hover — fade in dark overlay */
   body.light button:hover:not(:disabled), body.light select:hover,
   body.light .tab-btn:hover, body.light .crop-card:hover,
   body.light .bed-cell:hover, body.light .priority-btn:hover,
   body.light .map-tool-btn:hover, body.light .btn-primary:hover,
-  body.light .btn-secondary:hover, body.light .add-btn:hover {
+  body.light .btn-secondary:hover, body.light .add-btn:hover,
+  body.light div[onclick]:hover, body.light span[onclick]:hover {
     background-image: linear-gradient(rgba(0,0,0,0.06), rgba(0,0,0,0.06)) !important;
   }
 
-  /* ══ div[onclick] elements (Innhøsting, Oppsett overlays) ══ */
-  div[onclick], span[onclick] {
-    cursor: pointer;
-    transition: background 0.15s !important;
-  }
-  div[onclick]:hover {
-    background-image: linear-gradient(rgba(255,255,255,0.07), rgba(255,255,255,0.07)) !important;
-  }
-  body.light div[onclick]:hover {
-    background-image: linear-gradient(rgba(0,0,0,0.06), rgba(0,0,0,0.06)) !important;
-  }
+  /* Cursor for div/span with onclick */
+  div[onclick], span[onclick] { cursor: pointer; }
 
   /* ══ Focus ══ */
   .field-input:focus {
@@ -1038,19 +1032,14 @@ function renderOversikt() {
   const totalValue = crops.reduce((sum, c) => { const v = calcValue(c); return sum + (v !== null ? v : 0); }, 0);
   const valueDisplay = totalValue > 0 ? '~' + Math.round(totalValue / 1000) + 'k' : '–';
 
-  // Beds that have at least one crop with sowLog or plantLog
-  const filledBeds = new Set(
-    crops
-      .filter(c => c.sowLog || c.plantLog)
-      .flatMap(c => c.beds.map(spec => parseBedSpec(spec).bedId))
-  ).size;
-  const totalBeds = BED_IDS.length;
+  const forkTotal = crops.filter(c => c.sownDate && c.plantedDate).length;
+  const forkDone  = crops.filter(c => c.sownDate && c.plantedDate && c.sowLog).length;
 
   const stats = [
-    { label:"Sålogg",     val:`${sowingDone}/${sowingTotal}`,    icon:"🌱",  color:"var(--color-info)" },
-    { label:"Plantelogg", val:`${plantingDone}/${plantingTotal}`,icon:"🪴",  color:"#34d399" },
-    { label:"Senger",     val:`${filledBeds}/${totalBeds}`,      icon:"🌿",  color:"var(--color-value)" },
-    { label:"Verdi",      val:valueDisplay,                      icon:"💰",  color:"#f472b6" },
+    { label:"Forkultivering",  val:`${forkDone}/${forkTotal}`,        icon:"🌿", color:"var(--color-value)" },
+    { label:"Sålogg",          val:`${sowingDone}/${sowingTotal}`,    icon:"🌱", color:"var(--color-info)" },
+    { label:"Plantelogg",      val:`${plantingDone}/${plantingTotal}`,icon:"🪴", color:"#34d399" },
+    { label:"Verdi",           val:valueDisplay,                      icon:"💰", color:"#f472b6" },
   ];
 
   const upcoming = tasks.filter(t => !t.done).sort((a,b) => new Date(a.date)-new Date(b.date)).slice(0,4);
@@ -8118,7 +8107,14 @@ function renderLevOversikt(el) {
     + (sublabel ? '<div style="font-size:11px;color:var(--text-dim);margin-top:3px">' + sublabel + '</div>' : '')
     + '</div>';
 
+  // ── Forkultivering ──
+  const forkTotal = crops.filter(c => c.sownDate && c.plantedDate).length;
+  const forkDone  = crops.filter(c => c.sownDate && c.plantedDate && c.sowLog).length;
+
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+    + statCard('🌱', forkDone + ' / ' + forkTotal,
+        'Forkultivering',
+        forkTotal ? Math.round((forkDone / forkTotal) * 100) + '% ferdig sådd' : 'Legg inn sådato og plantedato', 'var(--accent-soft)')
     + statCard('💰', plannedSaleValue > 0 ? '~' + fmtKr(plannedSaleValue) : '–',
         'Planlagte grønnsakskasser',
         totalBoxesAllSeasons ? totalBoxesAllSeasons + ' kasser · sesongen' : 'Sett opp kunder og leveringsplan', 'var(--color-value)')
@@ -8126,11 +8122,8 @@ function renderLevOversikt(el) {
         'Kasseprogresjon',
         totalBoxesAllSeasons ? Math.round((harvestedBoxes / totalBoxesAllSeasons) * 100) + '% levert' : 'Sett opp leveringsplan', 'var(--accent-soft)')
     + statCard('💚', totalValue > 0 ? '~' + fmtKr(totalValue) : '0',
-        'Salg',
+        'Gjennomførte salg',
         harvestLog.length ? harvestLog.length + ' registreringer' : 'Ingen logget ennå', '#f472b6')
-    + statCard('🥬', Math.round(loggedQty) + ' / ' + plannedQty,
-        'Grønnsaker høstet',
-        plannedQty ? Math.round((loggedQty / plannedQty) * 100) + '% av planlagt' : 'Legg til vekster for å spore', '#34d399')
     + '</div>';
 
   if (!harvestLog.length) {
