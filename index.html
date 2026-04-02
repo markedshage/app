@@ -8118,6 +8118,9 @@ function renderLevOversikt(el) {
     + statCard('💚', totalValue > 0 ? '~' + fmtKr(totalValue) : '0',
         'Gjennomførte salg',
         harvestLog.length ? harvestLog.length + ' registreringer' : 'Ingen logget ennå', '#f472b6')
+    + statCard('🥬', Math.round(loggedQty) + ' / ' + plannedQty,
+        'Grønnsaker høstet',
+        plannedQty ? Math.round((loggedQty / plannedQty) * 100) + '% av plantet' : 'Ingen planter registrert', 'var(--accent-soft)')
     + '</div>';
 
   if (!harvestLog.length) {
