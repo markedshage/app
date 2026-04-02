@@ -8107,14 +8107,8 @@ function renderLevOversikt(el) {
     + (sublabel ? '<div style="font-size:11px;color:var(--text-dim);margin-top:3px">' + sublabel + '</div>' : '')
     + '</div>';
 
-  // ── Forkultivering ──
-  const forkTotal = crops.filter(c => c.sownDate && c.plantedDate).length;
-  const forkDone  = crops.filter(c => c.sownDate && c.plantedDate && c.sowLog).length;
-
+  // ── Stat cards ──
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
-    + statCard('🌱', forkDone + ' / ' + forkTotal,
-        'Forkultivering',
-        forkTotal ? Math.round((forkDone / forkTotal) * 100) + '% ferdig sådd' : 'Legg inn sådato og plantedato', 'var(--accent-soft)')
     + statCard('💰', plannedSaleValue > 0 ? '~' + fmtKr(plannedSaleValue) : '–',
         'Planlagte grønnsakskasser',
         totalBoxesAllSeasons ? totalBoxesAllSeasons + ' kasser · sesongen' : 'Sett opp kunder og leveringsplan', 'var(--color-value)')
