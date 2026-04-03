@@ -1039,8 +1039,8 @@ function openStatPopup(type) {
       sub: c.sowLog ? 'Sådd ' + c.sowLog : 'Ikke sådd ennå'
     }));
   } else if (type === 'sow') {
-    title = 'Sålogg';
-    const relevant = crops.filter(c => c.sownDate);
+    title = 'Direktesåing';
+    const relevant = crops.filter(c => c.sownDate && !c.plantedDate);
     items = relevant.map(c => ({
       emoji: c.emoji, name: c.family || c.name,
       done: !!(c.sowLog),
@@ -1096,8 +1096,8 @@ function openStatPopup(type) {
 }
 
 function renderOversikt() {
-  const sowingDone   = crops.filter(c => c.sownDate && c.sowLog).length;
-  const sowingTotal  = crops.filter(c => c.sownDate).length;
+  const sowingDone   = crops.filter(c => c.sownDate && c.sowLog && !c.plantedDate).length;
+  const sowingTotal  = crops.filter(c => c.sownDate && !c.plantedDate).length;
   const plantingDone = crops.filter(c => c.plantedDate && c.plantLog).length;
   const plantingTotal= crops.filter(c => c.plantedDate).length;
   const totalValue = crops.reduce((sum, c) => { const v = calcValue(c); return sum + (v !== null ? v : 0); }, 0);
@@ -1108,7 +1108,7 @@ function renderOversikt() {
 
   const stats = [
     { label:"Forkultivering", val:`${forkDone}/${forkTotal}`,        icon:"🌿", color:"var(--color-value)", type:"fork" },
-    { label:"Sålogg",         val:`${sowingDone}/${sowingTotal}`,    icon:"🌱", color:"var(--color-info)",  type:"sow" },
+    { label:"Direktesåing",    val:`${sowingDone}/${sowingTotal}`,    icon:"🌱", color:"var(--color-info)",  type:"sow" },
     { label:"Plantelogg",     val:`${plantingDone}/${plantingTotal}`,icon:"🪴", color:"#34d399",            type:"plant" },
     { label:"Verdi",          val:valueDisplay,                      icon:"💰", color:"#f472b6",            type:"value" },
   ];
