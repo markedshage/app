@@ -278,8 +278,8 @@
   .add-btn:active { background: rgba(52,211,153,0.22); }
 
   /* MODAL */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
-  .modal { background: var(--bg-modal); border: 1px solid rgba(52,211,153,0.3); border-radius: 20px 20px 0 0; padding: 24px 20px 36px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal { background: var(--bg-modal); border-radius: 16px; padding: 24px 20px 28px; width: 100%; max-width: 600px; max-height: 88vh; overflow-y: auto; }
   .modal-title { font-size: 17px; font-weight: 400; color: var(--accent-soft); margin-bottom: 18px; }
   .field-label { font-size: 10px; color: #6b7280; display: block; margin-bottom: 4px; letter-spacing: 0.1em; text-transform: uppercase; }
   .field-input { width: 100%; background: var(--bg-input); border: none; border-radius: 8px; padding: 10px 12px; color: var(--text-head); font-size: 15px; font-family: inherit; outline: none; transition: box-shadow 0.15s; }
@@ -1024,6 +1024,77 @@ function badge(status) {
 }
 
 /* ---- OVERSIKT ---- */
+function openStatPopup(type) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  let title = '', items = [];
+
+  if (type === 'fork') {
+    title = 'Forkultivering';
+    const relevant = crops.filter(c => c.sownDate && c.plantedDate);
+    items = relevant.map(c => ({
+      emoji: c.emoji, name: c.family || c.name,
+      done: !!(c.sowLog),
+      sub: c.sowLog ? 'Sådd ' + c.sowLog : 'Ikke sådd ennå'
+    }));
+  } else if (type === 'sow') {
+    title = 'Sålogg';
+    const relevant = crops.filter(c => c.sownDate);
+    items = relevant.map(c => ({
+      emoji: c.emoji, name: c.family || c.name,
+      done: !!(c.sowLog),
+      sub: c.sowLog ? 'Sådd ' + c.sowLog : 'Planlagt ' + c.sownDate
+    }));
+  } else if (type === 'plant') {
+    title = 'Plantelogg';
+    const relevant = crops.filter(c => c.plantedDate);
+    items = relevant.map(c => ({
+      emoji: c.emoji, name: c.family || c.name,
+      done: !!(c.plantLog),
+      sub: c.plantLog ? 'Plantet ' + c.plantLog : 'Planlagt ' + c.plantedDate
+    }));
+  } else if (type === 'value') {
+    title = 'Estimert verdi';
+    items = crops.map(c => {
+      const v = calcValue(c);
+      return { emoji: c.emoji, name: c.family || c.name, done: v !== null && v > 0, sub: v !== null ? '~' + fmtKr(v) : 'Ingen pris satt' };
+    }).filter(i => i.sub !== 'Ingen pris satt' || crops.length < 20);
+  }
+
+  const doneItems = items.filter(i => i.done);
+  const pendingItems = items.filter(i => !i.done);
+  const sorted = [...doneItems, ...pendingItems];
+
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#faf8f5' : '#1a2e1b';
+  const borderColor = isLight ? 'rgba(120,85,45,0.1)' : 'rgba(52,211,153,0.15)';
+
+  modal.innerHTML = `<div style="background:${bg};border-radius:16px;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid ${borderColor};flex-shrink:0">
+      <div style="font-size:15px;font-weight:500;color:var(--text-head)">${title}</div>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;font-size:22px;color:var(--text-muted);padding:0;line-height:1">×</button>
+    </div>
+    <div style="overflow-y:auto;padding:12px 20px 24px">
+      ${sorted.length === 0 ? `<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen vekster å vise</div>` : ''}
+      ${sorted.map(item => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid ${borderColor}">
+          <div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${item.done ? 'var(--accent)' : 'rgba(128,128,128,0.15)'}">
+            ${item.done ? `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}
+          </div>
+          <span style="font-size:18px;flex-shrink:0">${item.emoji}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;color:var(--text-head);font-weight:${item.done ? '400' : '400'};${item.done ? '' : ''}">${item.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${item.sub}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
 function renderOversikt() {
   const sowingDone   = crops.filter(c => c.sownDate && c.sowLog).length;
   const sowingTotal  = crops.filter(c => c.sownDate).length;
@@ -1036,10 +1107,10 @@ function renderOversikt() {
   const forkDone  = crops.filter(c => c.sownDate && c.plantedDate && c.sowLog).length;
 
   const stats = [
-    { label:"Forkultivering",  val:`${forkDone}/${forkTotal}`,        icon:"🌿", color:"var(--color-value)" },
-    { label:"Sålogg",          val:`${sowingDone}/${sowingTotal}`,    icon:"🌱", color:"var(--color-info)" },
-    { label:"Plantelogg",      val:`${plantingDone}/${plantingTotal}`,icon:"🪴", color:"#34d399" },
-    { label:"Verdi",           val:valueDisplay,                      icon:"💰", color:"#f472b6" },
+    { label:"Forkultivering", val:`${forkDone}/${forkTotal}`,        icon:"🌿", color:"var(--color-value)", type:"fork" },
+    { label:"Sålogg",         val:`${sowingDone}/${sowingTotal}`,    icon:"🌱", color:"var(--color-info)",  type:"sow" },
+    { label:"Plantelogg",     val:`${plantingDone}/${plantingTotal}`,icon:"🪴", color:"#34d399",            type:"plant" },
+    { label:"Verdi",          val:valueDisplay,                      icon:"💰", color:"#f472b6",            type:"value" },
   ];
 
   const upcoming = tasks.filter(t => !t.done).sort((a,b) => new Date(a.date)-new Date(b.date)).slice(0,4);
@@ -1047,7 +1118,7 @@ function renderOversikt() {
   document.getElementById('tab-oversikt').innerHTML = `
     <div class="stats-grid">
       ${stats.map(s => `
-        <div class="stat-card">
+        <div class="stat-card" onclick="openStatPopup('${s.type}')" style="cursor:pointer">
           <div class="stat-icon">${s.icon}</div>
           <div class="stat-val" style="color:${s.color}">${s.val}</div>
           <div class="stat-label">${s.label}</div>
@@ -3477,21 +3548,10 @@ function renderCal() {
 
   // Position near button or center of screen
   document.body.appendChild(popup);
-  if (btn) {
-    const rect = btn.getBoundingClientRect();
-    const popW = 300, popH = 280;
-    let top = rect.bottom + 6, left = rect.left;
-    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-    if (top + popH > window.innerHeight - 8) top = rect.top - popH - 6;
-    if (top < 8) top = 8;
-    popup.style.top = top + 'px';
-    popup.style.left = left + 'px';
-  } else {
-    // fallback: center
-    popup.style.top = '50%';
-    popup.style.left = '50%';
-    popup.style.transform = 'translate(-50%, -50%)';
-  }
+  // Always center on screen
+  popup.style.top = '50%';
+  popup.style.left = '50%';
+  popup.style.transform = 'translate(-50%, -50%)';
 }
 
 function calNav(dir, event) {
@@ -4394,15 +4454,8 @@ function startEditTaskDate(id, event) {
     renderOppgaver();
   };
 
-  // Open calendar and then reposition popup to center of screen
+  // Open calendar centered on screen
   openCal('_task-cal-btn', '_task-cal-val');
-  const popup = document.getElementById('cal-popup');
-  if (popup) {
-    const popW = 300;
-    const popH = 290;
-    popup.style.left = Math.max(8, (window.innerWidth - popW) / 2) + 'px';
-    popup.style.top  = Math.max(8, (window.innerHeight - popH) / 2) + 'px';
-  }
 }
 
 function cycleTaskPriority(id) {
