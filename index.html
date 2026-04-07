@@ -679,6 +679,20 @@ let cropFilter = "alle";
 let cropSearch = "";
 let expandedCrops = new Set();
 let focusTaskIds  = new Set();   // tasks pinned to focus modal
+
+function syncTodayFocus() {
+  // Auto-add tasks with today's date to focus (unless manually removed)
+  const today = new Date().toISOString().split('T')[0];
+  // Convert to DD-MM-YYYY format used in tasks
+  const [y,m,d] = today.split('-');
+  const todayFmt = `${d}-${m}-${y}`;
+  tasks.forEach(t => {
+    if (!t.done && t.date === todayFmt && !t._manuallyUnfocused) {
+      focusTaskIds.add(t.id);
+    }
+  });
+  try { localStorage.setItem('mh_focus_tasks', JSON.stringify([...focusTaskIds])); } catch(e) {}
+}
 let taskHistory   = [];           // completed tasks history
 let deliveryCustomers = [];
 let deliveryBox = [];              // standard box (legacy, kept for compat)
@@ -3182,6 +3196,28 @@ function renderSenger() {
                         : `<span>${bedCropList.map(c=>c.name).join(' · ')}</span>`)
                     : `<span style="color:var(--text-muted)">Ledig</span>`}
                 </div>
+                ${showBedStats && occupied ? (() => {
+                  // Find earliest relevant date across all crops in this bed
+                  const MONTHS_NO = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+                  const fmtD = d => { if (!d) return ''; const p = d.split('-'); if (p.length===3) { const [day,mon] = p[0].length===2 ? [p[0],p[1]] : [p[2],p[1]]; return +day + '. ' + MONTHS_NO[+mon-1]; } return d; };
+                  let bestDate = null, label = '', allDone = false;
+                  // For each crop in bed, pick plantedDate if both exist, else whichever exists
+                  const dates = bedCropList.map(c => {
+                    const hasPlant = c.plantedDate;
+                    const hasSow = c.sownDate && !c.plantedDate;
+                    if (hasPlant) return { date: c.plantedDate, label: 'Plantedato', done: !!(c.plantLog) };
+                    if (hasSow) return { date: c.sownDate, label: 'Sådato', done: !!(c.sowLog) };
+                    return null;
+                  }).filter(Boolean);
+                  if (!dates.length) return '';
+                  // Sort by date, pick earliest
+                  dates.sort((a,b) => a.date.split('-').reverse().join('') > b.date.split('-').reverse().join('') ? 1 : -1);
+                  const first = dates[0];
+                  allDone = dates.every(d => d.done);
+                  const formatted = fmtD(first.date);
+                  if (!formatted) return '';
+                  return `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;${allDone?'text-decoration:line-through;':''}">${first.label}: ${formatted}</div>`;
+                })() : ''}
               </div>
             </div>
             ${(() => {
@@ -4140,8 +4176,17 @@ function saveFocusTasks() {
 }
 
 function toggleFocusTask(id) {
-  if (focusTaskIds.has(id)) focusTaskIds.delete(id);
-  else focusTaskIds.add(id);
+  if (focusTaskIds.has(id)) {
+    focusTaskIds.delete(id);
+    // Mark task as manually unfocused so today's auto-focus won't re-add it
+    tasks = tasks.map(t => t.id === id ? {...t, _manuallyUnfocused: true} : t);
+    saveToLocal();
+  } else {
+    focusTaskIds.add(id);
+    // Clear manual unfocus flag
+    tasks = tasks.map(t => t.id === id ? {...t, _manuallyUnfocused: false} : t);
+    saveToLocal();
+  }
   saveFocusTasks();
   renderOppgaver();
 }
@@ -4449,7 +4494,13 @@ function startEditTaskDate(id, event) {
   _onDatePicked = (newDate) => {
     if (newDate !== (t.date || '')) {
       snapshot();
-      tasks = tasks.map(t2 => t2.id === id ? {...t2, date: newDate} : t2);
+      tasks = tasks.map(t2 => t2.id === id ? {...t2, date: newDate, _manuallyUnfocused: false} : t2);
+      // If new date is not today, remove from focus
+      const today = new Date().toISOString().split('T')[0];
+      const [y,m,d] = today.split('-');
+      const todayFmt = `${d}-${m}-${y}`;
+      if (newDate !== todayFmt) focusTaskIds.delete(id);
+      syncTodayFocus();
     }
     renderOppgaver();
   };
@@ -6156,6 +6207,13 @@ let markedViewIdx = null; // index into deliveryMarket of currently viewed marke
 // Init
 loadFromLocal();
 loadLevering();
+// Restore focus tasks from storage
+try {
+  const ft = localStorage.getItem('mh_focus_tasks');
+  if (ft) focusTaskIds = new Set(JSON.parse(ft));
+} catch(e) {}
+// Auto-add today's tasks to focus
+syncTodayFocus();
 snapshotLev();
 snapshot(true);
 showTab(currentTab);
