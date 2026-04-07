@@ -1061,7 +1061,7 @@ function openStatPopup(type) {
       sub: c.sowLog ? 'Sådd ' + c.sowLog : 'Planlagt ' + c.sownDate
     }));
   } else if (type === 'plant') {
-    title = 'Plantelogg';
+    title = 'Utplanting';
     const relevant = crops.filter(c => c.plantedDate);
     items = relevant.map(c => ({
       emoji: c.emoji, name: c.family || c.name,
@@ -1123,8 +1123,8 @@ function renderOversikt() {
   const stats = [
     { label:"Forkultivering", val:`${forkDone}/${forkTotal}`,        icon:"🌿", color:"var(--color-value)", type:"fork" },
     { label:"Direktesåing",    val:`${sowingDone}/${sowingTotal}`,    icon:"🌱", color:"var(--color-info)",  type:"sow" },
-    { label:"Plantelogg",     val:`${plantingDone}/${plantingTotal}`,icon:"🪴", color:"#34d399",            type:"plant" },
-    { label:"Verdi",          val:valueDisplay,                      icon:"💰", color:"#f472b6",            type:"value" },
+    { label:"Utplanting",     val:`${plantingDone}/${plantingTotal}`,icon:"🪴", color:"#34d399",            type:"plant" },
+    { label:"Estimert verdi",          val:valueDisplay,                      icon:"💰", color:"#f472b6",            type:"value" },
   ];
 
   const upcoming = tasks.filter(t => !t.done).sort((a,b) => new Date(a.date)-new Date(b.date)).slice(0,4);
@@ -7036,9 +7036,10 @@ function renderLevKasse(el) {
       + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">Ekstra kasser</div>'
       + '<div style="display:flex;align-items:center;gap:8px">'
       + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,-1)" style="width:26px;height:26px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">−</button>'
-      + '<span style="font-size:14px;color:var(--text-head);min-width:20px;text-align:center">' + (bw.extraBoxes||0) + '</span>'
+      + '<span id="extra-boxes-disp-' + bw.id + '" style="font-size:14px;color:var(--text-head);min-width:20px;text-align:center">' + (bw.extraBoxes||0) + '</span>'
       + '<button data-bwid="' + bw.id + '" onclick="event.stopPropagation();adjustExtraBoxes(this.dataset.bwid,1)" style="width:26px;height:26px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1">+</button>'
       + '</div></div>';
+    html += '<div id="extra-kasse-rows-' + bw.id + '">';
     for (let xi = 0; xi < (bw.extraBoxes||0); xi++) {
       const delivered = !!bw.extraCheck[xi];
       const bg = delivered ? (isLight2 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
@@ -7061,6 +7062,7 @@ function renderLevKasse(el) {
         + (delivered ? '<div style="font-size:12px;color:var(--accent-soft);flex-shrink:0">Levert ✓</div>' : '')
         + '</div>';
     }
+    html += '</div>';
     if (!(bw.extraBoxes > 0)) {
       html += '<div style="font-size:12px;color:var(--text-muted);padding:6px 0 4px;text-align:center">Ingen ekstra kasser denne uken</div>';
     }
@@ -7240,14 +7242,19 @@ function adjustExtraBoxes(bwId, delta) {
   if (!bw) return;
   bw.extraBoxes = Math.max(0, (bw.extraBoxes || 0) + delta);
   saveLevering();
-  const disp = document.getElementById('extra-boxes-disp-' + bwId);
-  if (disp) disp.textContent = bw.extraBoxes;
+
+  // Update count display in all views
+  document.querySelectorAll('#extra-boxes-disp-' + bwId).forEach(el => { el.textContent = bw.extraBoxes; });
+
+  // Update kassekunde panel if open
   const panel = document.getElementById('kassekunde-panel');
   if (panel?._renderPanel) panel._renderPanel();
+
+  // Update total count button in Plan view
   const btCuForCount = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
   const activeCuForCount = btCuForCount.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
   const newTotal = activeCuForCount.length + (bw.extraBoxes || 0);
-  const countBtn = document.querySelector('[data-bwid="' + bwId + '"]');
+  const countBtn = document.querySelector('button[data-bwid="' + bwId + '"]');
   if (countBtn) {
     const countEl = countBtn.querySelector('div[style*="font-size:26px"]');
     if (countEl) countEl.textContent = newTotal;
@@ -7261,7 +7268,27 @@ function adjustExtraBoxes(bwId, delta) {
     const totalEl = countBtn.querySelector('[style*="accent-soft"]');
     if (totalEl) totalEl.textContent = 'kr ' + (boxVal * newTotal).toFixed(0);
   }
+
   refreshKasseNeedRows(bwId);
+
+  // Re-render just the extra kasse rows section without full tab reload
+  const extraContainer = document.getElementById('extra-kasse-rows-' + bwId);
+  if (extraContainer) {
+    const isLight = document.body.classList.contains('light');
+    let rowsHtml = '';
+    for (let xi = 0; xi < (bw.extraBoxes||0); xi++) {
+      const delivered = !!(bw.extraCheck && bw.extraCheck[xi]);
+      const bg = delivered ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
+      const cbBg = delivered ? 'var(--accent)' : 'transparent';
+      rowsHtml += '<div data-lev-bwid="' + bwId + '" data-lev-extra="' + xi + '" onclick="kasseLeveringCheckExtra(this)"'
+        + ' style="display:flex;align-items:center;gap:14px;padding:14px;background:' + bg + ';border-radius:14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s">'
+        + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:' + cbBg + ';color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';font-size:16px">' + (delivered ? '✓' : '') + '</div>'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px"' + (delivered ? ' style="opacity:0.4"' : '') + '>📦</div>'
+        + '<div style="flex:1' + (delivered ? ';opacity:0.45' : '') + '"><div style="font-size:16px;color:var(--text-head)' + (delivered ? ';text-decoration:line-through' : '') + '">Ekstra kasse ' + (xi + 1) + '</div></div>'
+        + '</div>';
+    }
+    extraContainer.innerHTML = rowsHtml;
+  }
 }
 
 function kasseSetType(typeId) {
