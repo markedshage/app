@@ -680,6 +680,8 @@ let cropSearch = "";
 let expandedCrops = new Set();
 let collapsedGroups = new Set(); // crop names that are collapsed into one card
 let focusTaskIds  = new Set();   // tasks pinned to focus modal
+let focusMode = false;             // when true, only show focus tasks in Todo
+let historyMode = false;           // when true, show task history instead of tasks
 
 function syncTodayFocus() {
   // Auto-add tasks with today's date to focus (unless manually removed)
@@ -4221,43 +4223,12 @@ function toggleFocusTask(id) {
 }
 
 function openFocusModal() {
-  const focused = tasks.filter(t => focusTaskIds.has(t.id));
-  const pColors = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
-  const MONTHS_SHORT = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  toggleFocusMode();
+}
 
-  const buildInner = () => `
-    <div style="background:var(--bg-modal);border:none;border-radius:20px;padding:24px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div style="font-size:16px;color:var(--accent-soft);font-weight:400">🎯 Fokus</div>
-        <button onclick="document.getElementById('focus-modal').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;line-height:1">×</button>
-      </div>
-      ${focused.length === 0
-        ? '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen fokusoppgaver valgt.<br><br>Trykk ⊙ på en oppgave for å legge den til.</p>'
-        : focused.map(t => {
-            const tid = typeof t.id === 'string' ? `'${t.id}'` : t.id;
-            const dateDisplay = t.date ? (() => { const [d,m] = t.date.split('-'); return `${+d}. ${MONTHS_SHORT[+m-1]}`; })() : '';
-            return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--task-bg);border-left:3px solid ${pColors[t.priority]||'var(--color-value)'};border:none;border-radius:12px;margin-bottom:10px;${t.done?'opacity:0.6':''}">
-              <button onclick="toggleTask(${tid});openFocusModal()" style="width:24px;height:24px;border-radius:6px;background:${t.done?(pColors[t.priority]||'var(--color-value)'):'rgba(128,128,128,0.15)'};cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--bg-main);flex-shrink:0">${t.done?'✓':''}</button>
-              <div style="flex:1">
-                <div style="font-size:15px;color:var(--text-head);${t.done?'text-decoration:line-through':''}">${t.text}</div>
-                ${dateDisplay ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">📅 ${dateDisplay}</div>` : ''}
-              </div>
-              <div style="width:10px;height:10px;border-radius:50%;background:${pColors[t.priority]||'var(--color-value)'};flex-shrink:0"></div>
-            </div>`;
-          }).join('')
-      }
-    </div>`;
-
-  // Re-render in place if already open
-  const existing = document.getElementById('focus-modal');
-  if (existing) { existing.innerHTML = buildInner(); return; }
-
-  const modal = document.createElement('div');
-  modal.id = 'focus-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML = buildInner();
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+function toggleFocusMode() {
+  focusMode = !focusMode;
+  renderOppgaver();
 }
 
 
@@ -4353,55 +4324,83 @@ function renderOppgaver() {
   const pLabels = {høy:'Høy',middels:'Middels',lav:'Lav'};
   const MONTHS_SHORT = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
   const focusCount = tasks.filter(t => focusTaskIds.has(t.id)).length;
+  const visibleTaskFilter = t => !focusMode || focusTaskIds.has(t.id);
 
-  document.getElementById('tab-oppgaver').innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button onclick="openFocusModal()" style="padding:13px 16px;border-radius:12px;border:none;background:var(--bg-card);color:${focusCount>0?'var(--color-value)':'var(--text-muted)'};cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Fokus">🎯${focusCount>0?` ${focusCount}`:''}</button>
-      <button class="add-btn" style="margin-bottom:0;flex:1" onclick="document.getElementById('modal-task').style.display='flex'">+ Ny oppgave</button>
-      <button onclick="openHistoryModal()" style="padding:13px 16px;border-radius:12px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Historikk">📋</button>
-    </div>
-    ${priorities.map(p => {
-      const pts = getOrderedTasks(p);
-      const autoPts = tasks.filter(t => t.priority === p && String(t.id).startsWith('crop-') && !t.done);
-      if (!pts.length && !autoPts.length) return '';
-      return `<div class="task-section">
-        <div class="task-drop-zone" data-priority="${p}" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:4px 2px;border-radius:6px;transition:background 0.15s">
-          <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-head);display:flex;align-items:center;gap:6px">${pLabels[p]} prioritet <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${pColors[p]}"></span></div>
-        </div>
-        ${pts.map(t => {
-          const tid = typeof t.id === 'string' ? `'${t.id}'` : t.id;
-          const dateDisplay = t.date ? (() => { const [d,m] = t.date.split('-'); return `${+d}. ${MONTHS_SHORT[+m-1]}`; })() : '+ dato';
-          const isFocused = focusTaskIds.has(t.id);
-          return `
-          <div class="task-row ${t.done?'done':''}" draggable="true" data-task-id="${t.id}" data-priority="${p}">
-            <button class="check-btn ${t.done?'checked':''}" onclick="toggleTask(${tid})">${t.done?'✓':''}</button>
-            <div style="flex:1;min-width:0">
-              <div class="task-text" onclick="startEditTaskText(${tid}, this)" style="cursor:text;min-height:20px" title="Trykk for å redigere">${t.text}</div>
-              <div class="task-date" onclick="startEditTaskDate(${tid}, event)" style="cursor:pointer;color:${t.date?'var(--text-muted)':'rgba(107,114,128,0.4)'}">📅 ${dateDisplay}</div>
-            </div>
-            <button onclick="toggleFocusTask(${tid})" title="Fokus" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:${isFocused?'var(--color-value)':'rgba(107,114,128,0.4)'}">⊙</button>
-            ${renderPriorityDots(t.id, p)}
-            <button class="delete-btn" onclick="deleteTask(${tid})">×</button>
-          </div>`;
-        }).join('')}
-        ${autoPts.map(t => {
-          const tid = `'${t.id}'`;
-          const dateDisplay = t.date ? (() => { const [d,m] = t.date.split('-'); return `${+d}. ${MONTHS_SHORT[+m-1]}`; })() : '';
-          return `
-          <div class="task-row ${t.done?'done':''}">
-            <div class="check-btn ${t.done?'checked':''}" title="Registrer så/plante-logg for å krysse av" style="cursor:default;opacity:0.5">${t.done?'✓':'🔒'}</div>
-            <div style="flex:1;min-width:0">
-              <div class="task-text">${t.text}</div>
-              ${t.date ? `<div class="task-date">📅 ${dateDisplay}</div>` : ''}
-            </div>
-            <div style="width:8px;height:8px;border-radius:50%;background:${pColors[p]};flex-shrink:0"></div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('')}
-    ${tasks.filter(t => !String(t.id).startsWith('crop-')).length===0?'<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen oppgaver ennå</p>':''}`;
-  
-  // Initialize drag and drop after render
+  // Build history html
+  let histHtml = '';
+  if (historyMode) {
+    const sorted = [...taskHistory].sort((a,b) => new Date(b.completedAt||0) - new Date(a.completedAt||0));
+    const pc2 = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
+    histHtml += '<div style="font-size:12px;color:var(--accent-soft);margin-bottom:12px;text-align:center;letter-spacing:0.06em">📋 Historikk — ' + sorted.length + ' oppgave' + (sorted.length!==1?'r':'') + '</div>';
+    if (!sorted.length) {
+      histHtml += '<div style="color:var(--text-muted);padding:30px 0;text-align:center;font-size:13px">Ingen historikk ennå.<br>Fullførte oppgaver vises her.</div>';
+    } else {
+      sorted.forEach(t => {
+        const ri = taskHistory.indexOf(t);
+        const ds = t.completedAt ? new Date(t.completedAt).toLocaleDateString('no-NO',{day:'numeric',month:'short',year:'numeric'}) : '–';
+        histHtml += '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(128,128,128,0.12)">'
+          + '<div style="width:10px;height:10px;border-radius:50%;background:' + (pc2[t.priority]||'#6b7280') + ';flex-shrink:0"></div>'
+          + '<div style="flex:1;min-width:0"><div style="font-size:14px;color:var(--text-head);word-break:break-word">' + t.text + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Fullført ' + ds + '</div></div>'
+          + '<button onclick="deleteTaskFromHistory(' + ri + ')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0">×</button>'
+          + '</div>';
+      });
+    }
+  }
+
+  // Build tasks html
+  let tasksHtml = '';
+  if (!historyMode) {
+    if (focusMode) tasksHtml += '<div style="font-size:12px;color:var(--accent-soft);margin-bottom:12px;text-align:center;letter-spacing:0.06em">🎯 Fokus-modus — viser ' + focusCount + ' oppgave' + (focusCount!==1?'r':'') + '</div>';
+    priorities.forEach(p => {
+      const pts = getOrderedTasks(p).filter(visibleTaskFilter);
+      const autoPts = focusMode ? [] : tasks.filter(t => t.priority === p && String(t.id).startsWith('crop-') && !t.done);
+      if (!pts.length && !autoPts.length) return;
+      tasksHtml += '<div class="task-section">'
+        + '<div class="task-drop-zone" data-priority="' + p + '" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:4px 2px;border-radius:6px;transition:background 0.15s">'
+        + '<div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-head);display:flex;align-items:center;gap:6px">' + pLabels[p] + ' prioritet <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + pColors[p] + '"></span></div>'
+        + '</div>';
+      pts.forEach(t => {
+        const tid = typeof t.id === 'string' ? "'" + t.id + "'" : t.id;
+        const dateDisplay = t.date ? (function(){ const parts = t.date.split('-'); return (+parts[0]) + '. ' + MONTHS_SHORT[+parts[1]-1]; })() : '+ dato';
+        const isFocused = focusTaskIds.has(t.id);
+        tasksHtml += '<div class="task-row ' + (t.done?'done':'') + '" draggable="true" data-task-id="' + t.id + '" data-priority="' + p + '">'
+          + '<button class="check-btn ' + (t.done?'checked':'') + '" onclick="toggleTask(' + tid + ')">' + (t.done?'✓':'') + '</button>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="task-text" onclick="startEditTaskText(' + tid + ', this)" style="cursor:text;min-height:20px" title="Trykk for å redigere">' + t.text + '</div>'
+          + '<div class="task-date" onclick="startEditTaskDate(' + tid + ', event)" style="cursor:pointer;color:' + (t.date?'var(--text-muted)':'rgba(107,114,128,0.4)') + '">📅 ' + dateDisplay + '</div>'
+          + '</div>'
+          + '<button onclick="toggleFocusTask(' + tid + ')" title="Fokus" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:' + (isFocused?'var(--color-value)':'rgba(107,114,128,0.4)') + '">⊙</button>'
+          + renderPriorityDots(t.id, p)
+          + '<button class="delete-btn" onclick="deleteTask(' + tid + ')">×</button>'
+          + '</div>';
+      });
+      autoPts.forEach(t => {
+        const tid = "'" + t.id + "'";
+        const dateDisplay = t.date ? (function(){ const parts = t.date.split('-'); return (+parts[0]) + '. ' + MONTHS_SHORT[+parts[1]-1]; })() : '';
+        tasksHtml += '<div class="task-row ' + (t.done?'done':'') + '">'
+          + '<div class="check-btn ' + (t.done?'checked':'') + '" title="Registrer så/plante-logg for å krysse av" style="cursor:default;opacity:0.5">' + (t.done?'✓':'🔒') + '</div>'
+          + '<div style="flex:1;min-width:0"><div class="task-text">' + t.text + '</div>'
+          + (t.date ? '<div class="task-date">📅 ' + dateDisplay + '</div>' : '')
+          + '</div><div style="width:8px;height:8px;border-radius:50%;background:' + pColors[p] + ';flex-shrink:0"></div>'
+          + '</div>';
+      });
+      tasksHtml += '</div>';
+    });
+    if (tasks.filter(t => !String(t.id).startsWith('crop-')).length === 0) {
+      tasksHtml += '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen oppgaver ennå</p>';
+    }
+  }
+
+  document.getElementById('tab-oppgaver').innerHTML =
+    '<div style="display:flex;gap:8px;margin-bottom:14px">'
+    + '<button onclick="toggleFocusMode()" style="padding:13px 16px;border-radius:12px;border:none;background:' + (focusMode?'var(--accent-bg)':'var(--bg-card)') + ';color:' + (focusMode?'var(--accent-soft)':focusCount>0?'var(--color-value)':'var(--text-muted)') + ';cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Fokus">🎯' + (focusCount>0?' '+focusCount:'') + '</button>'
+    + '<button class="add-btn" style="margin-bottom:0;flex:1" onclick="document.getElementById(\'modal-task\').style.display=\'flex\'">+ Ny oppgave</button>'
+    + '<button onclick="openHistoryModal()" style="padding:13px 16px;border-radius:12px;border:none;background:' + (historyMode?'var(--accent-bg)':'var(--bg-card)') + ';color:' + (historyMode?'var(--accent-soft)':'var(--text-muted)') + ';cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap;flex-shrink:0" title="Historikk">📋</button>'
+    + '</div>'
+    + histHtml
+    + tasksHtml;
+
   requestAnimationFrame(() => initTaskDragDrop());
 }
 
@@ -4431,50 +4430,13 @@ function deleteTask(id) {
 function deleteTaskFromHistory(idx) {
   taskHistory.splice(idx, 1);
   try { localStorage.setItem('mh_task_history', JSON.stringify(taskHistory)); } catch(e) {}
-  openHistoryModal();
+  renderOppgaver();
 }
 
 function openHistoryModal() {
-  document.getElementById('history-modal')?.remove();
-  const modal = document.createElement('div');
-  modal.id = 'history-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
-
-  // Sort newest first (already unshifted, but re-sort to be safe)
-  const sorted = [...taskHistory].sort((a,b) => new Date(b.completedAt||0) - new Date(a.completedAt||0));
-  const pColors = {høy:'var(--color-danger)',middels:'var(--color-value)',lav:'#6ee7b7'};
-
-  const rows = sorted.length
-    ? sorted.map((t, i) => {
-        const realIdx = taskHistory.indexOf(t);
-        const dateStr = t.completedAt
-          ? new Date(t.completedAt).toLocaleDateString('no-NO', {day:'numeric',month:'short',year:'numeric'})
-          : '–';
-        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <div style="width:10px;height:10px;border-radius:50%;background:${pColors[t.priority]||'#6b7280'};flex-shrink:0"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;color:var(--text-head);word-break:break-word">${t.text}</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Fullført ${dateStr}</div>
-          </div>
-          <button onclick="deleteTaskFromHistory(${realIdx})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0">×</button>
-        </div>`;
-      }).join('')
-    : '<div style="color:var(--text-muted);padding:30px 0;text-align:center;font-size:13px">Ingen historikk ennå.<br>Fullførte oppgaver vises her.</div>';
-
-  modal.innerHTML = `
-    <div style="background:var(--bg-modal);border:none;border-radius:20px;
-      padding:24px;max-width:420px;width:100%;max-height:80vh;
-      display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.8)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0">
-        <div style="font-size:16px;color:var(--accent-soft);font-weight:400">Historikk</div>
-        <button onclick="document.getElementById('history-modal').remove()"
-          style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;line-height:1">×</button>
-      </div>
-      <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">${rows}</div>
-    </div>`;
-
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if (e.target===modal) modal.remove(); });
+  historyMode = !historyMode;
+  focusMode = false; // exit focus mode if active
+  renderOppgaver();
 }
 // deleteTask defined above
 
@@ -6404,12 +6366,18 @@ function deleteCustomer(i) {
 function openKasseOppsett() {
   const modal = document.createElement('div');
   modal.id = 'kasse-oppsett-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:var(--bg-main);z-index:4050;display:flex;flex-direction:column;justify-content:center';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:4050;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.addEventListener('click', e => { if (e.target === modal) closeKasseOppsett(); });
 
   const renderOppsettContent = () => {
     const DAYS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
     const FREQ_LABELS = {weekly:'Ukentlig', biweekly:'Annenhver uke', monthly:'Månedlig'};
-    let html = '<div style="flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch">';
+    let html = '<div style="background:var(--bg-modal);border-radius:16px;width:100%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid rgba(128,128,128,0.12);flex-shrink:0">'
+      + '<div style="font-size:15px;color:var(--accent-soft)">⚙ Oppsett</div>'
+      + '<button onclick="closeKasseOppsett()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1;padding:0">×</button>'
+      + '</div>'
+      + '<div style="flex:1;overflow-y:auto;padding:16px 20px;-webkit-overflow-scrolling:touch">';
 
     // Kassetyper section
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
@@ -6467,14 +6435,7 @@ function openKasseOppsett() {
     return html;
   };
 
-  modal.innerHTML = '<div style="display:flex;flex-direction:column;width:100%;max-width:600px;height:100vh;overflow:hidden">'
-    + '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg-header);border-bottom:1px solid var(--border-accent)">'
-    + '<button onclick="closeKasseOppsett()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;padding:0;line-height:1">←</button>'
-    + '<div style="font-size:15px;color:var(--text-head)">Oppsett</div>'
-    + '</div>'
-    + renderOppsettContent()
-    + '</div>';
-
+  modal.innerHTML = renderOppsettContent();
   document.body.appendChild(modal);
 }
 
@@ -6784,9 +6745,6 @@ function renderLevKasse(el) {
       + '<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px">Antall kasser</div>'
       + '<div style="display:flex;align-items:baseline;gap:6px">'
       + '<div style="font-size:26px;font-weight:300;color:var(--text-head);line-height:1">' + totalKasser + '</div>'
-      + '<div style="font-size:12px;color:var(--text-muted)">'
-      + (activeCustomers.length ? activeCustomers.length + ' kunde' + (activeCustomers.length !== 1 ? 'r' : '') : 'ingen kunder')
-      + (bw.extraBoxes ? ' + ' + bw.extraBoxes + ' ekstra' : '')
       + '</div></div></div></div>'
       + '<div style="text-align:right">'
       + '<div id="kasse-btn-total-' + bw.id + '" style="font-size:16px;color:var(--accent-soft);font-weight:300">kr ' + contentTotal.toFixed(0) + '</div>'
@@ -7032,9 +6990,7 @@ function renderLevKasse(el) {
       + '</div></div>';
 
     // Customer rows
-    if (activeCuLev.length === 0) {
-      html += '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:10px 0 6px">Ingen kunder denne uken</div>';
-    } else {
+    if (activeCuLev.length > 0) {
       activeCuLev.forEach((cu, cuIdx) => {
         const delivered = !!bw.deliveryCheck[cu.id || cu.name];
         const bg = delivered ? (isLight2 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
@@ -7599,10 +7555,9 @@ function openDuplicateWeek(boxTypeId, currentWeek, currentYear) {
     });
   }
 
-  html += '</div>';
+  html += '</div></div>'; // close scroll + inner modal
   modal.innerHTML = html;
   document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
 }
 
 function doDuplicateFromBase(srcBtId, targetBtId, targetWeek, targetYear) {
