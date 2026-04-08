@@ -5973,6 +5973,7 @@ async function syncLoadOnStart() {
       if (remote.levering) { if(remote.levering.customers) deliveryCustomers=remote.levering.customers; if(remote.levering.box) deliveryBox=remote.levering.box; if(remote.levering.boxTypes) boxTypes=remote.levering.boxTypes; if(remote.levering.boxWeeks) boxWeeks=remote.levering.boxWeeks; if(remote.levering.market) deliveryMarket=remote.levering.market; if(remote.levering.harvest) harvestLog=remote.levering.harvest; }
       saveToLocal();
       clearTimeout(syncTimer); syncTimer = null;
+      syncTodayFocus();
       render();
     }
   } catch(e) {
@@ -6024,6 +6025,7 @@ async function syncLoad(silent = false) {
     }
     saveToLocal();
     clearTimeout(syncTimer); syncTimer = null;
+    syncTodayFocus();
     render();
     if (!silent) showSyncToast('✓ Data lastet inn fra sky');
     return true;
