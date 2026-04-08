@@ -4227,7 +4227,8 @@ function openFocusModal() {
 }
 
 function toggleFocusMode() {
-  focusMode = !focusMode;
+  if (historyMode) { historyMode = false; focusMode = true; }
+  else focusMode = !focusMode;
   renderOppgaver();
 }
 
@@ -4434,8 +4435,8 @@ function deleteTaskFromHistory(idx) {
 }
 
 function openHistoryModal() {
-  historyMode = !historyMode;
-  focusMode = false; // exit focus mode if active
+  if (focusMode) { focusMode = false; historyMode = true; }
+  else historyMode = !historyMode;
   renderOppgaver();
 }
 // deleteTask defined above
@@ -4486,12 +4487,16 @@ function startEditTaskDate(id, event) {
     if (newDate !== (t.date || '')) {
       snapshot();
       tasks = tasks.map(t2 => t2.id === id ? {...t2, date: newDate, _manuallyUnfocused: false} : t2);
-      // If new date is not today, remove from focus
-      const today = new Date().toISOString().split('T')[0];
-      const [y,m,d] = today.split('-');
-      const todayFmt = `${d}-${m}-${y}`;
-      if (newDate !== todayFmt) focusTaskIds.delete(id);
-      syncTodayFocus();
+      // Only affect this specific task's focus status
+      const today2 = new Date().toISOString().split('T')[0];
+      const [y2,m2,d2] = today2.split('-');
+      const todayFmt2 = `${d2}-${m2}-${y2}`;
+      if (newDate === todayFmt2) {
+        focusTaskIds.add(id);
+      } else {
+        focusTaskIds.delete(id);
+      }
+      try { localStorage.setItem('mh_focus_tasks', JSON.stringify([...focusTaskIds])); } catch(e) {}
     }
     renderOppgaver();
   };
@@ -5926,10 +5931,21 @@ async function syncLoadOnStart() {
       return;
     }
 
-    // Fetch remote data
-    const resp = await fetch(`${JSONBIN_API}/${syncBinId}/latest?t=${Date.now()}`, {
-      headers: { 'X-Master-Key': syncKey, 'X-Bin-Meta': 'false', 'Cache-Control': 'no-store' }, cache: 'no-store'
-    });
+    // Show loading indicator if no local data
+    if (!localStorage.getItem('mh_data')) showSyncToast('⏳ Laster inn fra sky…');
+
+    // Fetch remote data with 8s timeout
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    let resp;
+    try {
+      resp = await fetch(`${JSONBIN_API}/${syncBinId}/latest?t=${Date.now()}`, {
+        headers: { 'X-Master-Key': syncKey, 'X-Bin-Meta': 'false', 'Cache-Control': 'no-store' },
+        cache: 'no-store', signal: ctrl.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!resp.ok) return;
     const remote = await resp.json();
     if (!remote || !remote.crops) return;
@@ -5944,7 +5960,6 @@ async function syncLoadOnStart() {
     const remoteSaved = remote.saved || null;
 
     // Load remote if: no local data, no local timestamp, or remote is newer
-    const hasNoLocal = !localStorage.getItem('mh_data');
     const remoteIsNewer = !localSaved || (remoteSaved && new Date(remoteSaved) > new Date(localSaved));
 
     if (hasNoLocal || remoteIsNewer) {
@@ -5960,17 +5975,26 @@ async function syncLoadOnStart() {
       render();
     }
   } catch(e) {
-    console.warn('syncLoadOnStart error:', e);
+    if (e.name !== 'AbortError') console.warn('syncLoadOnStart error:', e);
   }
 }
 
 // Load data from JSONBin and import it
 async function syncLoad(silent = false) {
   if (!syncKey || !syncBinId) return false;
+  if (!silent) showSyncToast('⏳ Laster inn fra sky…');
   try {
-    const resp = await fetch(`${JSONBIN_API}/${syncBinId}/latest?t=${Date.now()}`, {
-      headers: { 'X-Master-Key': syncKey, 'X-Bin-Meta': 'false', 'Cache-Control': 'no-store' }, cache: 'no-store'
-    });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    let resp;
+    try {
+      resp = await fetch(`${JSONBIN_API}/${syncBinId}/latest?t=${Date.now()}`, {
+        headers: { 'X-Master-Key': syncKey, 'X-Bin-Meta': 'false', 'Cache-Control': 'no-store' },
+        cache: 'no-store', signal: ctrl.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!resp.ok) {
       console.warn('JSONBin read failed:', resp.status, await resp.text());
       if (!silent) showSyncToast('⚠ Kunne ikke laste fra JSONBin');
