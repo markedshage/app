@@ -6202,7 +6202,10 @@ function showSyncToast(msg) {
   t.textContent = msg;
   t.style.opacity = '1';
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2500);
+  // ⏳ messages stay until replaced — all others auto-hide after 2.5s
+  if (!msg.startsWith('⏳')) {
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2500);
+  }
 }
 
 // Aliases for old internal references
