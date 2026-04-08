@@ -678,6 +678,7 @@ let selectedBed = null;
 let cropFilter = "alle";
 let cropSearch = "";
 let expandedCrops = new Set();
+let collapsedGroups = new Set(); // crop names that are collapsed into one card
 let focusTaskIds  = new Set();   // tasks pinned to focus modal
 
 function syncTodayFocus() {
@@ -3454,69 +3455,86 @@ function renderVekster() {
       </div>
     </div>
     <div id="crop-list">
-    ${sortedFiltered.map(c => {
-      const s = STATUS[c.status];
-      const plantCount = calcPlants(c);
-      const isExpanded = expandedCrops.has(c.id);
-      return `<div class="crop-card" onclick="toggleCropExpand(${c.id})" style="cursor:pointer">
-        <div class="crop-header">
-          <div class="crop-info">
-            <span style="font-size:26px">${c.emoji}</span>
-            <div>
-              <div class="crop-name">${c.family ? c.family : c.name}</div>
-              <div class="crop-family">${c.family ? c.name : ''}</div>            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            <div onclick="event.stopPropagation()" style="display:grid;grid-template-columns:1fr 1fr;gap:3px;width:120px">
-              ${Object.entries(STATUS).map(([key, s]) => {
-                const active = c.status===key;
-                return `<button onclick="event.stopPropagation();setCropStatus(${c.id},'${key}')"
-                  title="${s.label}"
-                  style="padding:3px 4px;border-radius:20px;
-                  background:${active ? s.bg : 'transparent'};
-                  color:${active ? s.color : 'var(--text-dim)'};
-                  cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap;text-align:center;
-                  font-weight:${active ? '600' : '400'};
-                  transition:background 0.15s,border-color 0.15s,color 0.15s">${s.label.split(' ')[0]}</button>`;
-              }).join('')}
+    ${(() => {
+      const groups = {};
+      sortedFiltered.forEach(c => { if (!groups[c.name]) groups[c.name] = []; groups[c.name].push(c); });
+      return Object.entries(groups).map(([gName, group]) => {
+        const isMulti = group.length > 1;
+        const isGroupExpanded = isMulti && collapsedGroups.has(gName);
+        if (isMulti && !isGroupExpanded) {
+          // Collapsed group card
+          const totalPlants = group.reduce((s, c) => s + calcPlants(c), 0);
+          const totalValue = group.reduce((s, c) => { const v = calcValue(c); return s + (v || 0); }, 0);
+          const hasValue = group.some(c => calcValue(c) !== null);
+          const statuses = [...new Set(group.map(c => c.status))];
+          return `<div class="crop-card" onclick="expandGroup(this)" data-gname="${gName.replace(/"/g,'&quot;')}">
+            <div class="crop-header">
+              <div class="crop-info">
+                <span style="font-size:26px">${group[0].emoji}</span>
+                <div>
+                  <div class="crop-name">${gName}</div>
+                  <div class="crop-family" style="color:var(--text-muted)">${group.length} sorter — trykk for å utvide</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;width:120px;pointer-events:none">
+                  ${Object.entries(STATUS).map(([key, s]) => {
+                    const active = statuses.includes(key);
+                    return '<div style="padding:3px 4px;border-radius:20px;background:' + (active ? s.bg : 'transparent') + ';color:' + (active ? s.color : 'var(--text-dim)') + ';font-size:10px;text-align:center;font-weight:' + (active ? '600' : '400') + '">' + s.label.split(' ')[0] + '</div>';
+                  }).join('')}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--bg-card);border-radius:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,0.12)">
-          <span style="font-size:20px">🌿</span>
-          <div>
-            <div style="font-size:22px;font-weight:300;color:var(--accent);line-height:1">${plantCount}</div>
-            <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">planter totalt</div>
-          </div>
-          ${calcValue(c) !== null ? `
-          <div style="margin-left:auto;text-align:right">
-            <div style="font-size:18px;font-weight:300;color:var(--color-value);line-height:1">~${fmtKr(calcValue(c))}</div>
-            <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div>
-          </div>` : ''}
-          ${c.beds.length > 1 && calcValue(c) === null ? `<div style="margin-left:auto;font-size:12px;color:var(--text-muted)">${c.beds.map(b => {
-            const bsCrop = {...c, beds:[b]};
-            return `${b}: ${calcPlants(bsCrop)}`;
-          }).join(' · ')}</div>` : ''}
-        </div>
-        ${isExpanded ? `
-        <div class="crop-meta">
-          <div>🛏 Seng: <span>${c.beds.join(', ')||'–'}</span></div>
-          <div>📐 Radavstand: <span>${c.rowSpacing} cm</span></div>
-          <div>🌱 Planteavstand: <span>${c.plantSpacing} cm</span></div>
-          <div>➕ Rader: <span>${c.rows}</span></div>
-          ${(() => { const g = calcGang(c); return g !== null ? `<div>↔ Gangavstand: <span>${g} cm</span></div>` : ''; })()}
-          ${c.sownDate ? `<div>🗓 Sådato: <span>${c.sownDate}</span></div>` : ''}
-          ${c.plantedDate ? `<div>🪴 Plantedato: <span>${c.plantedDate}</span></div>` : ''}
-        </div>
-        ${c.sowLog ? `<div class="crop-notes">🌾 Sålogg: ${c.sowLog}</div>` : ''}
-        ${c.plantLog ? `<div class="crop-notes">🪴 Plantelogg: ${c.plantLog}</div>` : ''}
-        ${c.notes ? `<div class="crop-notes">📝 ${c.notes}</div>` : ''}
-        ` : ''}
-        ${isExpanded ? `<div style="display:flex;gap:8px;margin-top:8px">
-          <button onclick="event.stopPropagation();openEditCrop(${c.id})" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>
-        </div>` : ''}
-      </div>`;
-    }).join('')}
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-card);border-radius:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,0.12)">
+              <span style="font-size:20px">🌿</span>
+              <div>
+                <div style="font-size:22px;font-weight:300;color:var(--accent);line-height:1">${totalPlants}</div>
+                <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">planter totalt</div>
+              </div>
+              ${hasValue ? '<div style="margin-left:auto;text-align:right"><div style="font-size:18px;font-weight:300;color:var(--color-value);line-height:1">~' + fmtKr(totalValue) + '</div><div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div></div>' : ''}
+            </div>
+          </div>`;
+        }
+        // Expanded: individual cards
+        return group.map((c, gi) => {
+          const plantCount = calcPlants(c);
+          const isExpanded = expandedCrops.has(c.id);
+          return '<div class="crop-card" onclick="toggleCropExpand(' + c.id + ')" style="cursor:pointer">'
+            + (gi === 0 && isMulti ? '<div onclick="event.stopPropagation();collapseGroup(\'' + gName.replace(/'/g,"\\'") + '\')" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;cursor:pointer;text-align:right;padding:0">↑ Kollaps sorter</div>' : '')
+            + '<div class="crop-header">'
+            + '<div class="crop-info"><span style="font-size:26px">' + c.emoji + '</span>'
+            + '<div><div class="crop-name">' + (c.family ? c.family : c.name) + '</div><div class="crop-family">' + (c.family ? c.name : '') + '</div></div></div>'
+            + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
+            + '<div onclick="event.stopPropagation()" style="display:grid;grid-template-columns:1fr 1fr;gap:3px;width:120px">'
+            + Object.entries(STATUS).map(([key, s]) => {
+                const active = c.status===key;
+                return '<button onclick="event.stopPropagation();setCropStatus(' + c.id + ',\'' + key + '\')" style="padding:3px 4px;border-radius:20px;background:' + (active ? s.bg : 'transparent') + ';color:' + (active ? s.color : 'var(--text-dim)') + ';cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap;text-align:center;font-weight:' + (active ? '600' : '400') + ';transition:background 0.15s">' + s.label.split(' ')[0] + '</button>';
+              }).join('')
+            + '</div></div></div>'
+            + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--bg-card);border-radius:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,0.12)">'
+            + '<span style="font-size:20px">🌿</span>'
+            + '<div><div style="font-size:22px;font-weight:300;color:var(--accent);line-height:1">' + plantCount + '</div>'
+            + '<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">planter totalt</div></div>'
+            + (calcValue(c) !== null ? '<div style="margin-left:auto;text-align:right"><div style="font-size:18px;font-weight:300;color:var(--color-value);line-height:1">~' + fmtKr(calcValue(c)) + '</div><div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase">est. verdi</div></div>' : '')
+            + '</div>'
+            + (isExpanded ? '<div class="crop-meta">'
+              + '<div>🛏 Seng: <span>' + (c.beds.join(', ')||'–') + '</span></div>'
+              + '<div>📐 Radavstand: <span>' + c.rowSpacing + ' cm</span></div>'
+              + '<div>🌱 Planteavstand: <span>' + c.plantSpacing + ' cm</span></div>'
+              + '<div>➕ Rader: <span>' + c.rows + '</span></div>'
+              + (() => { const g = calcGang(c); return g !== null ? '<div>↔ Gangavstand: <span>' + g + ' cm</span></div>' : ''; })()
+              + (c.sownDate ? '<div>🗓 Sådato: <span>' + c.sownDate + '</span></div>' : '')
+              + (c.plantedDate ? '<div>🪴 Plantedato: <span>' + c.plantedDate + '</span></div>' : '')
+              + '</div>'
+              + (c.sowLog ? '<div class="crop-notes">🌾 Sålogg: ' + c.sowLog + '</div>' : '')
+              + (c.plantLog ? '<div class="crop-notes">🪴 Plantelogg: ' + c.plantLog + '</div>' : '')
+              + (c.notes ? '<div class="crop-notes">📝 ' + c.notes + '</div>' : '')
+              + '<div style="display:flex;gap:8px;margin-top:8px"><button onclick="event.stopPropagation();openEditCrop(' + c.id + ')" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button></div>'
+              : '')
+            + '</div>';
+        }).join('');
+      }).join('');
+    })()}
     ${filtered.length===0?'<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen vekster i denne kategorien</p>':''}
     </div>`;
 }
@@ -3660,6 +3678,17 @@ document.addEventListener('click', e => {
 });
 function setCropFilter(f) { cropFilter = f; renderVekster(); }
 function setCropStatus(id, status) { snapshot(); crops = crops.map(c => c.id===id ? {...c, status} : c); renderVekster(); }
+
+function expandGroup(nameOrEl) {
+  const name = typeof nameOrEl === 'string' ? nameOrEl : nameOrEl.dataset.gname;
+  collapsedGroups.add(name);
+  renderVekster();
+}
+
+function collapseGroup(name) {
+  collapsedGroups.delete(name);
+  renderVekster();
+}
 
 function toggleCropExpand(id) {
   if (expandedCrops.has(id)) expandedCrops.delete(id);
