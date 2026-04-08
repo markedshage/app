@@ -5960,6 +5960,7 @@ async function syncLoadOnStart() {
     const remoteSaved = remote.saved || null;
 
     // Load remote if: no local data, no local timestamp, or remote is newer
+    const hasNoLocal = !localStorage.getItem('mh_data');
     const remoteIsNewer = !localSaved || (remoteSaved && new Date(remoteSaved) > new Date(localSaved));
 
     if (hasNoLocal || remoteIsNewer) {
@@ -6024,7 +6025,8 @@ async function syncLoad(silent = false) {
     saveToLocal();
     clearTimeout(syncTimer); syncTimer = null;
     render();
-    if (!silent)     return true;
+    if (!silent) showSyncToast('✓ Data lastet inn fra sky');
+    return true;
   } catch(e) {
     console.warn('syncLoad error:', e);
     if (!silent) showSyncToast('⚠ Feil ved innlasting');
