@@ -350,6 +350,7 @@
   .cal-day:hover { background: rgba(52,211,153,0.15); }
   .cal-day.today { color: var(--accent-soft); font-weight: bold; }
   .cal-day.selected { background: var(--accent) !important; color: #fff; }
+  .cal-day.related { background: var(--color-value) !important; color: #fff; opacity: 0.8; }
   .cal-day.other-month { color: var(--text-dim); }
   .cal-day.empty { cursor: default; }
   body.light .cal-day { color: var(--text-head); }
@@ -3645,9 +3646,28 @@ function renderCal() {
   if (existing) existing.remove();
 
   const { btnId, valId, year, month } = calState;
-  const selectedVal = document.getElementById(valId).value;
+  const selectedVal = document.getElementById(valId)?.value || '';
   const btn = document.getElementById(btnId);
   if (!btn) return;
+
+  // Find related date to show as secondary marker
+  const RELATED = {
+    'c-sown-val':      'c-sownby-val',
+    'c-sownby-val':    'c-sown-val',
+    'c-planted-val':   'c-plantedby-val',
+    'c-plantedby-val': 'c-planted-val',
+  };
+  const relatedValId = RELATED[valId];
+  const relatedVal = relatedValId ? (document.getElementById(relatedValId)?.value || '') : '';
+
+  // Labels for legend
+  const LABELS = {
+    'c-sown-val':      { self: 'Sådato', related: 'Så innen' },
+    'c-sownby-val':    { self: 'Så innen', related: 'Sådato' },
+    'c-planted-val':   { self: 'Plantedato', related: 'Plante innen' },
+    'c-plantedby-val': { self: 'Plante innen', related: 'Plantedato' },
+  };
+  const labelInfo = LABELS[valId];
 
   const popup = document.createElement('div');
   popup.className = 'cal-popup';
@@ -3667,8 +3687,18 @@ function renderCal() {
     const val = `${dd}-${mm}-${year}`;
     const isToday = d===today.getDate() && month===today.getMonth() && year===today.getFullYear();
     const isSel = val === selectedVal;
-    days += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" onclick="selectDate('${val}','${btnId}','${valId}')">${d}</div>`;
+    const isRelated = relatedVal && val === relatedVal;
+    let cls = `cal-day${isToday?' today':''}${isSel?' selected':''}${isRelated?' related':''}`;
+    days += `<div class="${cls}" onclick="selectDate('${val}','${btnId}','${valId}')">${d}</div>`;
   }
+
+  // Legend
+  const legend = labelInfo && relatedVal
+    ? `<div style="display:flex;gap:10px;padding:6px 4px 2px;font-size:10px;color:var(--text-muted)">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:3px"></span>${labelInfo.self}</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--color-value);margin-right:3px"></span>${labelInfo.related}</span>
+      </div>`
+    : '';
 
   popup.innerHTML = `
     <div class="cal-header">
@@ -3677,14 +3707,13 @@ function renderCal() {
       <button class="cal-nav" onclick="calNav(1,event)">›</button>
     </div>
     <div class="cal-grid">${days}</div>
-    <div style="display:flex;gap:6px;padding:0 4px 4px">
+    ${legend}
+    <div style="display:flex;gap:6px;padding:4px 4px 4px">
       <button class="cal-clear" style="flex:1" onclick="selectTodayInCal('${btnId}','${valId}')">I dag</button>
       <button class="cal-clear" style="flex:1" onclick="clearDate('${btnId}','${valId}')">Fjern dato</button>
     </div>`;
 
-  // Position near button or center of screen
   document.body.appendChild(popup);
-  // Always center on screen
   popup.style.top = '50%';
   popup.style.left = '50%';
   popup.style.transform = 'translate(-50%, -50%)';
@@ -4770,11 +4799,11 @@ function getCalEvents() {
     map[k].push({ label, emoji, color, ...extra });
   };
   crops.forEach(c => {
-    if (c.sownDate && !c.sowLog) add(c.sownDate, 'Sådato: '+(c.family||c.name), c.emoji, 'var(--color-info)', { cropId: c.id });
-    if (c.plantedDate && !c.plantLog) {
+    if (c.sownDate && !logDone(c.sowLog)) add(c.sownDate, 'Sådato: '+(c.family||c.name), c.emoji, 'var(--color-info)', { cropId: c.id, deadline: c.sownByDate || '' });
+    if (c.plantedDate && !logDone(c.plantLog)) {
       const segSpecs = c.beds.filter(s => parseBedSpec(s).start !== null);
       const segLabel = segSpecs.length > 0 ? ` (${segSpecs.join(', ')})` : '';
-      add(c.plantedDate, 'Plantedato: '+(c.family||c.name)+segLabel, c.emoji, '#34d399', { cropId: c.id });
+      add(c.plantedDate, 'Plantedato: '+(c.family||c.name)+segLabel, c.emoji, '#34d399', { cropId: c.id, deadline: c.plantedByDate || '' });
     }
   });
   const pColors = {høy:'var(--color-danger)', middels:'var(--color-value)', lav:'#6ee7b7'};
@@ -4881,9 +4910,12 @@ function renderKalender() {
             +'<div style="width:8px;height:8px;border-radius:50%;background:'+e.color+';flex-shrink:0"></div>'
             +'</div>';
         }
+        const deadlineHtml = e.deadline
+          ? (() => { const p=e.deadline.split('-'); const M=['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des']; return '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">📅 Frist: '+(+p[0])+'. '+(M[+p[1]-1]||'')+'</div>'; })()
+          : '';
         return '<div class="list-row" style="padding:6px 0">'
           +'<span style="font-size:16px">'+e.emoji+'</span>'
-          +'<div style="flex:1"><div style="font-size:13px;color:var(--text-head)">'+e.label+'</div></div>'
+          +'<div style="flex:1"><div style="font-size:13px;color:var(--text-head)">'+e.label+'</div>'+deadlineHtml+'</div>'
           +actionBtn
           +'<div style="width:8px;height:8px;border-radius:50%;background:'+e.color+';flex-shrink:0"></div>'
           +'</div>';
@@ -5109,8 +5141,8 @@ function startModus(type, cropId) {
   if (crop) {
     const existingLog = type === 'saa' ? crop.sowLog : crop.plantLog;
     const logType = type === 'saa' ? 'sådatoer' : 'plantedatoer';
-    if (existingLog) {
-      if (!confirm(`Du har allerede lagt inn en eller flere ${logType} (${existingLog}). Vil du legge inn en til?`)) return;
+    if (logDone(existingLog)) {
+      if (!confirm(`Du har allerede lagt inn en eller flere ${logType} (${logDisplay(existingLog)}). Vil du legge inn en til?`)) return;
     }
   }
   modusType  = type;
