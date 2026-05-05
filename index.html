@@ -3573,8 +3573,16 @@ function renderVekster() {
         return group.map((c, gi) => {
           const plantCount = calcPlants(c);
           const isExpanded = expandedCrops.has(c.id);
-          return '<div class="crop-card" onclick="toggleCropExpand(' + c.id + ')" style="cursor:pointer">'
-            + (gi === 0 && isMulti ? '<div onclick="event.stopPropagation();collapseGroup(\'' + gName.replace(/'/g,"\\'") + '\')" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;cursor:pointer;text-align:right;padding:0">↑ Kollaps sorter</div>' : '')
+          const safeGName = gName.replace(/'/g, "\\'");
+          const groupHeader = (gi === 0 && isMulti)
+            ? '<div onclick="collapseGroup(\'' + safeGName + '\')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--accent-bg);border-radius:12px;margin-bottom:6px;cursor:pointer">'
+              + '<div style="display:flex;align-items:center;gap:8px">'
+              + '<span style="font-size:20px">' + group[0].emoji + '</span>'
+              + '<div><div style="font-size:14px;font-weight:600;color:var(--accent-soft)">' + gName + '</div>'
+              + '<div style="font-size:11px;color:var(--text-muted);margin-top:1px">' + group.length + ' sorter — trykk for å kollapse ↑</div></div></div>'
+              + '</div>'
+            : '';
+          return groupHeader + '<div class="crop-card" onclick="toggleCropExpand(' + c.id + ')" style="cursor:pointer">'
             + '<div class="crop-header">'
             + '<div class="crop-info"><span style="font-size:26px">' + c.emoji + '</span>'
             + '<div><div class="crop-name">' + (c.family ? c.family : c.name) + '</div><div class="crop-family">' + (c.family ? c.name : '') + '</div></div></div>'
@@ -3747,7 +3755,7 @@ document.addEventListener('click', e => {
   if (!popup) return;
   if (popup.contains(e.target)) return;
   // Don't close if clicking a button that opens the calendar
-  if (e.target.closest && e.target.closest('[onclick*="openCal"], [onclick*="openModus"], [onclick*="startEditTaskDate"], [onclick*="DatePicker"]')) return;
+  if (e.target.closest && e.target.closest('[onclick*="openCal"], [onclick*="openModus"], [onclick*="startEditTaskDate"], [onclick*="DatePicker"], [onclick*="openLogCal"], [data-logtype]')) return;
   popup.remove();
 });
 function setCropFilter(f) { cropFilter = f; renderVekster(); }
