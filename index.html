@@ -493,45 +493,119 @@
 <div id="modal-crop" class="modal-overlay" style="display:none">
   <div class="modal">
     <div class="modal-title" id="modal-crop-title">Ny vekst</div>
-    <div class="form-grid">
-      <div><label class="field-label">Navn</label><input class="field-input" id="c-name" placeholder="f.eks. Tomater"></div>
-      <div><label class="field-label">Emoji</label><input class="field-input" id="c-emoji" value="🌱" maxlength="4"></div>
-      <div><label class="field-label">Sort</label><input class="field-input" id="c-family" placeholder="f.eks. Nattskygge"></div>
-      <div><label class="field-label">Kategori</label><select class="field-input" id="c-category"></select></div>
-      <div><label class="field-label">Senger (komma-separert, f.eks. A1, A1-1:5, B2-3)</label><input class="field-input" id="c-beds" placeholder="A1, A1-1:5, B2-3"><div id="c-beds-error" style="display:none;color:var(--color-danger);font-size:12px;margin-top:4px"></div></div>
-      <div><label class="field-label">Radavstand (cm)</label><input class="field-input" id="c-rowspacing" type="number" value="30"></div>
-      <div><label class="field-label">Planteavstand (cm)</label><input class="field-input" id="c-plantspacing" type="number" value="20"></div>
-      <div><label class="field-label">Rader (per bed)</label><input class="field-input" id="c-rows" type="number" value="2"></div>
-      <div><label class="field-label">Frø per klynge</label><input class="field-input" id="c-seedspercluster" type="number" value="1" min="1"></div>
-      <div><label class="field-label">Salgsenhet</label>
-        <select class="field-input" id="c-unit" onchange="updateUnitLabels()">
-          <option value="stk">stk</option>
-          <option value="bunt">bunt</option>
-          <option value="boks">boks</option>
-        </select>
+
+    <style>
+      .crop-section { margin-bottom: 8px; border-radius: 12px; overflow: hidden; background: var(--bg-card); }
+      .crop-section-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; user-select: none; font-size: 13px; font-weight: 600; color: var(--text-head); letter-spacing: 0.04em; }
+      .crop-section-header .cs-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; }
+      .crop-section-header.open .cs-arrow { transform: rotate(180deg); }
+      .crop-section-body { padding: 0 14px 14px; display: none; }
+      .crop-section-body.open { display: block; }
+      .log-entry-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .log-entry-row .date-display { flex: 1; }
+    </style>
+
+    <!-- Generelt -->
+    <div class="crop-section">
+      <div class="crop-section-header open" onclick="toggleCropSection(this)">Generelt <span class="cs-arrow">▼</span></div>
+      <div class="crop-section-body open">
+        <div class="form-grid">
+          <div><label class="field-label">Navn</label><input class="field-input" id="c-name" placeholder="f.eks. Tomater"></div>
+          <div><label class="field-label">Emoji</label><input class="field-input" id="c-emoji" value="🌱" maxlength="4"></div>
+          <div><label class="field-label">Sort</label><input class="field-input" id="c-family" placeholder="f.eks. Nattskygge"></div>
+          <div><label class="field-label">Kategori</label><select class="field-input" id="c-category"></select></div>
+        </div>
+        <div class="form-full"><label class="field-label">Status</label>
+          <select class="field-input" id="c-status">
+            <option value="planlagt">Planlagt</option>
+            <option value="sådd">Sådd</option>
+            <option value="plantet">Plantet</option>
+            <option value="høstet">Høstet</option>
+          </select>
+        </div>
+        <div class="form-full"><label class="field-label">Notater</label><textarea class="field-input" id="c-notes" rows="2"></textarea></div>
       </div>
-      <div><label class="field-label">Pris pr/kg (kr)</label><input class="field-input" id="c-pricepkg" type="number" step="0.5" value="0" min="0" oninput="recalcPricePerUnit()"></div>
-      <div><label id="c-weightg-label" class="field-label">Vekt per stk (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0" oninput="recalcPricePerUnitFromWeight()"></div>
-      <div style="position:relative"><label id="c-priceunit-label" class="field-label">Pris per stk (kr) <span id="c-priceunit-auto" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span></label><input class="field-input" id="c-priceunit" type="number" step="0.5" value="0" min="0" oninput="recalcWeightFromPrice()" placeholder="Auto fra kg×vekt"></div>
-      <div><label id="c-unitsperplant-label" class="field-label">Stk per plante</label><input class="field-input" id="c-unitsperplant" type="number" step="1" min="1" value="" oninput="this.value=Math.max(1,Math.round(+this.value||1));recalcVektTotal();toggleVektTotalFields()" placeholder="1"></div>
-      <div id="c-vekttotal-wrap"><label id="c-vekttotal-label" class="field-label">Vekt total (g)</label><input class="field-input" id="c-vekttotal" type="number" step="1" value="" min="0" oninput="recalcUnitsPerPlantFromVekt()" placeholder="Auto fra vekt×enheter"></div>
-      <div id="c-valuetotal-wrap"><label class="field-label">Verdi total (kr) <span style="font-size:10px;color:var(--text-muted)">(beregnet)</span></label><input class="field-input" id="c-valuetotal" type="number" step="1" value="" min="0" readonly style="opacity:0.7;cursor:default" placeholder="Auto fra vekt×pris/kg"></div>
     </div>
-    <div class="form-grid">
-      <div><label class="field-label">Sådato</label><button type="button" class="date-display empty" id="c-sown-btn" onclick="openCal('c-sown-btn','c-sown-val')">Velg dato 📅</button><input type="hidden" id="c-sown-val"></div>
-      <div><label class="field-label">Sålogg (dato)</label><button type="button" class="date-display empty" id="c-sowlog-btn" onclick="openCal('c-sowlog-btn','c-sowlog-val')">Velg dato 📅</button><input type="hidden" id="c-sowlog-val"></div>
-      <div><label class="field-label">Plantedato</label><button type="button" class="date-display empty" id="c-planted-btn" onclick="openCal('c-planted-btn','c-planted-val')">Velg dato 📅</button><input type="hidden" id="c-planted-val"></div>
-      <div><label class="field-label">Plantelogg (dato)</label><button type="button" class="date-display empty" id="c-plantlog-btn" onclick="openCal('c-plantlog-btn','c-plantlog-val')">Velg dato 📅</button><input type="hidden" id="c-plantlog-val"></div>
+
+    <!-- Teknisk -->
+    <div class="crop-section">
+      <div class="crop-section-header" onclick="toggleCropSection(this)">Teknisk <span class="cs-arrow">▼</span></div>
+      <div class="crop-section-body">
+        <div class="form-grid">
+          <div><label class="field-label">Senger</label><input class="field-input" id="c-beds" placeholder="A1, A1-1:5, B2-3"><div id="c-beds-error" style="display:none;color:var(--color-danger);font-size:12px;margin-top:4px"></div></div>
+          <div><label class="field-label">Rader (per bed)</label><input class="field-input" id="c-rows" type="number" value="2"></div>
+          <div><label class="field-label">Radavstand (cm)</label><input class="field-input" id="c-rowspacing" type="number" value="30"></div>
+          <div><label class="field-label">Planteavstand (cm)</label><input class="field-input" id="c-plantspacing" type="number" value="20"></div>
+          <div><label class="field-label">Frø per klynge</label><input class="field-input" id="c-seedspercluster" type="number" value="1" min="1"></div>
+        </div>
+      </div>
     </div>
-    <div class="form-full"><label class="field-label">Status</label>
-      <select class="field-input" id="c-status">
-        <option value="planlagt">Planlagt</option>
-        <option value="sådd">Sådd</option>
-        <option value="plantet">Plantet</option>
-        <option value="høstet">Høstet</option>
-      </select>
+
+    <!-- Datoer -->
+    <div class="crop-section">
+      <div class="crop-section-header" onclick="toggleCropSection(this)">Datoer <span class="cs-arrow">▼</span></div>
+      <div class="crop-section-body">
+        <div class="form-grid">
+          <div>
+            <label class="field-label">Sådato (fra)</label>
+            <button type="button" class="date-display empty" id="c-sown-btn" onclick="openCal('c-sown-btn','c-sown-val')">Velg dato 📅</button>
+            <input type="hidden" id="c-sown-val">
+          </div>
+          <div>
+            <label class="field-label">Så innen</label>
+            <button type="button" class="date-display empty" id="c-sownby-btn" onclick="openCal('c-sownby-btn','c-sownby-val')">Velg dato 📅</button>
+            <input type="hidden" id="c-sownby-val">
+          </div>
+          <div>
+            <label class="field-label">Plantedato (fra)</label>
+            <button type="button" class="date-display empty" id="c-planted-btn" onclick="openCal('c-planted-btn','c-planted-val')">Velg dato 📅</button>
+            <input type="hidden" id="c-planted-val">
+          </div>
+          <div>
+            <label class="field-label">Plante innen</label>
+            <button type="button" class="date-display empty" id="c-plantedby-btn" onclick="openCal('c-plantedby-btn','c-plantedby-val')">Velg dato 📅</button>
+            <input type="hidden" id="c-plantedby-val">
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label class="field-label" style="margin:0">Sålogg</label>
+            <button type="button" onclick="addSowLogEntry()" style="font-size:20px;background:none;border:none;color:var(--accent);cursor:pointer;padding:0 4px;line-height:1">+</button>
+          </div>
+          <div id="c-sowlog-entries"></div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label class="field-label" style="margin:0">Plantelogg</label>
+            <button type="button" onclick="addPlantLogEntry()" style="font-size:20px;background:none;border:none;color:var(--accent);cursor:pointer;padding:0 4px;line-height:1">+</button>
+          </div>
+          <div id="c-plantlog-entries"></div>
+        </div>
+      </div>
     </div>
-    <div class="form-full"><label class="field-label">Notater</label><textarea class="field-input" id="c-notes" rows="2"></textarea></div>
+
+    <!-- Økonomi -->
+    <div class="crop-section">
+      <div class="crop-section-header" onclick="toggleCropSection(this)">Økonomi <span class="cs-arrow">▼</span></div>
+      <div class="crop-section-body">
+        <div class="form-grid">
+          <div><label class="field-label">Salgsenhet</label>
+            <select class="field-input" id="c-unit" onchange="updateUnitLabels()">
+              <option value="stk">stk</option>
+              <option value="bunt">bunt</option>
+              <option value="boks">boks</option>
+            </select>
+          </div>
+          <div><label class="field-label">Pris pr/kg (kr)</label><input class="field-input" id="c-pricepkg" type="number" step="0.5" value="0" min="0" oninput="recalcPricePerUnit()"></div>
+          <div><label id="c-weightg-label" class="field-label">Vekt per stk (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0" oninput="recalcPricePerUnitFromWeight()"></div>
+          <div><label id="c-priceunit-label" class="field-label">Pris per stk (kr) <span id="c-priceunit-auto" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span></label><input class="field-input" id="c-priceunit" type="number" step="0.5" value="0" min="0" oninput="recalcWeightFromPrice()" placeholder="Auto fra kg×vekt"></div>
+          <div><label id="c-unitsperplant-label" class="field-label">Stk per plante</label><input class="field-input" id="c-unitsperplant" type="number" step="1" min="1" value="" oninput="this.value=Math.max(1,Math.round(+this.value||1));recalcVektTotal();toggleVektTotalFields()" placeholder="1"></div>
+          <div id="c-vekttotal-wrap"><label id="c-vekttotal-label" class="field-label">Vekt total (g)</label><input class="field-input" id="c-vekttotal" type="number" step="1" value="" min="0" oninput="recalcUnitsPerPlantFromVekt()" placeholder="Auto fra vekt×enheter"></div>
+          <div id="c-valuetotal-wrap"><label class="field-label">Verdi total <span style="font-size:10px;color:var(--text-muted)">(beregnet)</span></label><input class="field-input" id="c-valuetotal" type="number" step="1" value="" min="0" readonly style="opacity:0.7;cursor:default"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-primary" id="modal-crop-save-btn" onclick="saveCrop()">Legg til</button>
       <button class="btn-secondary" onclick="closeModal('modal-crop')">Avbryt</button>
@@ -919,8 +993,8 @@ function syncCropTasks() {
 
   crops.forEach(crop => {
     [
-      { type: 'saa',   dateField: crop.sownDate,    logField: crop.sowLog,   label: `Så ${crop.emoji} ${crop.family||crop.name}` },
-      { type: 'plant', dateField: crop.plantedDate, logField: crop.plantLog, label: `Plant ${crop.emoji} ${crop.family||crop.name}` },
+      { type: 'saa',   dateField: crop.sownDate,    logField: logDone(crop.sowLog),   label: `Så ${crop.emoji} ${crop.family||crop.name}` },
+      { type: 'plant', dateField: crop.plantedDate, logField: logDone(crop.plantLog), label: `Plant ${crop.emoji} ${crop.family||crop.name}` },
     ].forEach(({ type, dateField, logField, label }) => {
       const taskId = `crop-${crop.id}-${type}`; // stable string id for auto-tasks
       const existing = tasks.find(t => t.id === taskId);
@@ -1052,24 +1126,24 @@ function openStatPopup(type) {
     const relevant = crops.filter(c => c.sownDate && c.plantedDate);
     items = relevant.map(c => ({
       emoji: c.emoji, name: c.family || c.name,
-      done: !!(c.sowLog),
-      sub: c.sowLog ? 'Sådd ' + c.sowLog : 'Ikke sådd ennå'
+      done: logDone(c.sowLog),
+      sub: logDone(c.sowLog) ? 'Sådd ' + logDisplay(c.sowLog) : 'Ikke sådd ennå'
     }));
   } else if (type === 'sow') {
     title = 'Direktesåing';
     const relevant = crops.filter(c => c.sownDate && !c.plantedDate);
     items = relevant.map(c => ({
       emoji: c.emoji, name: c.family || c.name,
-      done: !!(c.sowLog),
-      sub: c.sowLog ? 'Sådd ' + c.sowLog : 'Planlagt ' + c.sownDate
+      done: logDone(c.sowLog),
+      sub: logDone(c.sowLog) ? 'Sådd ' + logDisplay(c.sowLog) : 'Planlagt ' + c.sownDate
     }));
   } else if (type === 'plant') {
     title = 'Utplanting';
     const relevant = crops.filter(c => c.plantedDate);
     items = relevant.map(c => ({
       emoji: c.emoji, name: c.family || c.name,
-      done: !!(c.plantLog),
-      sub: c.plantLog ? 'Plantet ' + c.plantLog : 'Planlagt ' + c.plantedDate
+      done: logDone(c.plantLog),
+      sub: logDone(c.plantLog) ? 'Plantet ' + logDisplay(c.plantLog) : 'Planlagt ' + c.plantedDate
     }));
   } else if (type === 'value') {
     title = 'Estimert verdi';
@@ -1992,8 +2066,8 @@ function showBedPopup(bedId) {
 
   const cropList = bedCrops.length
     ? bedCrops.map(c => {
-        const sowDate  = c.sowLog     ? `Sådd: ${c.sowLog}`         : (c.sownDate    ? `Sådato: ${c.sownDate}`    : '');
-        const plantDate= c.plantLog   ? `Plantet: ${c.plantLog}`    : (c.plantedDate ? `Plantedato: ${c.plantedDate}` : '');
+        const sowDate  = logDone(c.sowLog) ? `Sådd: ${logDisplay(c.sowLog)}` : (c.sownDate ? `Sådato: ${c.sownDate}` : '');
+        const plantDate= logDone(c.plantLog) ? `Plantet: ${logDisplay(c.plantLog)}` : (c.plantedDate ? `Plantedato: ${c.plantedDate}` : '');
         const status   = STATUS[c.status]?.label || c.status;
         return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -3195,8 +3269,8 @@ function renderSenger() {
                 <div style="font-size:14px;color:var(--text-head);font-weight:500">
                   ${occupied
                     ? (bedCropList.length === 1
-                        ? `<span>${mainCrop.name}</span>`
-                        : `<span>${bedCropList.map(c=>c.name).join(' · ')}</span>`)
+                        ? `<span>${mainCrop.family || mainCrop.name}</span>`
+                        : `<span>${bedCropList.map(c=>c.family || c.name).join(' · ')}</span>`)
                     : `<span style="color:var(--text-muted)">Ledig</span>`}
                 </div>
                 ${showBedStats && occupied ? (() => {
@@ -3208,8 +3282,8 @@ function renderSenger() {
                   const dates = bedCropList.map(c => {
                     const hasPlant = c.plantedDate;
                     const hasSow = c.sownDate && !c.plantedDate;
-                    if (hasPlant) return { date: c.plantedDate, label: 'Plantedato', done: !!(c.plantLog) };
-                    if (hasSow) return { date: c.sownDate, label: 'Sådato', done: !!(c.sowLog) };
+                    if (hasPlant) return { date: c.plantedDate, label: 'Plantedato', done: logDone(c.plantLog) };
+                    if (hasSow) return { date: c.sownDate, label: 'Sådato', done: logDone(c.sowLog) };
                     return null;
                   }).filter(Boolean);
                   if (!dates.length) return '';
@@ -3528,7 +3602,7 @@ function renderVekster() {
               + (c.sownDate ? '<div>🗓 Sådato: <span>' + c.sownDate + '</span></div>' : '')
               + (c.plantedDate ? '<div>🪴 Plantedato: <span>' + c.plantedDate + '</span></div>' : '')
               + '</div>'
-              + (c.sowLog ? '<div class="crop-notes">🌾 Sålogg: ' + c.sowLog + '</div>' : '')
+              + (logDone(c.sowLog) ? '<div class="crop-notes">🌾 Sålogg: ' + logDisplay(c.sowLog) + '</div>' : '')
               + (c.plantLog ? '<div class="crop-notes">🪴 Plantelogg: ' + c.plantLog + '</div>' : '')
               + (c.notes ? '<div class="crop-notes">📝 ' + c.notes + '</div>' : '')
               + '<div style="display:flex;gap:8px;margin-top:8px"><button onclick="event.stopPropagation();openEditCrop(' + c.id + ')" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button></div>'
@@ -3987,6 +4061,94 @@ function recalcUnitsPerPlantFromVekt() {
   }
 }
 
+
+// Normalize log field: accepts string or array, returns latest date string
+function latestLog(log) {
+  if (!log) return '';
+  if (Array.isArray(log)) return log.filter(Boolean).sort().pop() || '';
+  return log;
+}
+function logDone(log) {
+  if (!log) return false;
+  if (Array.isArray(log)) return log.filter(Boolean).length > 0;
+  return !!log;
+}
+function logDisplay(log) {
+  if (!log) return '';
+  if (Array.isArray(log)) {
+    const entries = log.filter(Boolean).sort();
+    if (!entries.length) return '';
+    return entries.length === 1 ? entries[0] : entries[entries.length-1] + ' (+' + (entries.length-1) + ')';
+  }
+  return log;
+}
+
+function toggleCropSection(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+// Log entry management
+let sowLogEntries = [];   // array of date strings
+let plantLogEntries = []; // array of date strings
+
+function renderLogEntries(containerId, entries, type) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = entries.map((d, i) => {
+    const display = d || 'Velg dato 📅';
+    const btnId = `${type}-log-btn-${i}`;
+    const valId = `${type}-log-val-${i}`;
+    return `<div class="log-entry-row">
+      <button type="button" class="date-display${d?'':' empty'}" id="${btnId}" onclick="openCal('${btnId}','${valId}')">${display}</button>
+      <input type="hidden" id="${valId}" value="${d}">
+      <button type="button" onclick="removeLogEntry('${type}',${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
+    </div>`;
+  }).join('');
+  // Wire up calendar callbacks
+  entries.forEach((d, i) => {
+    const valId = `${type}-log-val-${i}`;
+    const btnId = `${type}-log-btn-${i}`;
+    const el = document.getElementById(valId);
+    if (el) {
+      el.addEventListener('change', () => {
+        const val = el.value;
+        if (type === 'sow') sowLogEntries[i] = val;
+        else plantLogEntries[i] = val;
+        const btn = document.getElementById(btnId);
+        if (btn) { btn.textContent = val || 'Velg dato 📅'; btn.className = 'date-display' + (val?'':' empty'); }
+      });
+    }
+  });
+  // Override openCal callback to update arrays
+  window._logCalCallback = (valId, newVal) => {
+    const m = valId.match(/^(sow|plant)-log-val-(\d+)$/);
+    if (m) {
+      const idx = +m[2];
+      if (m[1] === 'sow') sowLogEntries[idx] = newVal;
+      else plantLogEntries[idx] = newVal;
+      const btn = document.getElementById(`${m[1]}-log-btn-${idx}`);
+      if (btn) { btn.textContent = newVal || 'Velg dato 📅'; btn.className = 'date-display' + (newVal?'':' empty'); }
+    }
+  };
+}
+
+function addSowLogEntry() {
+  sowLogEntries.push('');
+  renderLogEntries('c-sowlog-entries', sowLogEntries, 'sow');
+}
+
+function addPlantLogEntry() {
+  plantLogEntries.push('');
+  renderLogEntries('c-plantlog-entries', plantLogEntries, 'plant');
+}
+
+function removeLogEntry(type, idx) {
+  if (type === 'sow') { sowLogEntries.splice(idx, 1); renderLogEntries('c-sowlog-entries', sowLogEntries, 'sow'); }
+  else { plantLogEntries.splice(idx, 1); renderLogEntries('c-plantlog-entries', plantLogEntries, 'plant'); }
+}
+
 function openEditCrop(id) {
   editingCropId = id;
   const c = crops.find(x => x.id === id);
@@ -4013,9 +4175,14 @@ function openEditCrop(id) {
   document.getElementById('c-rows').value = c.rows;
   document.getElementById('c-seedspercluster').value = c.seedsPerCluster || 1;
   setDateField('c-sown-btn','c-sown-val', c.sownDate);
-  setDateField('c-sowlog-btn','c-sowlog-val', c.sowLog);
+  setDateField('c-sownby-btn','c-sownby-val', c.sownByDate || '');
   setDateField('c-planted-btn','c-planted-val', c.plantedDate);
-  setDateField('c-plantlog-btn','c-plantlog-val', c.plantLog);
+  setDateField('c-plantedby-btn','c-plantedby-val', c.plantedByDate || '');
+  // Log entries
+  sowLogEntries = c.sowLog ? (Array.isArray(c.sowLog) ? [...c.sowLog] : [c.sowLog]) : [];
+  plantLogEntries = c.plantLog ? (Array.isArray(c.plantLog) ? [...c.plantLog] : [c.plantLog]) : [];
+  renderLogEntries('c-sowlog-entries', sowLogEntries, 'sow');
+  renderLogEntries('c-plantlog-entries', plantLogEntries, 'plant');
   document.getElementById('c-status').value = c.status;
   document.getElementById('c-pricepkg').value = c.pricePerKg || 0;
   document.getElementById('c-weightg').value = c.weightG || 0;
@@ -4051,9 +4218,12 @@ function openAddCrop() {
   document.getElementById('c-rows').value = 2;
   document.getElementById('c-seedspercluster').value = 1;
   setDateField('c-sown-btn','c-sown-val','');
-  setDateField('c-sowlog-btn','c-sowlog-val','');
+  setDateField('c-sownby-btn','c-sownby-val','');
   setDateField('c-planted-btn','c-planted-val','');
-  setDateField('c-plantlog-btn','c-plantlog-val','');
+  setDateField('c-plantedby-btn','c-plantedby-val','');
+  sowLogEntries = []; plantLogEntries = [];
+  renderLogEntries('c-sowlog-entries', sowLogEntries, 'sow');
+  renderLogEntries('c-plantlog-entries', plantLogEntries, 'plant');
   document.getElementById('c-status').value = 'planlagt';
   document.getElementById('c-pricepkg').value = 0;
   document.getElementById('c-weightg').value = 0;
@@ -4115,9 +4285,11 @@ function saveCrop() {
     seedsPerCluster: +document.getElementById('c-seedspercluster').value || 1,
     beds: rawBeds,
     sownDate: document.getElementById('c-sown-val').value,
-    sowLog: document.getElementById('c-sowlog-val').value,
+    sownByDate: document.getElementById('c-sownby-val').value,
+    sowLog: sowLogEntries.filter(Boolean),
     plantedDate: document.getElementById('c-planted-val').value,
-    plantLog: document.getElementById('c-plantlog-val').value,
+    plantedByDate: document.getElementById('c-plantedby-val').value,
+    plantLog: plantLogEntries.filter(Boolean),
     status: document.getElementById('c-status').value,
     pricePerKg: parseFloat(document.getElementById('c-pricepkg').value) || 0,
     weightG: parseFloat(document.getElementById('c-weightg').value) || 0,
@@ -4520,7 +4692,16 @@ function addTask() {
   const text = document.getElementById('t-text').value.trim();
   if (!text) return;
   snapshot();
-  tasks.push({ id:Date.now(), text, done:false, date:document.getElementById('t-date-val').value, priority:newPriority });
+  const newTask = { id:Date.now(), text, done:false, date:document.getElementById('t-date-val').value, priority:newPriority };
+  tasks.push(newTask);
+  // Auto-add to focus if date is today
+  const today = new Date().toISOString().split('T')[0];
+  const [y,m,d] = today.split('-');
+  const todayFmt = `${d}-${m}-${y}`;
+  if (newTask.date === todayFmt) {
+    focusTaskIds.add(newTask.id);
+    try { localStorage.setItem('mh_focus_tasks', JSON.stringify([...focusTaskIds])); } catch(e) {}
+  }
   document.getElementById('t-text').value = '';
   setDateField('t-date-btn','t-date-val','');
   closeModal('modal-task');
@@ -4975,15 +5156,27 @@ function renderModus() {
   if (isSaa) {
     const plants = calcPlants(crop);
     const sownDateVal = crop.sownDate || '–';
+    const isDirectSow = !crop.plantedDate; // direktesåing: ingen plantedato
+    const gang = calcGang(crop);
+    const gangStr = gang !== null ? gang+' cm' : '–';
     const infoCell = (label, val) =>
       '<div style="padding:12px;border-radius:12px;background:var(--bg-card)">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">'+label+'</div>'
       +'<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
       +'</div>';
+    const baseFields = [
+      ['Antall planter', '<span style="font-size:26px;font-weight:300">'+plants+'</span>'],
+      ['Sådato', sownDateVal],
+    ];
+    if (crop.seedsPerCluster && crop.seedsPerCluster > 1) baseFields.push(['Frø per klynge', '<span style="font-size:26px;font-weight:300">'+crop.seedsPerCluster+'</span>']);
+    if (isDirectSow) {
+      baseFields.push(['Radavstand', (crop.rowSpacing||'–')+' cm']);
+      baseFields.push(['Planteavstand', (crop.plantSpacing||'–')+' cm']);
+      baseFields.push(['Gangavstand', gangStr]);
+      baseFields.push(['Rader', crop.rows]);
+    }
     details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
-      +infoCell('Antall planter', '<span style="font-size:26px;font-weight:300">'+plants+'</span>')
-      +infoCell('Sådato', sownDateVal)
-      +(crop.seedsPerCluster && crop.seedsPerCluster > 1 ? infoCell('Frø per klynge', '<span style="font-size:26px;font-weight:300">'+crop.seedsPerCluster+'</span>') : '')
+      + baseFields.map(([label, val]) => infoCell(label, val)).join('')
       +'</div>';
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
