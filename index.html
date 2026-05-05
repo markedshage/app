@@ -399,6 +399,7 @@
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 </head>
 <body>
 
@@ -515,15 +516,6 @@
           <div><label class="field-label">Sort</label><input class="field-input" id="c-family" placeholder="f.eks. Nattskygge"></div>
           <div><label class="field-label">Kategori</label><select class="field-input" id="c-category"></select></div>
         </div>
-        <div class="form-full"><label class="field-label">Status</label>
-          <select class="field-input" id="c-status">
-            <option value="planlagt">Planlagt</option>
-            <option value="sådd">Sådd</option>
-            <option value="plantet">Plantet</option>
-            <option value="høstet">Høstet</option>
-          </select>
-        </div>
-        <div class="form-full"><label class="field-label">Notater</label><textarea class="field-input" id="c-notes" rows="2"></textarea></div>
       </div>
     </div>
 
@@ -606,6 +598,11 @@
       </div>
     </div>
 
+    <input type="hidden" id="c-status">
+    <div style="margin-bottom:8px">
+      <label class="field-label">Notater</label>
+      <textarea class="field-input" id="c-notes" rows="2"></textarea>
+    </div>
     <div class="modal-actions">
       <button class="btn-primary" id="modal-crop-save-btn" onclick="saveCrop()">Legg til</button>
       <button class="btn-secondary" onclick="closeModal('modal-crop')">Avbryt</button>
@@ -3269,8 +3266,8 @@ function renderSenger() {
                 <div style="font-size:14px;color:var(--text-head);font-weight:500">
                   ${occupied
                     ? (bedCropList.length === 1
-                        ? `<span>${mainCrop.family || mainCrop.name}</span>`
-                        : `<span>${bedCropList.map(c=>c.family || c.name).join(' · ')}</span>`)
+                        ? `<span>${mainCrop.name}</span>`
+                        : `<span>${bedCropList.map(c=>c.name).join(' · ')}</span>`)
                     : `<span style="color:var(--text-muted)">Ledig</span>`}
                 </div>
                 ${showBedStats && occupied ? (() => {
@@ -3348,13 +3345,14 @@ function renderSenger() {
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
               <span style="font-size:24px">${o.crop.emoji}</span>
               <div style="flex:1">
-                <div style="font-size:15px;color:var(--text-head)">${o.crop.name}</div>
+                <div style="font-size:15px;color:var(--text-head)">${o.crop.family || o.crop.name}</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:1px">${o.crop.family ? o.crop.name : ''}</div>
                 <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
                   ${hasSegment ? `Del ${o.start}–${o.end}m (${segLen}m)` : `${bedLen}m`} &nbsp;·&nbsp;
                   <span style="color:${isLight?'#6b8c42':'#86efac'}">${STATUS[o.crop.status]?.label||o.crop.status}</span>
                 </div>
               </div>
-              <button onclick="event.stopPropagation();openEditCrop(crops.indexOf(crops.find(c=>c.id===o.crop.id)))" style="padding:6px 12px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
+              <button onclick="event.stopPropagation();openEditCrop(${o.crop.id})" style="padding:6px 12px;border-radius:8px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger</button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
               <div style="background:var(--bg-main);border-radius:8px;padding:8px 10px">
@@ -4190,6 +4188,12 @@ function openEditCrop(id) {
   if (puField) { puField.value = c.pricePerUnit || 0; puField.dataset.custom = c.pricePerUnitCustom ? '1' : ''; recalcPricePerUnit(); }
   document.getElementById('c-notes').value = c.notes;
   document.getElementById('modal-crop-delete-wrap').style.display = 'block';
+  // Reset sections: Generelt open, others closed
+  document.querySelectorAll('.crop-section-header').forEach(h => {
+    const isGenerelt = h.textContent.trim().startsWith('Generelt');
+    h.classList.toggle('open', isGenerelt);
+    h.nextElementSibling.classList.toggle('open', isGenerelt);
+  });
   document.getElementById('modal-crop').style.display = 'flex';
 }
 
@@ -4230,6 +4234,12 @@ function openAddCrop() {
   const puF = document.getElementById('c-priceunit'); if (puF) { puF.value = 0; delete puF.dataset.custom; }
   document.getElementById('c-notes').value = '';
   document.getElementById('modal-crop-delete-wrap').style.display = 'none';
+  // Reset sections: Generelt open, others closed
+  document.querySelectorAll('.crop-section-header').forEach(h => {
+    const isGenerelt = h.textContent.trim().startsWith('Generelt');
+    h.classList.toggle('open', isGenerelt);
+    h.nextElementSibling.classList.toggle('open', isGenerelt);
+  });
   document.getElementById('modal-crop').style.display = 'flex';
 }
 
@@ -5647,6 +5657,7 @@ function confirmImport(skipSave = false) {
 /* ---- EXCEL EXPORT ---- */
 function fmtDate(d) {
   if (!d) return '';
+  if (Array.isArray(d)) return d.filter(Boolean).map(s => s.replace(/-/g,'.')).join(', ');
   return d.replace(/-/g, '.');
 }
 
@@ -6140,7 +6151,11 @@ async function syncLoadOnStart() {
       clearTimeout(timer);
     }
     if (!resp.ok) return;
-    const remote = await resp.json();
+    let remote = await resp.json();
+    // Decompress LZ-string envelope if present
+    if (remote && remote.lz && typeof LZString !== 'undefined') {
+      try { remote = JSON.parse(LZString.decompressFromBase64(remote.lz)); } catch(e) { console.warn('LZ decompress failed', e); }
+    }
     if (!remote || !remote.crops) return;
 
     // Check local timestamp
@@ -6195,7 +6210,11 @@ async function syncLoad(silent = false) {
       if (!silent) showSyncToast('⚠ Kunne ikke laste fra JSONBin');
       return false;
     }
-    const data = await resp.json();
+    let data = await resp.json();
+    // Decompress LZ-string envelope if present
+    if (data && data.lz && typeof LZString !== 'undefined') {
+      try { data = JSON.parse(LZString.decompressFromBase64(data.lz)); } catch(e) { console.warn('LZ decompress failed', e); }
+    }
     if (!data || !data.crops) {
             return false;
     }
@@ -6232,19 +6251,58 @@ async function syncLoad(silent = false) {
 // Save current state to JSONBin
 async function syncSave() {
   if (!syncKey) return;
+  // Compress crops — strip empty/zero/default fields to reduce payload size
+  const compressCrop = c => {
+    const out = { id: c.id, name: c.name, emoji: c.emoji, status: c.status, beds: c.beds };
+    if (c.family) out.family = c.family;
+    if (c.category && c.category !== 'Andre') out.category = c.category;
+    if (c.rowSpacing && c.rowSpacing !== 30) out.rowSpacing = c.rowSpacing;
+    else out.rowSpacing = c.rowSpacing || 30;
+    if (c.plantSpacing && c.plantSpacing !== 20) out.plantSpacing = c.plantSpacing;
+    else out.plantSpacing = c.plantSpacing || 20;
+    if (c.rows && c.rows !== 2) out.rows = c.rows;
+    else out.rows = c.rows || 2;
+    if (c.seedsPerCluster && c.seedsPerCluster > 1) out.seedsPerCluster = c.seedsPerCluster;
+    if (c.sownDate) out.sownDate = c.sownDate;
+    if (c.sownByDate) out.sownByDate = c.sownByDate;
+    if (c.plantedDate) out.plantedDate = c.plantedDate;
+    if (c.plantedByDate) out.plantedByDate = c.plantedByDate;
+    if (c.sowLog && (Array.isArray(c.sowLog) ? c.sowLog.length : c.sowLog)) out.sowLog = c.sowLog;
+    if (c.plantLog && (Array.isArray(c.plantLog) ? c.plantLog.length : c.plantLog)) out.plantLog = c.plantLog;
+    if (c.pricePerKg) out.pricePerKg = c.pricePerKg;
+    if (c.weightG) out.weightG = c.weightG;
+    if (c.pricePerUnit) out.pricePerUnit = c.pricePerUnit;
+    if (c.pricePerUnitCustom) out.pricePerUnitCustom = c.pricePerUnitCustom;
+    if (c.unit && c.unit !== 'stk') out.unit = c.unit;
+    if (c.unitsPerPlant && c.unitsPerPlant > 1) out.unitsPerPlant = c.unitsPerPlant;
+    if (c.vektTotal) out.vektTotal = c.vektTotal;
+    if (c.notes) out.notes = c.notes;
+    if (c._manuallyUnfocused) out._manuallyUnfocused = c._manuallyUnfocused;
+    return out;
+  };
+  // Keep only last 200 task history entries
+  const trimmedHistory = (taskHistory || []).slice(-200);
   const payload = {
-    crops,
+    crops: crops.map(compressCrop),
     tasks: tasks.filter(t => !String(t.id).startsWith('crop-')),
     bedSizes,
     bedIDs: BED_IDS,
     gardenMap: gardenMap || null,
-    taskHistory: taskHistory || [],
+    taskHistory: trimmedHistory,
     levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog },
     saved: new Date().toISOString()
   };
-  const payloadStr = JSON.stringify(payload);
-  console.log('Sync payload size:', (payloadStr.length / 1024).toFixed(1), 'KB');
-  console.log('Crops:', crops.length, 'Tasks:', tasks.length);
+  const rawStr = JSON.stringify(payload);
+  // Compress with LZ-string if available, wrap in {lz: ...} envelope
+  let payloadStr, compressed = false;
+  if (typeof LZString !== 'undefined') {
+    const lzData = LZString.compressToBase64(rawStr);
+    payloadStr = JSON.stringify({ lz: lzData });
+    compressed = true;
+  } else {
+    payloadStr = rawStr;
+  }
+  console.log('Sync payload size:', (rawStr.length / 1024).toFixed(1), 'KB raw,', (payloadStr.length / 1024).toFixed(1), 'KB sent' + (compressed ? ' (LZ)' : ''));
   try {
     let resp;
     if (syncBinId) {
