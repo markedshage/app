@@ -4095,42 +4095,31 @@ function renderLogEntries(containerId, entries, type) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = entries.map((d, i) => {
-    const display = d || 'Velg dato 📅';
-    const btnId = `${type}-log-btn-${i}`;
-    const valId = `${type}-log-val-${i}`;
-    return `<div class="log-entry-row">
-      <button type="button" class="date-display${d?'':' empty'}" id="${btnId}" onclick="openCal('${btnId}','${valId}')">${display}</button>
-      <input type="hidden" id="${valId}" value="${d}">
-      <button type="button" onclick="removeLogEntry('${type}',${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
-    </div>`;
+    const display = d || "Velg dato 📅";
+    const btnId = type + "-log-btn-" + i;
+    const valId = type + "-log-val-" + i;
+    return '<div class="log-entry-row">'
+      + '<button type="button" class="date-display' + (d ? '' : ' empty') + '" id="' + btnId + '" data-logtype="' + type + '" data-logidx="' + i + '" onclick="openLogCal(this.dataset.logtype,+this.dataset.logidx)">' + display + '</button>'
+      + '<input type="hidden" id="' + valId + '" value="' + (d || '') + '">'
+      + '<button type="button" data-logtype="' + type + '" data-logidx="' + i + '" onclick="removeLogEntry(this.dataset.logtype,+this.dataset.logidx)" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>'
+      + '</div>';
   }).join('');
-  // Wire up calendar callbacks
-  entries.forEach((d, i) => {
-    const valId = `${type}-log-val-${i}`;
-    const btnId = `${type}-log-btn-${i}`;
-    const el = document.getElementById(valId);
-    if (el) {
-      el.addEventListener('change', () => {
-        const val = el.value;
-        if (type === 'sow') sowLogEntries[i] = val;
-        else plantLogEntries[i] = val;
-        const btn = document.getElementById(btnId);
-        if (btn) { btn.textContent = val || 'Velg dato 📅'; btn.className = 'date-display' + (val?'':' empty'); }
-      });
-    }
-  });
-  // Override openCal callback to update arrays
-  window._logCalCallback = (valId, newVal) => {
-    const m = valId.match(/^(sow|plant)-log-val-(\d+)$/);
-    if (m) {
-      const idx = +m[2];
-      if (m[1] === 'sow') sowLogEntries[idx] = newVal;
-      else plantLogEntries[idx] = newVal;
-      const btn = document.getElementById(`${m[1]}-log-btn-${idx}`);
-      if (btn) { btn.textContent = newVal || 'Velg dato 📅'; btn.className = 'date-display' + (newVal?'':' empty'); }
-    }
+}
+
+function openLogCal(type, idx) {
+  const btnId = type + '-log-btn-' + idx;
+  const valId = type + '-log-val-' + idx;
+  openCal(btnId, valId);
+  _onDatePicked = (newVal) => {
+    if (type === 'sow') sowLogEntries[idx] = newVal;
+    else plantLogEntries[idx] = newVal;
+    const btn = document.getElementById(btnId);
+    if (btn) { btn.textContent = newVal || 'Velg dato 📅'; btn.className = 'date-display' + (newVal ? '' : ' empty'); }
+    const inp = document.getElementById(valId);
+    if (inp) inp.value = newVal;
   };
 }
+
 
 function addSowLogEntry() {
   sowLogEntries.push('');
