@@ -4144,6 +4144,16 @@ function renderLogEntries(containerId, entries, type) {
 }
 
 function openLogCal(type, idx) {
+  if (type === 'date') {
+    openCal('hoest-date-btn', 'hoest-date-val');
+    _onDatePicked = (newVal) => {
+      const inp = document.getElementById('hoest-date-val');
+      const btn = document.getElementById('hoest-date-btn');
+      if (inp) inp.value = newVal;
+      if (btn) { btn.textContent = newVal ? fmtDate(newVal) : 'Dato 📅'; btn.className = 'date-display' + (newVal ? '' : ' empty'); }
+    };
+    return;
+  }
   const btnId = type + '-log-btn-' + idx;
   const valId = type + '-log-val-' + idx;
   openCal(btnId, valId);
@@ -4313,7 +4323,7 @@ function saveCrop() {
   const data = {
     name,
     emoji: document.getElementById('c-emoji').value || '🌱',
-    family: document.getElementById('c-family').value,
+    family: document.getElementById('c-family').value || '',
     category: document.getElementById('c-category').value || 'Andre',
     rowSpacing: +document.getElementById('c-rowspacing').value || 30,
     plantSpacing: +document.getElementById('c-plantspacing').value || 20,
@@ -4334,7 +4344,7 @@ function saveCrop() {
     vektTotal: parseFloat(document.getElementById('c-vekttotal')?.value) || 0,
     pricePerUnit: parseFloat(document.getElementById('c-priceunit')?.value) || 0,
     pricePerUnitCustom: !!document.getElementById('c-priceunit')?.dataset.custom,
-    notes: document.getElementById('c-notes').value,
+    notes: document.getElementById('c-notes').value || '',
   };
   const existingCrop = editingCropId !== null ? crops.find(c => c.id === editingCropId) : null;
   const prevStatus = existingCrop ? existingCrop.status : 'planlagt';
@@ -5422,6 +5432,21 @@ function importFromExcel(event) {
   importFileObject(file);
 }
 
+
+function sanitizeCrops() {
+  crops = crops.map(c => ({
+    ...c,
+    notes:   c.notes   === 'undefined' || c.notes   === undefined   ? '' : c.notes,
+    family:  c.family  === 'undefined' || c.family  === undefined   ? '' : c.family,
+    category: c.category === 'undefined' || c.category === undefined ? 'Andre' : c.category,
+    sowLog:  c.sowLog  === 'undefined' || c.sowLog  === undefined   ? [] : c.sowLog,
+    plantLog: c.plantLog === 'undefined' || c.plantLog === undefined ? [] : c.plantLog,
+    sownDate: c.sownDate === 'undefined' ? '' : (c.sownDate || ''),
+    sownByDate: c.sownByDate === 'undefined' ? '' : (c.sownByDate || ''),
+    plantedDate: c.plantedDate === 'undefined' ? '' : (c.plantedDate || ''),
+    plantedByDate: c.plantedByDate === 'undefined' ? '' : (c.plantedByDate || ''),
+  }));
+}
 function saveToLocal() {
   try {
     const data = {
@@ -5459,6 +5484,7 @@ function loadFromLocal() {
     if (data.taskHistory) taskHistory = data.taskHistory;
     // Normalize any removed statuses
     crops = crops.map(c => STATUS[c.status] ? c : {...c, status: 'plantet'});
+    sanitizeCrops();
     return true;
   } catch(e) { return false; }
 }
@@ -5575,8 +5601,9 @@ function importFileObject(file, skipSave = false) {
           if (!r[0]) continue;
           const name = String(r[0] || '').trim();
           const phone = String(r[1] || '').trim();
-          const btName = String(r[2] || '').trim();
-          const btIdRaw = String(r[3] || '').trim();
+          const email = String(r[2] || '').trim();
+          const btName = String(r[3] || '').trim();
+          const btIdRaw = String(r[4] || '').trim();
           // Try to resolve box type: first by ID, then by name
           let boxTypeId = null;
           if (btIdRaw) {
@@ -6211,8 +6238,9 @@ async function syncLoadOnStart() {
     const remoteIsNewer = !localSaved || (remoteSaved && new Date(remoteSaved) > new Date(localSaved));
 
     if (hasNoLocal || remoteIsNewer) {
-      if (remote.crops)   crops    = remote.crops;
+      if (remote.crops)   crops    = remote.crops.map ? remote.crops : [];
       if (remote.tasks)   tasks    = remote.tasks;
+      sanitizeCrops();
       if (remote.bedSizes) bedSizes = remote.bedSizes;
       if (remote.bedIDs && remote.bedIDs.length) BED_IDS = remote.bedIDs;
       if (remote.gardenMap) gardenMap = remote.gardenMap;
@@ -8763,6 +8791,8 @@ function openNyRegistrering(editIdx) {
     + '<select id="hoest-dest" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
     + ['kasse','marked','annet'].map(d=>'<option value="'+d+'"'+(existing&&existing.dest===d?' selected':'')+'>'+{kasse:'Grønnsakskasse',marked:'Marked',annet:'Annet'}[d]+'</option>').join('')
     + '</select>'
+    + '<button type="button" class="date-display'+(existing&&existing.date?'':' empty')+'" id="hoest-date-btn" onclick="openLogCal(\'date\',0)">'+(existing&&existing.date?fmtDate(existing.date):fmtDate(new Date().toISOString().split('T')[0].split('-').reverse().join('-')))+'</button>'
+    + '<input type="hidden" id="hoest-date-val" value="'+(existing&&existing.date?existing.date:new Date().toISOString().split('T')[0].split('-').reverse().join('-'))+'">'
     + '<input id="hoest-note" placeholder="Notat (valgfritt)" value="'+(existing&&existing.note?existing.note:'')+'" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">'
     + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:14px">'
@@ -8876,13 +8906,13 @@ function saveHarvest(editIdx) {
   const dest   = document.getElementById('hoest-dest')?.value;
   const note   = document.getElementById('hoest-note')?.value.trim();
   if (!cropId || !qty) { alert('Velg vekst og mengde.'); return; }
-  const today = new Date().toISOString().split('T')[0];
+  const dateVal = document.getElementById('hoest-date-val')?.value || new Date().toISOString().split('T')[0];
   if (editIdx !== undefined && editIdx >= 0 && editIdx < harvestLog.length) {
     // Edit existing
-    harvestLog[editIdx] = {...harvestLog[editIdx], cropId, bedId, qty, unit, dest, note};
+    harvestLog[editIdx] = {...harvestLog[editIdx], cropId, bedId, qty, unit, dest, note, date: dateVal};
   } else {
     // New entry
-    harvestLog.unshift({id:Date.now(), date:today, cropId, bedId, qty, unit, dest, note});
+    harvestLog.unshift({id:Date.now(), date:dateVal, cropId, bedId, qty, unit, dest, note});
   }
   saveLevering();
   document.getElementById('ny-reg-modal')?.remove();
