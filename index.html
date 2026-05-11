@@ -5146,6 +5146,36 @@ function modusClearDate() {
   renderModus();
 }
 
+
+function buildRulerHtml(crop, accentColor) {
+  const gang = calcGang(crop);
+  if (gang === null || !crop.rowSpacing || !crop.rows) return '';
+  const rows = +crop.rows;
+  const rowSpacing = +crop.rowSpacing;
+  const gangEach = +gang;
+  const rawBed = crop.beds && crop.beds[0] ? crop.beds[0].replace(/-.*/, '') : null;
+  const bedWidth = rawBed && bedSizes[rawBed] ? Math.round(bedSizes[rawBed].width * 100) : 120;
+  const positions = [];
+  for (let i = 0; i < rows; i++) positions.push(gangEach + i * rowSpacing);
+  const svgW = 280, svgH = 50, lineY = 22;
+  const scale = svgW / bedWidth;
+  let markers = '';
+  positions.forEach(pos => {
+    const x = Math.round(pos * scale);
+    markers += '<line x1="' + x + '" y1="' + (lineY-9) + '" x2="' + x + '" y2="' + (lineY+9) + '" stroke="' + accentColor + '" stroke-width="2" stroke-linecap="round"/>';
+    markers += '<text x="' + x + '" y="' + (svgH-2) + '" text-anchor="middle" font-size="9" fill="' + accentColor + '" font-family="inherit">' + pos + '</text>';
+  });
+  markers += '<text x="1" y="' + (svgH-2) + '" text-anchor="start" font-size="8" fill="rgba(128,128,128,0.5)" font-family="inherit">0</text>';
+  markers += '<text x="' + (svgW-1) + '" y="' + (svgH-2) + '" text-anchor="end" font-size="8" fill="rgba(128,128,128,0.5)" font-family="inherit">' + bedWidth + 'cm</text>';
+  return '<div style="margin-bottom:14px">'
+    + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Radplassering (cm fra kant)</div>'
+    + '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + svgH + '" style="overflow:visible">'
+    + '<line x1="0" y1="' + lineY + '" x2="' + svgW + '" y2="' + lineY + '" stroke="rgba(128,128,128,0.2)" stroke-width="2"/>'
+    + markers
+    + '</svg>'
+    + '</div>';
+}
+
 function startModus(type, cropId) {
   const crop = crops.find(c => c.id === cropId);
   if (crop) {
@@ -5227,6 +5257,7 @@ function renderModus() {
     details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
       + baseFields.map(([label, val]) => infoCell(label, val)).join('')
       +'</div>';
+    if (isDirectSow) details += buildRulerHtml(crop, accentColor);
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
       +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
@@ -5252,6 +5283,7 @@ function renderModus() {
         +'</div>'
       ).join('')
       +'</div>';
+    details += buildRulerHtml(crop, accentColor);
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
       +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
