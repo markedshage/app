@@ -1804,10 +1804,10 @@ function renderMapWorld() {
 
   const labelH  = 0;
   const gangPad = Math.round(0.4 * S); // 0.4m in scaled pixels
-  const borderR   = Math.max(3, Math.round(8 * mapScale));
-  const bedR      = Math.max(2, Math.round(4 * mapScale));
-  const idSize    = Math.max(12, Math.round(12 * mapScale));
-  const labelSize = Math.max(12, Math.round(12 * mapScale));
+  const borderR   = Math.round(8 * mapScale);
+  const bedR      = Math.round(4 * mapScale);
+  const idSize    = Math.round(12 * mapScale);
+  const labelSize = Math.round(12 * mapScale);
 
   let maxX = 200, maxY = 200;
   Object.values(layout).forEach(p => { maxX=Math.max(maxX,p.x+p.w+80); maxY=Math.max(maxY,p.y+p.h+80); });
@@ -1861,9 +1861,9 @@ function renderMapWorld() {
         } else if (SHOW_EMOJI) {
           // Emoji mode
           const total = Math.max(1, Math.round(sz.length));
-          const emojiSize = Math.max(12, Math.min(
-            Math.round(Math.min(p.w, p.h) * 0.52),
-            Math.round(24 * mapScale)
+          const emojiSize = Math.round(Math.min(
+            Math.min(p.w, p.h) * 0.52,
+            24 * mapScale
           ));
           const flexDir = isPortrait ? 'column' : 'row';
           const seq = Array.from({length:total}, (_,ii) => bedCrops[ii % bedCrops.length].emoji);
@@ -1878,7 +1878,7 @@ function renderMapWorld() {
             padding:${Math.round(3*mapScale)}px;
             overflow:hidden;box-sizing:border-box;pointer-events:none">
             ${shown.map(e=>`<span style="font-size:${emojiSize}px;line-height:1;flex-shrink:0">${e}</span>`).join('')}
-            ${leftover>0?`<span style="font-size:${Math.max(11,Math.round(11*mapScale))}px;color:${LEDIG_COLOR};flex-shrink:0">+${leftover}</span>`:''}
+            ${leftover>0?`<span style="font-size:${Math.round(11*mapScale)}px;color:${LEDIG_COLOR};flex-shrink:0">+${leftover}</span>`:''}
           </div>`;
         }
       }
@@ -1910,7 +1910,7 @@ function renderMapWorld() {
     // Label
     const aLbl = document.createElement('div');
     aLbl.style.cssText = `position:absolute;left:6px;top:4px;
-      font-size:${Math.max(12,Math.round(11*mapScale))}px;
+      font-size:${Math.round(11*mapScale)}px;
       color:${isLight?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.25)'};
       font-family:Georgia,serif;pointer-events:none`;
     aLbl.textContent = `${gardenMap.areaW}×${gardenMap.areaH}m`;
@@ -1940,7 +1940,7 @@ function renderMapWorld() {
     world.appendChild(aBox);
     const aLbl = document.createElement('div');
     aLbl.style.cssText = `position:absolute;left:${aLeft+8}px;top:${aTop+5}px;
-      font-size:${Math.max(12,Math.round(11*mapScale))}px;
+      font-size:${Math.round(11*mapScale)}px;
       color:${isLight?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.25)'};
       font-family:Georgia,serif;pointer-events:none;z-index:0`;
     aLbl.textContent = `${gardenMap.areaW} × ${gardenMap.areaH} m`;
