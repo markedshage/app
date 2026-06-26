@@ -6686,7 +6686,7 @@ function gistShowMenu() {
   hdr.textContent = 'Sky-synkronisering';
   menu.appendChild(hdr);
   menu.appendChild(sep());
-  menu.appendChild(row('📋', 'Versjonslogg', 'var(--text-head)', () => { openVersionLog(); float.remove(); }));
+  menu.appendChild(row('📋', 'Versjonslogg', 'var(--text-head)', () => { openVersionLog(); document.getElementById('gear-float')?.remove(); closeGearMenu(); }));
   menu.appendChild(row('⬇', 'Last inn fra sky', 'var(--text-head)', () => syncLoad(false)));
   menu.appendChild(row('⬆', 'Lagre til sky', '#34d399', () => syncSave()));
   menu.appendChild(sep());
