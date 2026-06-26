@@ -926,6 +926,8 @@ function showFloatingGearMenu(triggerBtn) {
     float.appendChild(sep());
     float.appendChild(row('🏷', 'Kategorier', 'var(--text-head)', () => { openCategorySettings(); float.remove(); }));
     float.appendChild(sep());
+    float.appendChild(row('📋', 'Versjonslogg', 'var(--text-head)', () => { openVersionLog(); float.remove(); }));
+    float.appendChild(sep());
     float.appendChild(row('⬆', 'Importer fra Excel', 'var(--text-head)', () => { document.getElementById('excel-import-input')?.click(); float.remove(); }));
     float.appendChild(row('⬇', 'Eksporter til Excel', 'var(--text-head)', () => { exportToExcel(); float.remove(); }));
 
