@@ -6120,6 +6120,190 @@ function applyTheme() {
   renderSyncBtn(); // re-render sync button color
 }
 
+
+// ══════════════════════════════════════════════════════
+// DAGLIG BACKUP — 7 bins, én per ukedag (0=Søn ... 6=Lør)
+// ══════════════════════════════════════════════════════
+const BACKUP_KEY      = 'mh_backup_bins';   // localStorage: array of 7 bin IDs
+const BACKUP_META_KEY = 'mh_backup_meta';   // localStorage: array of 7 {date, ts}
+const DAYS_BACKUP     = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
+
+function getBackupBins() {
+  try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null') || []; } catch(e) { return []; }
+}
+function getBackupMeta() {
+  try { return JSON.parse(localStorage.getItem(BACKUP_META_KEY) || 'null') || Array(7).fill(null); } catch(e) { return Array(7).fill(null); }
+}
+
+async function ensureBackupBins() {
+  if (!syncKey) return;
+  let bins = getBackupBins();
+  if (bins.length === 7 && bins.every(Boolean)) return; // all exist
+
+  showSyncToast('⏳ Oppretter backup-bins…');
+  const newBins = [...bins];
+  for (let i = 0; i < 7; i++) {
+    if (newBins[i]) continue; // already exists
+    try {
+      const resp = await fetch('https://api.jsonbin.io/v3/b', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': syncKey,
+          'X-Bin-Name': 'MH-Backup-' + DAYS_BACKUP[i],
+          'X-Bin-Private': 'true'
+        },
+        body: JSON.stringify({ placeholder: true, day: DAYS_BACKUP[i] })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        newBins[i] = data.metadata?.id || null;
+      }
+    } catch(e) { console.warn('Backup bin create failed for day', i, e); }
+  }
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(newBins));
+  showSyncToast(newBins.every(Boolean) ? '✓ Backup-bins opprettet' : '⚠ Noen backup-bins feilet');
+}
+
+async function runDailyBackup() {
+  if (!syncKey) return;
+  const bins = getBackupBins();
+  if (!bins.length || !bins.every(Boolean)) {
+    await ensureBackupBins();
+  }
+  const bins2 = getBackupBins();
+  const dayIdx = new Date().getDay(); // 0=Sun, 6=Sat
+  const binId = bins2[dayIdx];
+  if (!binId) return;
+
+  // Check if we already backed up today
+  const meta = getBackupMeta();
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (meta[dayIdx] && meta[dayIdx].date === todayStr) return; // already done today
+
+  try {
+    // Build payload
+    const rawStr = JSON.stringify({
+      crops, tasks: tasks.filter(t => !String(t.id).startsWith('crop-')),
+      bedSizes, bedIDs: BED_IDS, gardenMap: gardenMap || null,
+      taskHistory: taskHistory || [],
+      levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog },
+      saved: new Date().toISOString(),
+      backupDay: DAYS_BACKUP[dayIdx]
+    });
+    let body, compressed = false;
+    if (typeof LZString !== 'undefined') {
+      body = JSON.stringify({ lz: LZString.compressToBase64(rawStr) });
+      compressed = true;
+    } else { body = rawStr; }
+
+    const resp = await fetch('https://api.jsonbin.io/v3/b/' + binId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': syncKey },
+      body
+    });
+    if (resp.ok) {
+      const newMeta = getBackupMeta();
+      newMeta[dayIdx] = { date: todayStr, ts: new Date().toISOString(), day: DAYS_BACKUP[dayIdx] };
+      localStorage.setItem(BACKUP_META_KEY, JSON.stringify(newMeta));
+      console.log('✓ Backup lagret for', DAYS_BACKUP[dayIdx]);
+    }
+  } catch(e) { console.warn('Backup failed:', e); }
+}
+
+async function restoreBackup(dayIdx) {
+  const bins = getBackupBins();
+  const binId = bins[dayIdx];
+  if (!binId) { alert('Ingen backup-bin for denne dagen'); return; }
+  const meta = getBackupMeta();
+  const m = meta[dayIdx];
+  const label = m ? m.date + ' (' + m.day + ')' : DAYS_BACKUP[dayIdx];
+  if (!confirm('Gjenopprett backup fra ' + label + '?\nDette erstatter alle nåværende data.')) return;
+
+  showSyncToast('⏳ Gjenoppretter backup…');
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
+    const resp = await fetch('https://api.jsonbin.io/v3/b/' + binId + '/latest', {
+      headers: { 'X-Master-Key': syncKey, 'X-Bin-Meta': 'false' },
+      signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    if (!resp.ok) { showSyncToast('⚠ Kunne ikke hente backup'); return; }
+    let data = await resp.json();
+    if (data && data.lz && typeof LZString !== 'undefined') {
+      try { data = JSON.parse(LZString.decompressFromBase64(data.lz)); } catch(e) {}
+    }
+    if (!data || !data.crops) { showSyncToast('⚠ Ingen gyldige data i backup'); return; }
+    if (data.crops) crops = data.crops;
+    if (data.tasks) tasks = data.tasks;
+    if (data.bedSizes) bedSizes = data.bedSizes;
+    if (data.bedIDs && data.bedIDs.length) BED_IDS = data.bedIDs;
+    if (data.gardenMap) gardenMap = data.gardenMap;
+    if (data.taskHistory) taskHistory = data.taskHistory;
+    if (data.levering) {
+      if (data.levering.customers) deliveryCustomers = data.levering.customers;
+      if (data.levering.boxTypes) boxTypes = data.levering.boxTypes;
+      if (data.levering.boxWeeks) boxWeeks = data.levering.boxWeeks;
+      if (data.levering.market) deliveryMarket = data.levering.market;
+      if (data.levering.harvest) harvestLog = data.levering.harvest;
+    }
+    sanitizeCrops();
+    saveToLocal();
+    render();
+    showSyncToast('✓ Backup gjenopprettet fra ' + label);
+    document.getElementById('backup-modal')?.remove();
+  } catch(e) {
+    showSyncToast('⚠ Feil ved gjenoppretting');
+    console.error(e);
+  }
+}
+
+function closeBackupModal() { document.getElementById("backup-modal")?.remove(); }
+
+function openVersionLog() {
+  const meta = getBackupMeta();
+  const bins = getBackupBins();
+  const binsReady = bins.length === 7 && bins.every(Boolean);
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#faf8f5' : '#1a2e1b';
+
+  let rows = '';
+  for (let i = 0; i < 7; i++) {
+    const m = meta[i];
+    const hasData = m && m.date;
+    const label = hasData ? m.date : '–';
+    const timeStr = hasData ? new Date(m.ts).toLocaleTimeString('no-NO', {hour:'2-digit',minute:'2-digit'}) : '';
+    rows += '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(128,128,128,0.1)">'
+      + '<div>'
+      + '<div style="font-size:14px;color:var(--text-head)">' + DAYS_BACKUP[i] + '</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + (hasData ? label + (timeStr ? ' · ' + timeStr : '') : 'Ingen backup ennå') + '</div>'
+      + '</div>'
+      + (hasData && binsReady
+        ? '<button onclick="restoreBackup(' + i + ')" style="padding:6px 14px;border-radius:20px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">Gjenopprett</button>'
+        : '<span style="font-size:11px;color:var(--text-muted)">' + (binsReady ? '' : 'Ikke klar') + '</span>'
+      )
+      + '</div>';
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'backup-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;width:100%;max-width:460px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid rgba(128,128,128,0.12);flex-shrink:0">'
+    + '<div style="font-size:15px;color:var(--text-head);font-weight:500">Versjonslogg</div>'
+    + '<button onclick="closeBackupModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1;padding:0">×</button>'
+    + '</div>'
+    + '<div style="padding:0 20px 20px;overflow-y:auto">'
+    + (binsReady ? '' : '<div style="font-size:12px;color:var(--color-value);padding:12px 0;border-bottom:1px solid rgba(128,128,128,0.1)">⚠ Backup-bins ikke initialisert. Kobler til synkronisering og prøver igjen…</div>')
+    + rows
+    + '</div>'
+    + '</div>';
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+
 function initSync() {
   const DEFAULT_KEY = '$2a$10$H3ZyijeCyakGbK9kSCv3U.NqxD/DZNaug3LPpodQYWWiAF270R3oq';
   const DEFAULT_BIN = '69b17723c3097a1dd517e7da';
@@ -6502,6 +6686,7 @@ function gistShowMenu() {
   hdr.textContent = 'Sky-synkronisering';
   menu.appendChild(hdr);
   menu.appendChild(sep());
+  menu.appendChild(row('📋', 'Versjonslogg', 'var(--text-head)', () => { openVersionLog(); float.remove(); }));
   menu.appendChild(row('⬇', 'Last inn fra sky', 'var(--text-head)', () => syncLoad(false)));
   menu.appendChild(row('⬆', 'Lagre til sky', '#34d399', () => syncSave()));
   menu.appendChild(sep());
@@ -6592,6 +6777,8 @@ showTab(currentTab);
 if (harvestMode) { document.body.classList.add('harvest'); showLeveringOverlay(); }
 initSync();
 applyTheme();
+// Run daily backup after a short delay to let sync finish first
+setTimeout(() => runDailyBackup(), 8000);
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
