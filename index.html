@@ -5518,6 +5518,19 @@ function loadFromLocal() {
     const data = JSON.parse(raw);
     if (data.crops) crops = data.crops;
     if (data.tasks) tasks = data.tasks;
+    // Restore backup bin IDs from cloud if local is missing
+    if (data.backupBins && data.backupBins.length === 7) {
+      const localBins = getBackupBins();
+      if (!localBins.length || !localBins.every(Boolean)) {
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(data.backupBins));
+      }
+    }
+    if (data.backupMeta) {
+      const localMeta = getBackupMeta();
+      if (localMeta.every(m => !m)) {
+        localStorage.setItem(BACKUP_META_KEY, JSON.stringify(data.backupMeta));
+      }
+    }
     if (data.bedSizes) bedSizes = data.bedSizes;
     if (data.bedIDs && data.bedIDs.length) BED_IDS = data.bedIDs;
     if (data.gardenMap) gardenMap = data.gardenMap;
@@ -6245,6 +6258,19 @@ async function restoreBackup(dayIdx) {
     if (!data || !data.crops) { showSyncToast('⚠ Ingen gyldige data i backup'); return; }
     if (data.crops) crops = data.crops;
     if (data.tasks) tasks = data.tasks;
+    // Restore backup bin IDs from cloud if local is missing
+    if (data.backupBins && data.backupBins.length === 7) {
+      const localBins = getBackupBins();
+      if (!localBins.length || !localBins.every(Boolean)) {
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(data.backupBins));
+      }
+    }
+    if (data.backupMeta) {
+      const localMeta = getBackupMeta();
+      if (localMeta.every(m => !m)) {
+        localStorage.setItem(BACKUP_META_KEY, JSON.stringify(data.backupMeta));
+      }
+    }
     if (data.bedSizes) bedSizes = data.bedSizes;
     if (data.bedIDs && data.bedIDs.length) BED_IDS = data.bedIDs;
     if (data.gardenMap) gardenMap = data.gardenMap;
@@ -6276,22 +6302,31 @@ function openVersionLog() {
   const isLight = document.body.classList.contains('light');
   const bg = isLight ? '#faf8f5' : '#1a2e1b';
 
+  // Build list of entries with data, sorted newest first
+  const entries = meta
+    .map((m, i) => ({ ...m, dayIdx: i }))
+    .filter(m => m && m.ts)
+    .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+
   let rows = '';
-  for (let i = 0; i < 7; i++) {
-    const m = meta[i];
-    const hasData = m && m.date;
-    const label = hasData ? m.date : '–';
-    const timeStr = hasData ? new Date(m.ts).toLocaleTimeString('no-NO', {hour:'2-digit',minute:'2-digit'}) : '';
-    rows += '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(128,128,128,0.1)">'
-      + '<div>'
-      + '<div style="font-size:14px;color:var(--text-head)">' + DAYS_BACKUP[i] + '</div>'
-      + '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + (hasData ? label + (timeStr ? ' · ' + timeStr : '') : 'Ingen backup ennå') + '</div>'
-      + '</div>'
-      + (hasData && binsReady
-        ? '<button onclick="restoreBackup(' + i + ')" style="padding:6px 14px;border-radius:20px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">Gjenopprett</button>'
-        : '<span style="font-size:11px;color:var(--text-muted)">' + (binsReady ? '' : 'Ikke klar') + '</span>'
-      )
-      + '</div>';
+  if (!entries.length) {
+    rows = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0">Ingen backups lagret ennå</div>';
+  } else {
+    entries.forEach(m => {
+      const dt = new Date(m.ts);
+      const dateStr = dt.toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+      const timeStr = dt.toLocaleTimeString('no-NO', { hour:'2-digit', minute:'2-digit' });
+      rows += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(128,128,128,0.1)">'
+        + '<div>'
+        + '<div style="font-size:13px;color:var(--text-head)">' + dateStr + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">' + timeStr + '</div>'
+        + '</div>'
+        + (binsReady
+          ? '<button onclick="restoreBackup(' + m.dayIdx + ')" style="padding:6px 14px;border-radius:20px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">Gjenopprett</button>'
+          : '<span style="font-size:11px;color:var(--text-muted)">Ikke klar</span>'
+        )
+        + '</div>';
+    });
   }
 
   const modal = document.createElement('div');
@@ -6300,10 +6335,10 @@ function openVersionLog() {
   modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;width:100%;max-width:460px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid rgba(128,128,128,0.12);flex-shrink:0">'
     + '<div style="font-size:15px;color:var(--text-head);font-weight:500">Versjonslogg</div>'
-    + '<button onclick="closeBackupModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1;padding:0">×</button>'
+    + '<button onclick="closeBackupModal()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1;padding:0">\xd7</button>'
     + '</div>'
     + '<div style="padding:0 20px 20px;overflow-y:auto">'
-    + (binsReady ? '' : '<div style="font-size:12px;color:var(--color-value);padding:12px 0;border-bottom:1px solid rgba(128,128,128,0.1)">⚠ Backup-bins ikke initialisert. Kobler til synkronisering og prøver igjen…</div>')
+    + (!binsReady ? '<div style="font-size:12px;color:var(--color-value);padding:12px 0;border-bottom:1px solid rgba(128,128,128,0.1)">⚠ Backup-bins ikke initialisert ennå…</div>' : '')
     + rows
     + '</div>'
     + '</div>';
@@ -6464,6 +6499,20 @@ async function syncLoadOnStart() {
     if (hasNoLocal || remoteIsNewer) {
       if (remote.crops)   crops    = remote.crops.map ? remote.crops : [];
       if (remote.tasks)   tasks    = remote.tasks;
+      // Restore backup bin IDs from cloud if local is missing
+      if (remote.backupBins && remote.backupBins.length === 7) {
+        const localBins = getBackupBins();
+        if (!localBins.length || !localBins.every(Boolean)) {
+          localStorage.setItem(BACKUP_KEY, JSON.stringify(remote.backupBins));
+          console.log('✓ Backup bins restored from cloud');
+        }
+      }
+      if (remote.backupMeta) {
+        const localMeta = getBackupMeta();
+        if (localMeta.every(m => !m)) {
+          localStorage.setItem(BACKUP_META_KEY, JSON.stringify(remote.backupMeta));
+        }
+      }
       sanitizeCrops();
       if (remote.bedSizes) bedSizes = remote.bedSizes;
       if (remote.bedIDs && remote.bedIDs.length) BED_IDS = remote.bedIDs;
@@ -6581,6 +6630,8 @@ async function syncSave() {
     gardenMap: gardenMap || null,
     taskHistory: trimmedHistory,
     levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog },
+    backupBins: getBackupBins(),
+    backupMeta: getBackupMeta(),
     saved: new Date().toISOString()
   };
   const rawStr = JSON.stringify(payload);
