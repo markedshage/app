@@ -1187,15 +1187,15 @@ function openStatPopup(type) {
 }
 
 function renderOversikt() {
-  const sowingDone   = crops.filter(c => c.sownDate && c.sowLog && !c.plantedDate).length;
+  const sowingDone   = crops.filter(c => c.sownDate && logDone(c.sowLog) && !c.plantedDate).length;
   const sowingTotal  = crops.filter(c => c.sownDate && !c.plantedDate).length;
-  const plantingDone = crops.filter(c => c.plantedDate && c.plantLog).length;
+  const plantingDone = crops.filter(c => c.plantedDate && logDone(c.plantLog)).length;
   const plantingTotal= crops.filter(c => c.plantedDate).length;
   const totalValue = crops.reduce((sum, c) => { const v = calcValue(c); return sum + (v !== null ? v : 0); }, 0);
   const valueDisplay = totalValue > 0 ? '~' + Math.round(totalValue / 1000) + 'k' : '–';
 
   const forkTotal = crops.filter(c => c.sownDate && c.plantedDate).length;
-  const forkDone  = crops.filter(c => c.sownDate && c.plantedDate && c.sowLog).length;
+  const forkDone  = crops.filter(c => c.sownDate && c.plantedDate && logDone(c.sowLog)).length;
 
   const stats = [
     { label:"Forkultivering", val:`${forkDone}/${forkTotal}`,        icon:"🌿", color:"var(--color-value)", type:"fork" },
@@ -5468,13 +5468,19 @@ function importFromExcel(event) {
 
 
 function sanitizeCrops() {
+  const normalizeLog = (log) => {
+    if (!log || log === 'undefined') return [];
+    if (Array.isArray(log)) return log.filter(Boolean);
+    if (typeof log === 'string' && log.trim()) return [log.trim()];
+    return [];
+  };
   crops = crops.map(c => ({
     ...c,
     notes:   c.notes   === 'undefined' || c.notes   === undefined   ? '' : c.notes,
     family:  c.family  === 'undefined' || c.family  === undefined   ? '' : c.family,
     category: c.category === 'undefined' || c.category === undefined ? 'Andre' : c.category,
-    sowLog:  c.sowLog  === 'undefined' || c.sowLog  === undefined   ? [] : c.sowLog,
-    plantLog: c.plantLog === 'undefined' || c.plantLog === undefined ? [] : c.plantLog,
+    sowLog:  normalizeLog(c.sowLog),
+    plantLog: normalizeLog(c.plantLog),
     sownDate: c.sownDate === 'undefined' ? '' : (c.sownDate || ''),
     sownByDate: c.sownByDate === 'undefined' ? '' : (c.sownByDate || ''),
     plantedDate: c.plantedDate === 'undefined' ? '' : (c.plantedDate || ''),
