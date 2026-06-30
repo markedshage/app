@@ -525,7 +525,7 @@
       <div class="crop-section-header" onclick="toggleCropSection(this)">Teknisk <span class="cs-arrow">▼</span></div>
       <div class="crop-section-body">
         <div class="form-grid">
-          <div><label class="field-label">Senger</label><input class="field-input" id="c-beds" placeholder="A1, A1-1:5, B2-3"><div id="c-beds-error" style="display:none;color:var(--color-danger);font-size:12px;margin-top:4px"></div></div>
+          <div><label class="field-label">Senger</label><div onclick="openBedPicker()" style="min-height:40px;padding:10px 12px;border-radius:10px;background:var(--bg-input);cursor:pointer;font-size:14px;font-family:inherit;color:var(--text-head)" id="c-beds-display">Velg senger 🗺</div><input type="hidden" id="c-beds"><div id="c-beds-error" style="display:none;color:var(--color-danger);font-size:12px;margin-top:4px"></div></div>
           <div><label class="field-label">Rader (per bed)</label><input class="field-input" id="c-rows" type="number" value="2"></div>
           <div><label class="field-label">Radavstand (cm)</label><input class="field-input" id="c-rowspacing" type="number" value="30"></div>
           <div><label class="field-label">Planteavstand (cm)</label><input class="field-input" id="c-plantspacing" type="number" value="20"></div>
@@ -592,7 +592,8 @@
           <div><label class="field-label">Pris pr/kg (kr)</label><input class="field-input" id="c-pricepkg" type="number" step="0.5" value="0" min="0" oninput="recalcPricePerUnit()"></div>
           <div><label id="c-weightg-label" class="field-label">Vekt per stk (g)</label><input class="field-input" id="c-weightg" type="number" step="1" value="0" min="0" oninput="recalcPricePerUnitFromWeight()"></div>
           <div><label id="c-priceunit-label" class="field-label">Pris per stk (kr) <span id="c-priceunit-auto" style="font-size:10px;color:var(--text-muted);margin-left:4px"></span></label><input class="field-input" id="c-priceunit" type="number" step="0.5" value="0" min="0" oninput="recalcWeightFromPrice()" placeholder="Auto fra kg×vekt"></div>
-          <div><label id="c-unitsperplant-label" class="field-label">Stk per plante</label><input class="field-input" id="c-unitsperplant" type="number" step="1" min="1" value="" oninput="this.value=Math.max(1,Math.round(+this.value||1));recalcVektTotal();toggleVektTotalFields()" placeholder="1"></div>
+          <div><label id="c-unitsperplant-label" class="field-label">Stk per plante (0 = planter per stk)</label><input class="field-input" id="c-unitsperplant" type="number" step="1" min="0" value="" oninput="this.value=Math.max(0,Math.round(+this.value||0));recalcVektTotal();toggleVektTotalFields();togglePlantsPerUnitField()" placeholder="1"></div>
+          <div id="c-plantsperunit-wrap" style="display:none"><label class="field-label" id="c-plantsperunit-label">Planter per stk</label><input class="field-input" id="c-plantsperunit" type="number" step="1" min="1" value="" placeholder="f.eks. 5" oninput="recalcValueFromPlantsPerUnit()"></div>
           <div id="c-vekttotal-wrap"><label id="c-vekttotal-label" class="field-label">Vekt total (g)</label><input class="field-input" id="c-vekttotal" type="number" step="1" value="" min="0" oninput="recalcUnitsPerPlantFromVekt()" placeholder="Auto fra vekt×enheter"></div>
           <div id="c-valuetotal-wrap"><label class="field-label">Verdi total <span style="font-size:10px;color:var(--text-muted)">(beregnet)</span></label><input class="field-input" id="c-valuetotal" type="number" step="1" value="" min="0" readonly style="opacity:0.7;cursor:default"></div>
         </div>
@@ -776,6 +777,174 @@ let boxWeeks = [];                 // [{id, boxTypeId, week, year, items:[{cropI
 let deliveryMarket = [];           // [{id, cropId, qty, unit}]
 let harvestLog = [];
 let showBedStats = (() => { try { return localStorage.getItem('mh_bed_stats') !== '0'; } catch(e) { return true; } })();
+let showBedNotes = (() => { try { return !!localStorage.getItem('mh_bed_notes'); } catch(e) { return false; } })();
+
+
+
+function closeBedPicker() { document.getElementById("bed-picker-modal")?.remove(); }
+function closeBedSettings() { document.getElementById("bed-settings-modal")?.remove(); }
+
+function openBedPicker() {
+  const existing = document.getElementById('bed-picker-modal');
+  if (existing) { existing.remove(); return; }
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#faf8f5' : '#1a2e1b';
+  const currentBeds = (document.getElementById('c-beds')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  // Group by field
+  const fields = {};
+  BED_IDS.forEach(id => {
+    const p = parseBedId(id);
+    if (!p) return;
+    if (!fields[p.field]) fields[p.field] = [];
+    fields[p.field].push(id);
+  });
+
+  const modal = document.createElement('div');
+  modal.id = 'bed-picker-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:8000;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  let fieldsHtml = Object.entries(fields).map(([f, beds]) =>
+    '<div style="margin-bottom:14px">'
+    + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px">Felt ' + f + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+    + beds.map(id => {
+        const sel = currentBeds.includes(id);
+        return '<button onclick="toggleBedChip(this,this.dataset.bed)" data-bed="' + id + '" style="padding:6px 12px;border-radius:20px;border:none;background:' + (sel?'var(--accent)':'var(--bg-card)') + ';color:' + (sel?'var(--bg-main)':'var(--text-muted)') + ';cursor:pointer;font-size:13px;font-family:inherit">' + id + '</button>';
+      }).join('')
+    + '</div></div>'
+  ).join('');
+
+  modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;width:100%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid rgba(128,128,128,0.12);flex-shrink:0">'
+    + '<div style="font-size:15px;color:var(--text-head);font-weight:500">Velg senger</div>'
+    + '<button onclick="closeBedPicker()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:22px;line-height:1;padding:0">×</button>'
+    + '</div>'
+    + '<div style="padding:16px 20px;overflow-y:auto">' + fieldsHtml + '</div>'
+    + '<div style="padding:12px 20px;border-top:1px solid rgba(128,128,128,0.1)">'
+    + '<button onclick="applyBedPicker()" style="width:100%;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Bruk valgte senger</button>'
+    + '</div></div>';
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function toggleBedChip(btn, bedId) {
+  const isSelected = btn.style.background.includes('var(--accent)');
+  if (isSelected) {
+    btn.style.background = 'var(--bg-card)';
+    btn.style.color = 'var(--text-muted)';
+  } else {
+    btn.style.background = 'var(--accent)';
+    btn.style.color = 'var(--bg-main)';
+  }
+}
+
+function applyBedPicker() {
+  const selected = [...document.querySelectorAll('#bed-picker-modal [data-bed]')]
+    .filter(b => b.style.background.includes('var(--accent)'))
+    .map(b => b.dataset.bed);
+  if (window._bedPickerCallback) {
+    window._bedPickerCallback(selected);
+    window._bedPickerCallback = null;
+  } else {
+    const inp = document.getElementById('c-beds');
+    if (inp) inp.value = selected.join(', ');
+    const disp = document.getElementById('c-beds-display');
+    if (disp) disp.textContent = selected.length ? selected.join(', ') : 'Velg senger 🗺';
+  }
+  document.getElementById('bed-picker-modal')?.remove();
+}
+
+function openBedNoteEdit(bedId) {
+  const current = (bedSizes[bedId] && bedSizes[bedId].note) || '';
+  const isLight = document.body.classList.contains('light');
+  const modal = document.createElement('div');
+  modal.id = 'bed-note-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = '<div style="background:' + (isLight?'#faf8f5':'#1a2e1b') + ';border-radius:16px;padding:20px;width:100%;max-width:400px">'
+    + '<div style="font-size:14px;color:var(--text-muted);margin-bottom:10px">Notat for seng ' + bedId + '</div>'
+    + '<textarea id="bed-note-input" rows="3" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box">' + current + '</textarea>'
+    + '<div style="display:flex;gap:8px;margin-top:12px">'
+    + '<button onclick="closeBedNoteModal()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>'
+    + '<button onclick="saveBedNote(\'' + bedId + '\')" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Lagre</button>'
+    + '</div></div>';
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('bed-note-input')?.focus(), 50);
+}
+
+function closeBedNoteModal() { document.getElementById("bed-note-modal")?.remove(); }
+
+function saveBedNote(bedId) {
+  if (!bedSizes[bedId]) bedSizes[bedId] = { length: 11, width: 1.2 };
+  const note = document.getElementById('bed-note-input')?.value || '';
+  bedSizes[bedId].note = note.trim();
+  document.getElementById('bed-note-modal')?.remove();
+  saveToLocal();
+  scheduleSync();
+  renderSenger();
+}
+
+function openBedSettings() {
+  const existing = document.getElementById('bed-settings-modal');
+  if (existing) { existing.remove(); return; }
+  const isLight = document.body.classList.contains('light');
+  const float = document.createElement('div');
+  float.id = 'bed-settings-modal';
+  float.style.cssText = 'position:fixed;right:12px;top:70px;background:' + (isLight ? '#fffbf5' : '#1a2e1b') + ';border:none;border-radius:16px;padding:8px;min-width:220px;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,0.5)';
+
+  const row = (icon, label, color, fn) => {
+    const b = document.createElement('button');
+    b.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-size:13px;color:' + color + ';font-family:inherit;text-align:left';
+    b.innerHTML = '<span style="font-size:16px;width:20px;text-align:center;flex-shrink:0">' + icon + '</span><span style="flex:1">' + label + '</span>';
+    b.onmouseover = () => b.style.background = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)';
+    b.onmouseout  = () => b.style.background = 'transparent';
+    b.onclick = (e) => { e.stopPropagation(); fn(); };
+    return b;
+  };
+  const rowToggle = (icon, label, fn, on) => {
+    const b = row(icon, label, 'var(--text-head)', fn);
+    const t = document.createElement('div');
+    t.style.cssText = 'width:36px;height:20px;border-radius:10px;position:relative;flex-shrink:0;background:' + (on ? 'var(--accent)' : 'rgba(128,128,128,0.3)');
+    const k = document.createElement('div');
+    k.style.cssText = 'position:absolute;top:2px;left:' + (on ? '18' : '2') + 'px;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.3)';
+    t.id = 'bst-' + icon;
+    t.appendChild(k);
+    b.appendChild(t);
+    return b;
+  };
+  const sep = () => { const d = document.createElement('div'); d.style.cssText = 'height:1px;background:var(--border);margin:4px 0'; return d; };
+
+  float.appendChild(row('➕', 'Ny seng', 'var(--text-head)', () => { openAddBed(); float.remove(); }));
+  float.appendChild(sep());
+  float.appendChild(rowToggle('📊', 'Statistikk', () => {
+    toggleBedStats();
+    const t = float.querySelector('#bst-📊');
+    if (t) { t.style.background = showBedStats ? 'var(--accent)' : 'rgba(128,128,128,0.3)'; t.firstChild.style.left = showBedStats ? '18px' : '2px'; }
+  }, showBedStats));
+  float.appendChild(rowToggle('📝', 'Notat', () => {
+    toggleBedNotes();
+    const t = float.querySelector('#bst-📝');
+    if (t) { t.style.background = showBedNotes ? 'var(--accent)' : 'rgba(128,128,128,0.3)'; t.firstChild.style.left = showBedNotes ? '18px' : '2px'; }
+  }, showBedNotes));
+
+  document.body.appendChild(float);
+  setTimeout(() => {
+    function mdH(e) {
+      const m = document.getElementById('bed-settings-modal');
+      if (!m) { document.removeEventListener('mousedown', mdH); return; }
+      if (!m.contains(e.target)) { m.remove(); document.removeEventListener('mousedown', mdH); }
+    }
+    document.addEventListener('mousedown', mdH);
+  }, 50);
+}
+
+function toggleBedNotes() {
+  showBedNotes = !showBedNotes;
+  try { localStorage.setItem('mh_bed_notes', showBedNotes ? '1' : ''); } catch(e) {}
+  renderSenger();
+}
+
 function toggleBedStats() {
   showBedStats = !showBedStats;
   try { localStorage.setItem('mh_bed_stats', showBedStats ? '1' : '0'); } catch(e) {}
@@ -1164,7 +1333,7 @@ function openStatPopup(type) {
   modal.innerHTML = `<div style="background:${bg};border-radius:16px;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid ${borderColor};flex-shrink:0">
       <div style="font-size:15px;font-weight:500;color:var(--text-head)">${title}</div>
-      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;font-size:22px;color:var(--text-muted);padding:0;line-height:1">×</button>
+      <button onclick="closeBedNoteModal()" style="background:none;font-size:22px;color:var(--text-muted);padding:0;line-height:1">×</button>
     </div>
     <div style="overflow-y:auto;padding:12px 20px 24px">
       ${sorted.length === 0 ? `<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen vekster å vise</div>` : ''}
@@ -1265,13 +1434,17 @@ function calcPlants(crop) {
 }
 
 function calcValue(crop) {
+  const plants = calcPlants(crop);
+  // plantsPerUnit mode: unitsPerPlant===0, use plantsPerUnit instead
+  if ((crop.unitsPerPlant === 0 || crop.unitsPerPlant === '0') && crop.plantsPerUnit > 0 && crop.pricePerUnit) {
+    return Math.round((plants / crop.plantsPerUnit) * crop.pricePerUnit);
+  }
   if (!crop.pricePerKg) return null;
-  // Prefer vektTotal-based calculation if available
   if (crop.vektTotal && crop.vektTotal > 0) {
-    return Math.round(calcPlants(crop) * (crop.vektTotal / 1000) * crop.pricePerKg);
+    return Math.round(plants * (crop.vektTotal / 1000) * crop.pricePerKg);
   }
   if (!crop.weightG) return null;
-  return Math.round(calcPlants(crop) * (crop.weightG / 1000) * crop.pricePerKg);
+  return Math.round(plants * (crop.weightG / 1000) * crop.pricePerKg);
 }
 
 
@@ -3201,8 +3374,7 @@ function renderSenger() {
         ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Felt':'Felt '+f}</option>`).join('')}
       </select>
       <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Kart</button>
-      <button onclick="openAddBed()" style="padding:7px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Ny seng</button>
-      <button onclick="toggleBedStats()" style="padding:7px 12px;border-radius:20px;border:none;background:${showBedStats?'var(--accent-bg)':'var(--bg-card)'};color:${showBedStats?'var(--accent-soft)':'var(--text-muted)'};cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Statistikk</button>
+      <button onclick="openBedSettings()" style="padding:7px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">⚙️ Innstillinger</button>
     </div>`;
 
   // Group beds by field letter
@@ -3273,6 +3445,7 @@ function renderSenger() {
                         : `<span>${bedCropList.map(c=>c.name).join(' · ')}</span>`)
                     : `<span style="color:var(--text-muted)">Ledig</span>`}
                 </div>
+                ${showBedNotes && occupied && bedSizes[bed]?.note ? '' : ''}
                 ${showBedStats && occupied ? (() => {
                   // Find earliest relevant date across all crops in this bed
                   const MONTHS_NO = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
@@ -3282,21 +3455,22 @@ function renderSenger() {
                   const dates = bedCropList.map(c => {
                     const hasPlant = c.plantedDate;
                     const hasSow = c.sownDate && !c.plantedDate;
-                    if (hasPlant) return { date: c.plantedDate, label: 'Plantedato', done: logDone(c.plantLog) };
-                    if (hasSow) return { date: c.sownDate, label: 'Sådato', done: logDone(c.sowLog) };
+                    if (hasPlant) { const pl = logDone(c.plantLog) ? latestLog(c.plantLog) : null; return pl ? { date: pl, label: 'Plantelogg', done: true } : { date: c.plantedDate, label: 'Plantedato', done: false }; }
+                    if (hasSow) { const sl = logDone(c.sowLog) ? latestLog(c.sowLog) : null; return sl ? { date: sl, label: 'Sålogg', done: true } : { date: c.sownDate, label: 'Sådato', done: false }; }
                     return null;
                   }).filter(Boolean);
                   if (!dates.length) return '';
                   // Sort by date, pick earliest
                   dates.sort((a,b) => a.date.split('-').reverse().join('') > b.date.split('-').reverse().join('') ? 1 : -1);
                   const first = dates[0];
-                  allDone = dates.every(d => d.done);
+                  allDone = false; // no strikethrough
                   const formatted = fmtD(first.date);
                   if (!formatted) return '';
-                  return `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;${allDone?'text-decoration:line-through;':''}">${first.label}: ${formatted}</div>`;
+                  return `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;${''}">${first.label}: ${formatted}</div>`;
                 })() : ''}
               </div>
             </div>
+            ${showBedNotes && bedSizes[bed]?.note ? `<div style="flex:1;text-align:center;font-size:13px;color:var(--text-muted);padding:0 10px;align-self:center;line-height:1.4">${bedSizes[bed].note}</div>` : ''}
             ${(() => {
               const totalVal = bedCropList.reduce((sum, crop) => {
                 const segSpecs = crop.beds.filter(s => parseBedSpec(s).bedId === bed);
@@ -3399,7 +3573,10 @@ function renderSenger() {
           </div>`;
         });
 
-        html += `<button onclick="event.stopPropagation();selectBed('${bed}');openAddBed('${bed}')" style="width:100%;padding:10px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;margin-bottom:4px">Rediger seng</button>`;
+        html += `<div style="display:flex;gap:6px;margin-bottom:4px">
+          <button onclick="event.stopPropagation();selectBed('${bed}');openAddBed('${bed}')" style="flex:1;padding:10px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Rediger seng</button>
+          <button onclick="event.stopPropagation();openBedNoteEdit('${bed}')" style="flex:1;padding:10px;border-radius:10px;border:none;background:${bedSizes[bed]?.note ? 'var(--accent-bg)' : 'transparent'};color:${bedSizes[bed]?.note ? 'var(--accent-soft)' : 'var(--text-muted)'};cursor:pointer;font-size:12px;font-family:inherit">📝 ${bedSizes[bed]?.note ? 'Rediger notat' : 'Legg til notat'}</button>
+        </div>`;
         html += `</div>`;
       }
     });
@@ -3433,28 +3610,101 @@ function openAddBed() {
   document.getElementById('modal-addbed').style.display = 'flex';
 }
 
+
+// Parse bed ID into field letter(s) and number
+function parseBedId(bedId) {
+  const m = bedId.match(/^([A-Z]+)(\d+)$/);
+  if (!m) return null;
+  return { field: m[1], num: parseInt(m[2]), full: bedId };
+}
+
+// Get all bed numbers as a flat sorted list, check if contiguous across fields
+function getShiftableRange(newOrDeletedId, allBeds, isDelete) {
+  const parsed = parseBedId(newOrDeletedId);
+  if (!parsed) return null;
+  // Get all parsed beds sorted by number
+  const allParsed = allBeds.map(parseBedId).filter(Boolean).sort((a,b) => a.num - b.num);
+  // Check if numbers are contiguous across fields (no gap)
+  let crossField = false;
+  for (let i = 1; i < allParsed.length; i++) {
+    if (allParsed[i].num === allParsed[i-1].num + 1 && allParsed[i].field !== allParsed[i-1].field) {
+      crossField = true;
+    }
+  }
+  // Find beds to shift: same field unless cross-field numbering
+  return allParsed.filter(b => {
+    if (crossField) return b.num >= parsed.num + (isDelete ? 1 : 1);
+    return b.field === parsed.field && b.num >= parsed.num + (isDelete ? 1 : 1);
+  });
+}
+
+function shiftBedIds(bedsToShift, delta) {
+  // Build rename map: old -> new
+  const renameMap = {};
+  bedsToShift.forEach(b => {
+    renameMap[b.full] = b.field + (b.num + delta);
+  });
+  // Rename in BED_IDS
+  BED_IDS = BED_IDS.map(id => renameMap[id] || id);
+  // Rename in bedSizes
+  const newBedSizes = {};
+  Object.entries(bedSizes).forEach(([id, val]) => {
+    newBedSizes[renameMap[id] || id] = val;
+  });
+  bedSizes = newBedSizes;
+  // Rename in all crop beds
+  crops = crops.map(c => ({
+    ...c,
+    beds: c.beds.map(spec => {
+      // Handle specs like "A1", "A1-1:5", "A1-3"
+      return spec.replace(/^([A-Z]+\d+)/, match => renameMap[match] || match);
+    })
+  }));
+}
+
 function addBed() {
   const name = document.getElementById('ab-name').value.trim().toUpperCase();
   const errEl = document.getElementById('ab-error');
   if (!name) { errEl.textContent = 'Skriv inn et sengnavn.'; errEl.style.display='block'; return; }
   if (BED_IDS.includes(name)) { errEl.textContent = `Seng ${name} finnes allerede.`; errEl.style.display='block'; return; }
-  BED_IDS.push(name);
   snapshot();
-  bedSizes[name] = {
-    length: parseFloat(document.getElementById('ab-length').value) || 11,
-    width:  parseFloat(document.getElementById('ab-width').value)  || 1.2,
-  };
+  const newLen = parseFloat(document.getElementById('ab-length').value) || 11;
+  const newWid = parseFloat(document.getElementById('ab-width').value) || 1.2;
+  const toShift = getShiftableRange(name, BED_IDS, false);
+  if (toShift && toShift.length > 0) {
+    const names = toShift.map(b => b.full).join(', ');
+    if (confirm('Vil du forskyve ' + names + ' med +1 for å gjøre plass til ' + name + '?')) {
+      shiftBedIds(toShift, 1);
+    }
+  }
+  BED_IDS.push(name);
+  BED_IDS.sort((a, b) => {
+    const pa = parseBedId(a), pb = parseBedId(b);
+    if (!pa || !pb) return 0;
+    return pa.field < pb.field ? -1 : pa.field > pb.field ? 1 : pa.num - pb.num;
+  });
+  bedSizes[name] = { length: newLen, width: newWid };
   closeModal('modal-addbed');
   selectedBed = name;
+  saveToLocal();
   renderSenger();
 }
 
 function deleteBed(bedId) {
-  if (getCropsInBed(bedId).length > 0) return;
+  if (getCropsInBed(bedId).length > 0) { alert('Fjern alle vekster fra sengen før du sletter den.'); return; }
+  if (!confirm('Slett seng ' + bedId + '?')) return;
   snapshot();
+  const toShift = getShiftableRange(bedId, BED_IDS, true);
   BED_IDS = BED_IDS.filter(id => id !== bedId);
   delete bedSizes[bedId];
+  if (toShift && toShift.length > 0) {
+    const names = toShift.map(b => b.full).join(', ');
+    if (confirm('Vil du forskyve ' + names + ' med -1 for å fylle hullet etter ' + bedId + '?')) {
+      shiftBedIds(toShift, -1);
+    }
+  }
   selectedBed = null;
+  saveToLocal();
   renderSenger();
 }
 
@@ -3554,14 +3804,7 @@ function renderVekster() {
                 </div>
               </div>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;width:120px;pointer-events:none">
-                  ${Object.entries(STATUS).map(([key, s]) => {
-                    const active = statuses.includes(key);
-                    return '<div style="padding:3px 4px;border-radius:20px;background:' + (active ? s.bg : 'transparent') + ';color:' + (active ? s.color : 'var(--text-dim)') + ';font-size:10px;text-align:center;font-weight:' + (active ? '600' : '400') + '">' + s.label.split(' ')[0] + '</div>';
-                  }).join('')}
-                </div>
-              </div>
-            </div>
+                </div></div>
             <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-card);border-radius:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,0.12)">
               <span style="font-size:20px">🌿</span>
               <div>
@@ -3590,12 +3833,7 @@ function renderVekster() {
             + '<div class="crop-info"><span style="font-size:26px">' + c.emoji + '</span>'
             + '<div><div class="crop-name">' + (c.family ? c.family : c.name) + '</div><div class="crop-family">' + (c.family ? c.name : '') + '</div></div></div>'
             + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
-            + '<div onclick="event.stopPropagation()" style="display:grid;grid-template-columns:1fr 1fr;gap:3px;width:120px">'
-            + Object.entries(STATUS).map(([key, s]) => {
-                const active = c.status===key;
-                return '<button onclick="event.stopPropagation();setCropStatus(' + c.id + ',\'' + key + '\')" style="padding:3px 4px;border-radius:20px;background:' + (active ? s.bg : 'transparent') + ';color:' + (active ? s.color : 'var(--text-dim)') + ';cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap;text-align:center;font-weight:' + (active ? '600' : '400') + ';transition:background 0.15s">' + s.label.split(' ')[0] + '</button>';
-              }).join('')
-            + '</div></div></div>'
+            + '</div></div>'
             + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--bg-card);border-radius:10px;box-shadow:inset 0 0 0 1px rgba(128,128,128,0.12)">'
             + '<span style="font-size:20px">🌿</span>'
             + '<div><div style="font-size:22px;font-weight:300;color:var(--accent);line-height:1">' + plantCount + '</div>'
@@ -3614,7 +3852,7 @@ function renderVekster() {
               + (logDone(c.sowLog) ? '<div class="crop-notes">🌾 Sålogg: ' + logDisplay(c.sowLog) + '</div>' : '')
               + (c.plantLog ? '<div class="crop-notes">🪴 Plantelogg: ' + c.plantLog + '</div>' : '')
               + (c.notes ? '<div class="crop-notes">📝 ' + c.notes + '</div>' : '')
-              + '<div style="display:flex;gap:8px;margin-top:8px"><button onclick="event.stopPropagation();openEditCrop(' + c.id + ')" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button></div>'
+              + '<div style="display:flex;gap:6px;margin-top:8px">'              + '<button onclick="event.stopPropagation();openEditCrop(' + c.id + ')" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>'              + (c.sownDate ? '<button onclick="event.stopPropagation();startModus(\'saa\',' + c.id + ')" style="flex:1;background:rgba(96,165,250,0.1);border:none;border-radius:20px;color:var(--color-info);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">🌱 Såguide</button>' : '')              + (c.plantedDate ? '<button onclick="event.stopPropagation();startModus(\'plant\',' + c.id + ')" style="flex:1;background:rgba(52,211,153,0.1);border:none;border-radius:20px;color:var(--accent-soft);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">🪴 Planteguide</button>' : '')              + '</div>'
               : '')
             + '</div>';
         }).join('');
@@ -3786,7 +4024,7 @@ document.addEventListener('click', e => {
   if (!popup) return;
   if (popup.contains(e.target)) return;
   // Don't close if clicking a button that opens the calendar
-  if (e.target.closest && e.target.closest('[onclick*="openCal"], [onclick*="openModus"], [onclick*="startEditTaskDate"], [onclick*="DatePicker"], [onclick*="openLogCal"], [data-logtype]')) return;
+  if (e.target.closest && e.target.closest('[onclick*="openCal"], [onclick*="openModus"], [onclick*="startEditTaskDate"], [onclick*="DatePicker"], [onclick*="openLogCal"], [data-logtype], [data-guidefield], [onclick*="openGuideDate"]')) return;
   popup.remove();
 });
 function setCropFilter(f) { cropFilter = f; renderVekster(); }
@@ -3998,6 +4236,27 @@ function calcGang(crop, bedSpec) {
   return Math.round(gang * 10) / 10;
 }
 
+function togglePlantsPerUnitField() {
+  const upp = +document.getElementById('c-unitsperplant')?.value || 0;
+  const wrap = document.getElementById('c-plantsperunit-wrap');
+  const priceWrap = document.getElementById('c-priceunit');
+  const labelEl = document.getElementById('c-plantsperunit-label');
+  if (!wrap) return;
+  if (upp === 0) {
+    wrap.style.display = '';
+    // Update label based on unit
+    const unit = document.getElementById('c-unit')?.value || 'stk';
+    if (labelEl) labelEl.textContent = 'Planter per ' + unit;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function recalcValueFromPlantsPerUnit() {
+  const plants = +document.getElementById('c-unitsperplant')?.value || 0;
+  // value = (totalPlants / plantsPerUnit) * pricePerUnit — shown readonly
+}
+
 function toggleVektTotalFields() {
   const upp = parseFloat(document.getElementById('c-unitsperplant')?.value) || 1;
   const show = upp !== 1;
@@ -4196,7 +4455,10 @@ function openEditCrop(id) {
   const unitSel = document.getElementById('c-unit');
   if (unitSel) { unitSel.value = c.unit || 'stk'; }
   const uppEl = document.getElementById('c-unitsperplant');
-  if (uppEl) { uppEl.value = c.unitsPerPlant || 1; delete uppEl.dataset.custom; }
+  if (uppEl) { uppEl.value = c.unitsPerPlant !== undefined ? c.unitsPerPlant : 1; delete uppEl.dataset.custom; }
+  const ppuEl = document.getElementById('c-plantsperunit');
+  if (ppuEl) ppuEl.value = c.plantsPerUnit || '';
+  setTimeout(() => togglePlantsPerUnitField(), 0);
   const vtEl = document.getElementById('c-vekttotal');
   if (vtEl) { vtEl.value = c.vektTotal || ''; delete vtEl.dataset.custom; }
   const valEl = document.getElementById('c-valuetotal');
@@ -4206,6 +4468,8 @@ function openEditCrop(id) {
   _catSel.value = c.category || 'Andre';
   setTimeout(() => { updateUnitLabels(); toggleVektTotalFields(); }, 0);
   document.getElementById('c-beds').value = c.beds.join(', ');
+  const _bdisp = document.getElementById('c-beds-display');
+  if (_bdisp) _bdisp.textContent = c.beds.length ? c.beds.join(', ') : 'Velg senger 🗺';
   document.getElementById('c-rowspacing').value = c.rowSpacing;
   document.getElementById('c-plantspacing').value = c.plantSpacing;
   document.getElementById('c-rows').value = c.rows;
@@ -5149,6 +5413,83 @@ function modusClearDate() {
 }
 
 
+
+
+
+function openBedPickerGuide(cropId) {
+  const crop = crops.find(c => c.id === cropId);
+  if (!crop) return;
+  // Temporarily set c-beds hidden field and display for picker
+  let tmpInp = document.getElementById('c-beds');
+  let tmpDisp = document.getElementById('c-beds-display');
+  if (!tmpInp) { tmpInp = document.createElement('input'); tmpInp.type='hidden'; tmpInp.id='c-beds'; document.body.appendChild(tmpInp); }
+  tmpInp.value = crop.beds.join(', ');
+  // Override applyBedPicker to save to crop
+  window._bedPickerCallback = (selected) => {
+    snapshot();
+    crops = crops.map(c => c.id===cropId ? {...c, beds: selected} : c);
+    saveToLocal(); scheduleSync();
+    // Update guide display
+    const spans = document.querySelectorAll('[onclick*="openBedPickerGuide"]');
+    spans.forEach(s => { if (s.onclick?.toString().includes(cropId)) s.textContent = selected.join(', ')||'–'; });
+  };
+  openBedPicker();
+}
+
+function openGuideDate(fieldId) {
+  const cropId = window._modusCropId;
+  const crop = crops.find(c => c.id === cropId);
+  if (!crop) return;
+  const isSow = fieldId.includes('sow');
+  const tempBtnId = 'guide-date-tmp-btn';
+  let tmpBtn = document.getElementById(tempBtnId);
+  if (!tmpBtn) { tmpBtn = document.createElement('button'); tmpBtn.id = tempBtnId; tmpBtn.style.display='none'; document.body.appendChild(tmpBtn); }
+  const valId = 'guide-date-val';
+  let tmpVal = document.getElementById(valId);
+  if (!tmpVal) { tmpVal = document.createElement('input'); tmpVal.type='hidden'; tmpVal.id=valId; document.body.appendChild(tmpVal); }
+  tmpVal.value = (isSow ? crop.sownDate : crop.plantedDate) || '';
+  openCal(tempBtnId, valId);
+  _onDatePicked = (newVal) => {
+    snapshot();
+    if (isSow) { crops = crops.map(c => c.id===cropId ? {...c, sownDate: newVal} : c); }
+    else { crops = crops.map(c => c.id===cropId ? {...c, plantedDate: newVal} : c); }
+    saveToLocal();
+    scheduleSync();
+    // Update button text in guide using data-guidefield
+    const btn = document.querySelector('[data-guidefield="' + fieldId + '"]');
+    if (btn) btn.textContent = newVal || '–';
+    showSyncToast('✓ Dato oppdatert');
+  };
+}
+
+function updateGuideRuler() {
+  // Get current values from guide inputs
+  const rsEl = document.getElementById('modus-rowspacing');
+  const psEl = document.getElementById('modus-plantspacing');
+  const rowsEl = document.getElementById('modus-rows');
+  const cropId = window._modusCropId;
+  if (!cropId) return;
+  const crop = crops.find(c => c.id === cropId);
+  if (!crop) return;
+  const tempCrop = {
+    ...crop,
+    rowSpacing: rsEl ? +rsEl.value : crop.rowSpacing,
+    plantSpacing: psEl ? +psEl.value : crop.plantSpacing,
+    rows: rowsEl ? +rowsEl.value : crop.rows,
+  };
+  const rulerContainer = document.getElementById('modus-ruler');
+  if (rulerContainer) {
+    const accentColor = document.body.classList.contains('harvest') ? '#34d399' : 'var(--color-info)';
+    rulerContainer.innerHTML = buildRulerHtml(tempCrop, accentColor);
+  }
+  // Update gangavstand display
+  const gangEl = document.getElementById('modus-gang-val');
+  if (gangEl) {
+    const newGang = calcGang(tempCrop);
+    gangEl.textContent = newGang !== null ? newGang + ' cm' : '–';
+  }
+}
+
 function buildRulerHtml(crop, accentColor) {
   const gang = calcGang(crop);
   if (gang === null || !crop.rowSpacing || !crop.rows) return '';
@@ -5179,6 +5520,7 @@ function buildRulerHtml(crop, accentColor) {
 }
 
 function startModus(type, cropId) {
+  window._modusCropId = cropId;
   const crop = crops.find(c => c.id === cropId);
   if (crop) {
     const existingLog = type === 'saa' ? crop.sowLog : crop.plantLog;
@@ -5229,7 +5571,7 @@ function renderModus() {
   const logLabel = isSaa ? 'Logg sådato' : 'Logg plantedato';
   const logSection = '<div style="margin-bottom:18px">'
     +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">'+logLabel+'</div>'
-    +'<button type="button" id="modus-date-btn" onclick="openModusDatePicker()" style="width:100%;padding:12px;border-radius:12px;border:none;background:var(--bg-card);color:'+(logDateVal?'#d1fae5':'#6b7280')+';cursor:pointer;font-size:14px;font-family:inherit;text-align:left">'+logDateDisplay+'</button>'
+    +'<button type="button" id="modus-date-btn" onclick="openModusDatePicker()" style="width:100%;padding:12px;border-radius:12px;border:none;background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:14px;font-family:inherit;text-align:left">'+logDateDisplay+'</button>'
     +'<input type="hidden" id="modus-date-val" value="'+logDateVal+'">'
     +'</div>';
 
@@ -5240,26 +5582,36 @@ function renderModus() {
     const isDirectSow = !crop.plantedDate; // direktesåing: ingen plantedato
     const gang = calcGang(crop);
     const gangStr = gang !== null ? gang+' cm' : '–';
-    const infoCell = (label, val) =>
+    const infoCell = (label, val, fieldId) =>
       '<div style="padding:12px;border-radius:12px;background:var(--bg-card)">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">'+label+'</div>'
-      +'<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
+      +(fieldId
+        ? (fieldId.includes('date')
+          ? '<button type="button" data-guidefield="' + fieldId + '" onclick="openGuideDate(this.dataset.guidefield)" style="font-size:14px;color:var(--text-head);background:rgba(255,255,255,0.06);border:none;border-radius:6px;width:100%;padding:4px 8px;font-family:inherit;text-align:left;cursor:pointer">' + val + '</button>'
+          : '<input id="'+fieldId+'" value="'+val+'" type="number" oninput="updateGuideRuler()" style="font-size:16px;color:var(--text-head);background:transparent;border:none;width:100%;padding:2px 0;font-family:inherit;outline:none;-webkit-appearance:none;background:rgba(255,255,255,0.06);border-radius:6px;padding:4px 8px">')
+        : '<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
+      )
       +'</div>';
+    const bedDisplay = crop.beds && crop.beds.length ? crop.beds.join(', ') : '–';
     const baseFields = [
       ['Antall planter', '<span style="font-size:26px;font-weight:300">'+plants+'</span>'],
-      ['Sådato', sownDateVal],
+      ['Seng(er)', '<span style="cursor:pointer;font-size:14px" onclick="openBedPickerGuide('+crop.id+')">' + bedDisplay + '</span>'],
+      ['Sådato', sownDateVal, 'modus-sowdate'],
     ];
     if (crop.seedsPerCluster && crop.seedsPerCluster > 1) baseFields.push(['Frø per klynge', '<span style="font-size:26px;font-weight:300">'+crop.seedsPerCluster+'</span>']);
     if (isDirectSow) {
-      baseFields.push(['Radavstand', (crop.rowSpacing||'–')+' cm']);
-      baseFields.push(['Planteavstand', (crop.plantSpacing||'–')+' cm']);
-      baseFields.push(['Gangavstand', gangStr]);
-      baseFields.push(['Rader', crop.rows]);
+      baseFields.push(['Radavstand', crop.rowSpacing||0, 'modus-rowspacing']);
+      baseFields.push(['Planteavstand', crop.plantSpacing||0, 'modus-plantspacing']);
+      // gangavstand shown separately below grid
+      baseFields.push(['Rader', crop.rows||0, 'modus-rows']);
     }
-    details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
-      + baseFields.map(([label, val]) => infoCell(label, val)).join('')
+    details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+      + baseFields.map(([label, val, fid]) => infoCell(label, val, fid)).join('')
       +'</div>';
-    if (isDirectSow) details += buildRulerHtml(crop, accentColor);
+    if (isDirectSow) {
+      details += '<div style="padding:8px 12px;border-radius:10px;background:var(--bg-card);margin-bottom:10px;font-size:13px;color:var(--text-muted)">Gangavstand: <span id="modus-gang-val" style="color:var(--text-head);font-weight:500">' + gangStr + '</span></div>';
+      details += '<div id="modus-ruler">' + buildRulerHtml(crop, accentColor) + '</div>';
+    }
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
       +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
@@ -5269,6 +5621,7 @@ function renderModus() {
     const gang = calcGang(crop);
     const gangStr = gang !== null ? gang+' cm' : '–';
     const plantedDateVal = crop.plantedDate || '–';
+    const bedDisplay = crop.beds && crop.beds.length ? crop.beds.join(', ') : '–';
     details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
       +[
         ['Senger', crop.beds.join(', ')],
@@ -5285,7 +5638,7 @@ function renderModus() {
         +'</div>'
       ).join('')
       +'</div>';
-    details += buildRulerHtml(crop, accentColor);
+    details += '<div id="modus-ruler">' + buildRulerHtml(crop, accentColor) + '</div>';
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
       +'<textarea id="modus-notes" onchange="modusNotesChanged()" oninput="modusNotesChanged()" rows="2" style="width:100%;padding:8px 10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-head);font-size:12px;font-family:inherit;resize:vertical;line-height:1.5">'+escapeHtml(modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : (crop.notes||''))+'</textarea>'
@@ -5304,6 +5657,17 @@ function renderModus() {
 
 function openModusDatePicker() {
   openCal('modus-date-btn', 'modus-date-val');
+  _onDatePicked = (newVal) => {
+    const btn = document.getElementById('modus-date-btn');
+    const inp = document.getElementById('modus-date-val');
+    if (inp) inp.value = newVal;
+    if (btn) {
+      const parts = newVal ? newVal.split('-') : [];
+      const MONTHS_NO = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+      btn.textContent = parts.length === 3 ? (+parts[0]) + '. ' + (MONTHS_NO[+parts[1]-1]||'') + ' ' + parts[2] : (newVal||'Velg dato 📅');
+      btn.style.color = 'var(--text-head)';
+    }
+  };
 }
 
 function openModusMainDatePicker() {
