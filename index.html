@@ -6524,6 +6524,10 @@ async function ensureBackupBins() {
   if (!syncKey) return;
   let bins = getBackupBins();
   if (bins.length === 7 && bins.every(Boolean)) return; // all exist
+  // Small delay to allow any in-progress cloud loads to finish restoring bins
+  await new Promise(r => setTimeout(r, 200));
+  bins = getBackupBins();
+  if (bins.length === 7 && bins.every(Boolean)) return; // restored from cloud
 
   showSyncToast('⏳ Oppretter backup-bins…');
   const newBins = [...bins];
@@ -6888,8 +6892,12 @@ async function syncLoadOnStart() {
       syncTodayFocus();
       render();
     }
+    // Run daily backup AFTER cloud data (and backup bins) are loaded
+    setTimeout(() => runDailyBackup(), 500);
   } catch(e) {
     if (e.name !== 'AbortError') console.warn('syncLoadOnStart error:', e);
+    // Still try backup even if sync failed — bins may be in localStorage already
+    setTimeout(() => runDailyBackup(), 500);
   }
 }
 
@@ -7201,7 +7209,7 @@ if (harvestMode) { document.body.classList.add('harvest'); showLeveringOverlay()
 initSync();
 applyTheme();
 // Run daily backup after a short delay to let sync finish first
-setTimeout(() => runDailyBackup(), 8000);
+// runDailyBackup is now called after syncLoadOnStart completes
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
