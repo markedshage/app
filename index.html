@@ -411,6 +411,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 </head>
 <body>
+<div id="sync-loading-overlay" style="position:fixed;inset:0;background:var(--bg-main);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity 0.4s">
+  <div style="font-size:48px">🌱</div>
+  <div style="font-size:16px;color:var(--text-head);font-weight:500">Markedshage Assistenten</div>
+  <div style="font-size:13px;color:var(--text-muted)" id="sync-loading-msg">Kobler til sky…</div>
+</div>
 
 <header>
   <div class="header-top">
@@ -6858,13 +6863,13 @@ async function syncLoadOnStart() {
     } finally {
       clearTimeout(timer);
     }
-    if (!resp.ok) return;
+    if (!resp.ok) { hideSyncOverlay(); return; }
     let remote = await resp.json();
     // Decompress LZ-string envelope if present
     if (remote && remote.lz && typeof LZString !== 'undefined') {
       try { remote = JSON.parse(LZString.decompressFromBase64(remote.lz)); } catch(e) { console.warn('LZ decompress failed', e); }
     }
-    if (!remote || !remote.crops) return;
+    if (!remote || !remote.crops) { hideSyncOverlay(); return; }
 
     // Check local timestamp
     let localSaved = null;
