@@ -6884,6 +6884,23 @@ async function syncLoadOnStart() {
     const hasNoLocal = !localStorage.getItem('mh_data');
     const remoteIsNewer = !localSaved || (remoteSaved && new Date(remoteSaved) > new Date(localSaved));
 
+    // ALWAYS restore backup bins from cloud (regardless of data age)
+    if (remote.backupBins && remote.backupBins.length === 7) {
+      const localBins2 = getBackupBins();
+      const merged2 = remote.backupBins.map((cloudId, i) => localBins2[i] || cloudId);
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(merged2));
+    }
+    if (remote.backupMeta) {
+      const localMeta2 = getBackupMeta();
+      const mergedMeta2 = remote.backupMeta.map((cloudM, i) => {
+        const loc = localMeta2[i];
+        if (!loc) return cloudM;
+        if (!cloudM) return loc;
+        return (new Date(cloudM.ts||0) > new Date(loc.ts||0)) ? cloudM : loc;
+      });
+      localStorage.setItem(BACKUP_META_KEY, JSON.stringify(mergedMeta2));
+    }
+
     if (hasNoLocal || remoteIsNewer) {
       if (remote.crops)   crops    = remote.crops.map ? remote.crops : [];
       if (remote.tasks)   tasks    = remote.tasks;
@@ -6917,12 +6934,18 @@ async function syncLoadOnStart() {
       syncTodayFocus();
       render();
     }
+    clearTimeout(window._syncFallbackTimer);
     hideSyncOverlay();
+    showTab(currentTab);
+    if (harvestMode) showLeveringOverlay();
     // Run daily backup AFTER cloud data (and backup bins) are loaded
     setTimeout(() => runDailyBackup(), 500);
   } catch(e) {
     if (e.name !== 'AbortError') console.warn('syncLoadOnStart error:', e);
+    clearTimeout(window._syncFallbackTimer);
     hideSyncOverlay();
+    showTab(currentTab);
+    if (harvestMode) showLeveringOverlay();
     // Still try backup even if sync failed — bins may be in localStorage already
     setTimeout(() => runDailyBackup(), 500);
   }
@@ -7231,10 +7254,17 @@ try {
 syncTodayFocus();
 snapshotLev();
 snapshot(true);
-showTab(currentTab);
-if (harvestMode) { document.body.classList.add('harvest'); showLeveringOverlay(); }
-initSync();
 applyTheme();
+if (harvestMode) { document.body.classList.add('harvest'); }
+initSync(); // syncLoadOnStart will call render() when done
+// Fallback: if no sync key or offline, show app after 10s
+window._syncFallbackTimer = setTimeout(() => {
+  if (document.getElementById('sync-loading-overlay')) {
+    hideSyncOverlay();
+    showTab(currentTab);
+    if (harvestMode) showLeveringOverlay();
+  }
+}, 10000);
 // Run daily backup after a short delay to let sync finish first
 // runDailyBackup is now called after syncLoadOnStart completes
 
