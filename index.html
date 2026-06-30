@@ -398,6 +398,14 @@
     box-shadow: 0 0 0 2px var(--accent);
   }
 
+
+  #sync-loading-overlay {
+    position: fixed; inset: 0; background: var(--bg-main);
+    z-index: 99999; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    transition: opacity 0.4s;
+  }
+  #sync-loading-overlay.fade-out { opacity: 0; pointer-events: none; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
@@ -6821,16 +6829,23 @@ function gistSetup() {
 }
 
 // On startup: load from JSONBin if no local data
+function hideSyncOverlay() {
+  const overlay = document.getElementById('sync-loading-overlay');
+  if (!overlay) return;
+  overlay.classList.add('fade-out');
+  setTimeout(() => overlay.remove(), 450);
+}
+
 async function syncLoadOnStart() {
   try {
     if (!syncBinId) {
+      hideSyncOverlay();
       await syncSave();
       return;
     }
+    const msgEl = document.getElementById('sync-loading-msg');
 
-    // Show loading indicator if no local data
-    if (!localStorage.getItem('mh_data')) showSyncToast('⏳ Laster inn fra sky…');
-
+    if (msgEl) msgEl.textContent = 'Henter data…';
     // Fetch remote data with 8s timeout
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -6867,19 +6882,24 @@ async function syncLoadOnStart() {
     if (hasNoLocal || remoteIsNewer) {
       if (remote.crops)   crops    = remote.crops.map ? remote.crops : [];
       if (remote.tasks)   tasks    = remote.tasks;
-      // Restore backup bin IDs from cloud if local is missing
+      // Restore backup bin IDs from cloud — merge: prefer cloud where local is missing
       if (remote.backupBins && remote.backupBins.length === 7) {
         const localBins = getBackupBins();
-        if (!localBins.length || !localBins.every(Boolean)) {
-          localStorage.setItem(BACKUP_KEY, JSON.stringify(remote.backupBins));
-          console.log('✓ Backup bins restored from cloud');
-        }
+        const merged = remote.backupBins.map((cloudId, i) => localBins[i] || cloudId);
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(merged));
+        console.log('✓ Backup bins merged from cloud:', merged);
       }
       if (remote.backupMeta) {
         const localMeta = getBackupMeta();
-        if (localMeta.every(m => !m)) {
-          localStorage.setItem(BACKUP_META_KEY, JSON.stringify(remote.backupMeta));
-        }
+        // Merge: prefer cloud entry where local is missing
+        const mergedMeta = remote.backupMeta.map((cloudM, i) => {
+          const loc = localMeta[i];
+          if (!loc) return cloudM;
+          if (!cloudM) return loc;
+          // Keep whichever is more recent
+          return (new Date(cloudM.ts||0) > new Date(loc.ts||0)) ? cloudM : loc;
+        });
+        localStorage.setItem(BACKUP_META_KEY, JSON.stringify(mergedMeta));
       }
       sanitizeCrops();
       if (remote.bedSizes) bedSizes = remote.bedSizes;
@@ -6892,10 +6912,12 @@ async function syncLoadOnStart() {
       syncTodayFocus();
       render();
     }
+    hideSyncOverlay();
     // Run daily backup AFTER cloud data (and backup bins) are loaded
     setTimeout(() => runDailyBackup(), 500);
   } catch(e) {
     if (e.name !== 'AbortError') console.warn('syncLoadOnStart error:', e);
+    hideSyncOverlay();
     // Still try backup even if sync failed — bins may be in localStorage already
     setTimeout(() => runDailyBackup(), 500);
   }
