@@ -6632,13 +6632,47 @@ async function runDailyBackup() {
       headers: { 'Content-Type': 'application/json', 'X-Master-Key': syncKey },
       body
     });
+    if (resp.status === 404) {
+      // Bin deleted on server — create a new one and retry
+      console.log('[Backup] Bin 404, creating new bin for', DAYS_BACKUP[dayIdx]);
+      const bins3 = getBackupBins();
+      bins3[dayIdx] = null;
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(bins3));
+      try {
+        const createResp = await fetch('https://api.jsonbin.io/v3/b', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': syncKey,
+            'X-Bin-Name': 'MH-Backup-' + DAYS_BACKUP[dayIdx],
+            'X-Bin-Private': 'true'
+          },
+          body
+        });
+        if (createResp.ok) {
+          const created = await createResp.json();
+          const newBinId = created.metadata?.id;
+          if (newBinId) {
+            bins3[dayIdx] = newBinId;
+            localStorage.setItem(BACKUP_KEY, JSON.stringify(bins3));
+            const newMeta = getBackupMeta();
+            newMeta[dayIdx] = { date: todayStr, ts: new Date().toISOString(), day: DAYS_BACKUP[dayIdx] };
+            localStorage.setItem(BACKUP_META_KEY, JSON.stringify(newMeta));
+            console.log('[Backup] ✓ New bin created and backup saved:', newBinId);
+            scheduleSync();
+          }
+        }
+      } catch(e) { console.warn('[Backup] Failed to create replacement bin:', e); }
+      return;
+    }
     if (resp.ok) {
       const newMeta = getBackupMeta();
       newMeta[dayIdx] = { date: todayStr, ts: new Date().toISOString(), day: DAYS_BACKUP[dayIdx] };
       localStorage.setItem(BACKUP_META_KEY, JSON.stringify(newMeta));
-      console.log('✓ Backup lagret for', DAYS_BACKUP[dayIdx]);
-      // Persist meta to cloud immediately so it survives localStorage wipes
+      console.log('[Backup] ✓ Lagret for', DAYS_BACKUP[dayIdx]);
       scheduleSync();
+    } else {
+      console.warn('[Backup] PUT failed with status', resp.status);
     }
   } catch(e) { console.warn('Backup failed:', e); }
 }
@@ -6661,7 +6695,18 @@ async function restoreBackup(dayIdx) {
       signal: ctrl.signal
     });
     clearTimeout(timer);
-    if (!resp.ok) { showSyncToast('⚠ Kunne ikke hente backup'); return; }
+    if (!resp.ok) {
+      if (resp.status === 404) {
+        showSyncToast('⚠ Backup-binen finnes ikke lenger på serveren');
+        // Clear the invalid bin ID
+        const bins2 = getBackupBins();
+        bins2[dayIdx] = null;
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(bins2));
+      } else {
+        showSyncToast('⚠ Kunne ikke hente backup');
+      }
+      return;
+    }
     let data = await resp.json();
     if (data && data.lz && typeof LZString !== 'undefined') {
       try { data = JSON.parse(LZString.decompressFromBase64(data.lz)); } catch(e) {}
