@@ -6546,11 +6546,17 @@ function getBackupMeta() {
 async function ensureBackupBins() {
   if (!syncKey) return;
   let bins = getBackupBins();
-  if (bins.length === 7 && bins.every(Boolean)) return; // all exist
-  // Small delay to allow any in-progress cloud loads to finish restoring bins
-  await new Promise(r => setTimeout(r, 200));
+  if (bins.length === 7 && bins.every(Boolean)) return;
+  
+  // Wait longer and re-check — cloud restore may still be settling
+  await new Promise(r => setTimeout(r, 1000));
   bins = getBackupBins();
-  if (bins.length === 7 && bins.every(Boolean)) return; // restored from cloud
+  if (bins.length === 7 && bins.every(Boolean)) { 
+    console.log('[Backup] Bins found after wait, skipping creation');
+    return;
+  }
+  
+  console.log('[Backup] Creating missing bins, current:', bins);
 
   showSyncToast('⏳ Oppretter backup-bins…');
   const newBins = [...bins];
@@ -6578,22 +6584,32 @@ async function ensureBackupBins() {
 }
 
 async function runDailyBackup() {
-  if (!syncKey) return;
-  const bins = getBackupBins();
-  if (!bins.length || !bins.every(Boolean)) {
-    await ensureBackupBins();
-  }
-  const bins2 = getBackupBins();
-  const dayIdx = new Date().getDay(); // 0=Sun, 6=Sat
-  const binId = bins2[dayIdx];
-  if (!binId) return;
+  if (!syncKey) { console.log('[Backup] No sync key, skipping'); return; }
 
-  // Check if we already backed up today
+  // Get bins — wait a moment to let cloud restore settle
+  await new Promise(r => setTimeout(r, 300));
+  let bins = getBackupBins();
+  console.log('[Backup] Bins from localStorage:', bins);
+
+  if (!bins.length || !bins.every(Boolean)) {
+    console.log('[Backup] Missing bins, running ensureBackupBins');
+    await ensureBackupBins();
+    bins = getBackupBins();
+    console.log('[Backup] Bins after ensure:', bins);
+  }
+
+  const dayIdx = new Date().getDay();
+  const binId = bins[dayIdx];
+  console.log('[Backup] Today dayIdx:', dayIdx, 'binId:', binId);
+  if (!binId) { console.log('[Backup] No bin for today, aborting'); return; }
+
   const meta = getBackupMeta();
   const todayStr = new Date().toISOString().split('T')[0];
-  if (meta[dayIdx] && meta[dayIdx].date === todayStr) return; // already done today
-  
-  // Note: we only backup today's slot. Historical slots are preserved in cloud.
+  console.log('[Backup] Meta for today:', meta[dayIdx], 'todayStr:', todayStr);
+  if (meta[dayIdx] && meta[dayIdx].date === todayStr) {
+    console.log('[Backup] Already backed up today, skipping');
+    return;
+  }
 
   try {
     // Build payload
@@ -6883,13 +6899,13 @@ async function syncLoadOnStart() {
     } finally {
       clearTimeout(timer);
     }
-    if (!resp.ok) { hideSyncOverlay(); return; }
+    if (!resp.ok) { hideSyncOverlay(); showTab(currentTab); setTimeout(() => runDailyBackup(), 500); return; }
     let remote = await resp.json();
     // Decompress LZ-string envelope if present
     if (remote && remote.lz && typeof LZString !== 'undefined') {
       try { remote = JSON.parse(LZString.decompressFromBase64(remote.lz)); } catch(e) { console.warn('LZ decompress failed', e); }
     }
-    if (!remote || !remote.crops) { hideSyncOverlay(); return; }
+    if (!remote || !remote.crops) { hideSyncOverlay(); showTab(currentTab); setTimeout(() => runDailyBackup(), 500); return; }
 
     // Check local timestamp
     let localSaved = null;
@@ -7287,6 +7303,18 @@ window._syncFallbackTimer = setTimeout(() => {
 }, 10000);
 // Run daily backup after a short delay to let sync finish first
 // runDailyBackup is now called after syncLoadOnStart completes
+
+// Re-check backup when tab becomes visible (catches new-day scenario)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const lastCheck = localStorage.getItem('mh_backup_lastcheck') || '';
+    const today = new Date().toISOString().split('T')[0];
+    if (lastCheck !== today) {
+      localStorage.setItem('mh_backup_lastcheck', today);
+      setTimeout(() => runDailyBackup(), 2000);
+    }
+  }
+});
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
