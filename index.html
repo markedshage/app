@@ -5499,6 +5499,9 @@ function updateGuideRuler() {
     const newGang = calcGang(tempCrop);
     gangEl.textContent = newGang !== null ? newGang + ' cm' : '–';
   }
+  // Update plant count display
+  const plantEl = document.getElementById('modus-plant-count');
+  if (plantEl) plantEl.textContent = calcPlants(tempCrop);
 }
 
 function buildRulerHtml(crop, accentColor) {
@@ -5556,6 +5559,17 @@ function renderModus() {
   const crop = crops.find(c => c.id === modusCrops[modusIndex]);
   if (!crop) return;
   const isSaa = modusType === 'saa';
+  // infoCell helper — shared by both såguide and planteguide
+  const infoCell = (label, val, fieldId) =>
+    '<div style="padding:12px;border-radius:12px;background:var(--bg-card)">'
+    +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">'+label+'</div>'
+    +(fieldId
+      ? (fieldId.includes('date')
+        ? '<button type="button" data-guidefield="' + fieldId + '" onclick="openGuideDate(this.dataset.guidefield)" style="font-size:14px;color:var(--text-head);background:rgba(255,255,255,0.06);border:none;border-radius:6px;width:100%;padding:4px 8px;font-family:inherit;text-align:left;cursor:pointer">' + val + '</button>'
+        : '<input id="'+fieldId+'" value="'+val+'" type="text" inputmode="numeric" pattern="[0-9]*" oninput="updateGuideRuler()" autocomplete="off" style="font-size:20px;color:var(--text-head);background:rgba(255,255,255,0.08);border:none;border-radius:8px;width:100%;padding:8px;font-family:inherit;outline:none;-webkit-appearance:none;touch-action:manipulation">')
+      : '<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
+    )
+    +'</div>';
   const title = isSaa ? '&#127807; Såguide' : '&#9978;&#65039; Planteguide';
   const accentColor = isSaa ? 'var(--color-info)' : '#34d399';
   const accentBg    = isSaa ? 'rgba(96,165,250,0.12)' : 'rgba(52,211,153,0.12)';
@@ -5590,22 +5604,12 @@ function renderModus() {
   if (isSaa) {
     const plants = calcPlants(crop);
     const sownDateVal = crop.sownDate || '–';
-    const isDirectSow = !crop.plantedDate; // direktesåing: ingen plantedato
+    const isDirectSow = !crop.plantedDate;
     const gang = calcGang(crop);
     const gangStr = gang !== null ? gang+' cm' : '–';
-    const infoCell = (label, val, fieldId) =>
-      '<div style="padding:12px;border-radius:12px;background:var(--bg-card)">'
-      +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">'+label+'</div>'
-      +(fieldId
-        ? (fieldId.includes('date')
-          ? '<button type="button" data-guidefield="' + fieldId + '" onclick="openGuideDate(this.dataset.guidefield)" style="font-size:14px;color:var(--text-head);background:rgba(255,255,255,0.06);border:none;border-radius:6px;width:100%;padding:4px 8px;font-family:inherit;text-align:left;cursor:pointer">' + val + '</button>'
-          : '<input id="'+fieldId+'" value="'+val+'" type="number" oninput="updateGuideRuler()" style="font-size:16px;color:var(--text-head);background:transparent;border:none;width:100%;padding:2px 0;font-family:inherit;outline:none;-webkit-appearance:none;background:rgba(255,255,255,0.06);border-radius:6px;padding:4px 8px">')
-        : '<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
-      )
-      +'</div>';
     const bedDisplay = crop.beds && crop.beds.length ? crop.beds.join(', ') : '–';
     const baseFields = [
-      ['Antall planter', '<span style="font-size:26px;font-weight:300">'+plants+'</span>'],
+      ['Antall planter', '<span id="modus-plant-count" style="font-size:26px;font-weight:300">'+plants+'</span>'],
       ['Seng(er)', '<span style="cursor:pointer;font-size:14px" onclick="openBedPickerGuide('+crop.id+')">' + bedDisplay + '</span>'],
       ['Sådato', sownDateVal, 'modus-sowdate'],
     ];
@@ -5633,22 +5637,18 @@ function renderModus() {
     const gangStr = gang !== null ? gang+' cm' : '–';
     const plantedDateVal = crop.plantedDate || '–';
     const bedDisplay = crop.beds && crop.beds.length ? crop.beds.join(', ') : '–';
-    details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
-      +[
-        ['Senger', crop.beds.join(', ')],
-        ['Plantedato', plantedDateVal],
-        ['Radavstand', (crop.rowSpacing||'–')+' cm'],
-        ['Planteavstand', (crop.plantSpacing||'–')+' cm'],
-        ['Gangavstand', gangStr],
-        ['Antall planter', calcPlants(crop)],
-        ['Rader', crop.rows],
-      ].map(([label, val]) =>
-        '<div style="padding:12px;border-radius:12px;background:var(--bg-card)">'
-        +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px">'+label+'</div>'
-        +'<div style="font-size:16px;color:var(--text-head)">'+val+'</div>'
-        +'</div>'
-      ).join('')
+    const baseFields = [
+      ['Seng(er)', '<span style="cursor:pointer;font-size:14px" onclick="openBedPickerGuide('+crop.id+')">'+bedDisplay+'</span>', null],
+      ['Plantedato', plantedDateVal, 'modus-plantdate'],
+      ['Radavstand', crop.rowSpacing||0, 'modus-rowspacing'],
+      ['Planteavstand', crop.plantSpacing||0, 'modus-plantspacing'],
+      ['Rader', crop.rows||0, 'modus-rows'],
+      ['Antall planter', '<span id="modus-plant-count" style="font-size:26px;font-weight:300">'+calcPlants(crop)+'</span>', null],
+    ];
+    details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+      + baseFields.map(([label, val, fid]) => infoCell(label, val, fid)).join('')
       +'</div>';
+    details += '<div style="padding:8px 12px;border-radius:10px;background:var(--bg-card);margin-bottom:10px;font-size:13px;color:var(--text-muted)">Gangavstand: <span id="modus-gang-val" style="color:var(--text-head);font-weight:500">' + gangStr + '</span></div>';
     details += '<div id="modus-ruler">' + buildRulerHtml(crop, accentColor) + '</div>';
     details += '<div style="margin-bottom:14px">'
       +'<div style="font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Notater</div>'
@@ -5698,23 +5698,35 @@ function escapeHtml(str) {
 function modusLogAndNext() {
   const crop = crops.find(c => c.id === modusCrops[modusIndex]);
   if (crop) {
-    // Read current textarea value before saving
     const notesEl = document.getElementById('modus-notes');
     if (notesEl) modusNotes[crop.id] = notesEl.value;
 
     const logDate = modusLogDate[crop.id] || '';
     const notes   = modusNotes[crop.id] !== undefined ? modusNotes[crop.id] : null;
 
+    // Save editable guide fields
+    const rsEl = document.getElementById('modus-rowspacing'); if (rsEl && rsEl.value) crop.rowSpacing = +rsEl.value;
+    const psEl = document.getElementById('modus-plantspacing'); if (psEl && psEl.value) crop.plantSpacing = +psEl.value;
+    const rwEl = document.getElementById('modus-rows'); if (rwEl && rwEl.value) crop.rows = +rwEl.value;
+
     snapshot();
     if (modusType === 'saa') {
       if (notes !== null) crop.notes = notes;
-      crop.sowLog = logDate;
-      if (logDate) crop.status = 'sådd';
+      if (logDate) {
+        const existing = Array.isArray(crop.sowLog) ? crop.sowLog : (crop.sowLog ? [crop.sowLog] : []);
+        crop.sowLog = [...existing.filter(d => d !== logDate), logDate];
+        crop.status = 'sådd';
+      }
     } else {
       if (notes !== null) crop.notes = notes;
-      crop.plantLog = logDate;
-      if (logDate) crop.status = 'plantet';
+      if (logDate) {
+        const existing = Array.isArray(crop.plantLog) ? crop.plantLog : (crop.plantLog ? [crop.plantLog] : []);
+        crop.plantLog = [...existing.filter(d => d !== logDate), logDate];
+        crop.status = 'plantet';
+      }
     }
+    saveToLocal();
+    scheduleSync();
   }
   if (modusIndex < modusCrops.length - 1) {
     modusIndex++;
@@ -6580,6 +6592,8 @@ async function runDailyBackup() {
   const meta = getBackupMeta();
   const todayStr = new Date().toISOString().split('T')[0];
   if (meta[dayIdx] && meta[dayIdx].date === todayStr) return; // already done today
+  
+  // Note: we only backup today's slot. Historical slots are preserved in cloud.
 
   try {
     // Build payload
@@ -6607,6 +6621,8 @@ async function runDailyBackup() {
       newMeta[dayIdx] = { date: todayStr, ts: new Date().toISOString(), day: DAYS_BACKUP[dayIdx] };
       localStorage.setItem(BACKUP_META_KEY, JSON.stringify(newMeta));
       console.log('✓ Backup lagret for', DAYS_BACKUP[dayIdx]);
+      // Persist meta to cloud immediately so it survives localStorage wipes
+      scheduleSync();
     }
   } catch(e) { console.warn('Backup failed:', e); }
 }
@@ -6676,32 +6692,38 @@ function closeBackupModal() { document.getElementById("backup-modal")?.remove();
 
 function openVersionLog() {
   const meta = getBackupMeta();
-  const bins = getBackupBins();
-  const binsReady = bins.length === 7 && bins.every(Boolean);
+  const bins2 = getBackupBins();
+  const binsReady = bins2.length === 7 && bins2.every(Boolean);
   const isLight = document.body.classList.contains('light');
   const bg = isLight ? '#faf8f5' : '#1a2e1b';
 
-  // Build list of entries with data, sorted newest first
-  const entries = meta
-    .map((m, i) => ({ ...m, dayIdx: i }))
-    .filter(m => m && m.ts)
-    .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  // Build list — show ALL bins that exist, even if meta is missing
+  const entries = bins2
+    .map((binId, i) => ({ binId, dayIdx: i, meta: meta[i] || null }))
+    .filter(e => e.binId)
+    .sort((a, b) => {
+      const ta = a.meta?.ts ? new Date(a.meta.ts) : 0;
+      const tb = b.meta?.ts ? new Date(b.meta.ts) : 0;
+      return tb - ta;
+    });
 
   let rows = '';
   if (!entries.length) {
     rows = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0">Ingen backups lagret ennå</div>';
   } else {
-    entries.forEach(m => {
-      const dt = new Date(m.ts);
-      const dateStr = dt.toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-      const timeStr = dt.toLocaleTimeString('no-NO', { hour:'2-digit', minute:'2-digit' });
+    entries.forEach(e => {
+      const m = e.meta;
+      const hasDate = m && m.ts;
+      const dt = hasDate ? new Date(m.ts) : null;
+      const dateStr = dt ? dt.toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) : DAYS_BACKUP[e.dayIdx];
+      const timeStr = dt ? dt.toLocaleTimeString('no-NO', { hour:'2-digit', minute:'2-digit' }) : 'Dato ukjent — trykk Gjenopprett for å sjekke';
       rows += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(128,128,128,0.1)">'
         + '<div>'
         + '<div style="font-size:13px;color:var(--text-head)">' + dateStr + '</div>'
         + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">' + timeStr + '</div>'
         + '</div>'
         + (binsReady
-          ? '<button onclick="restoreBackup(' + m.dayIdx + ')" style="padding:6px 14px;border-radius:20px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">Gjenopprett</button>'
+          ? '<button onclick="restoreBackup(' + e.dayIdx + ')" style="padding:6px 14px;border-radius:20px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">Gjenopprett</button>'
           : '<span style="font-size:11px;color:var(--text-muted)">Ikke klar</span>'
         )
         + '</div>';
