@@ -5378,6 +5378,7 @@ function loadVadstolen() {
 let modusType  = null;
 let modusCrops = [];
 let modusIndex = 0;
+let modusBedId = null; // currently selected bed for this guide session
 let modusLogDate  = {};  // cropId -> log date
 let modusMainDate = {};  // cropId -> edited sown/plant date
 let modusNotes    = {};  // cropId -> edited notes
@@ -5487,6 +5488,7 @@ function updateGuideRuler() {
     rowSpacing: rsEl ? +rsEl.value : crop.rowSpacing,
     plantSpacing: psEl ? +psEl.value : crop.plantSpacing,
     rows: rowsEl ? +rowsEl.value : crop.rows,
+    beds: modusBedId ? [modusBedId, ...(crop.beds||[]).filter(b=>b!==modusBedId)] : crop.beds,
   };
   const rulerContainer = document.getElementById('modus-ruler');
   if (rulerContainer) {
@@ -5510,7 +5512,8 @@ function buildRulerHtml(crop, accentColor) {
   const rows = +crop.rows;
   const rowSpacing = +crop.rowSpacing;
   const gangEach = +gang;
-  const rawBed = crop.beds && crop.beds[0] ? crop.beds[0].replace(/-.*/, '') : null;
+  const activeBed = (typeof modusBedId !== 'undefined' && modusBedId) ? modusBedId : (crop.beds && crop.beds[0] ? crop.beds[0] : null);
+  const rawBed = activeBed ? activeBed.replace(/-.*/, '') : null;
   const bedWidth = rawBed && bedSizes[rawBed] ? Math.round(bedSizes[rawBed].width * 100) : 120;
   const positions = [];
   for (let i = 0; i < rows; i++) positions.push(gangEach + i * rowSpacing);
@@ -5549,10 +5552,56 @@ function startModus(type, cropId) {
   modusLogDate  = {};
   modusMainDate = {};
   modusNotes    = {};
+  modusBedId = null;
   const pool = type === 'saa' ? SITATER_SAA : SITATER_PLANT;
   modusSitat = pool[Math.floor(Math.random() * pool.length)];
+
+  // If crop has multiple beds, show bed selector first
+  const theCrop = crops.find(c => c.id === cropId);
+  if (theCrop && theCrop.beds && theCrop.beds.length > 1) {
+    document.getElementById('modal-modus').style.display = 'flex';
+    renderModusBedSelect(theCrop);
+  } else {
+    // Single bed or no bed — use it directly
+    modusBedId = theCrop && theCrop.beds.length === 1 ? theCrop.beds[0] : null;
+    renderModus();
+    document.getElementById('modal-modus').style.display = 'flex';
+  }
+}
+
+function renderModusBedSelect(crop) {
+  const isSaa = modusType === 'saa';
+  const accentColor = isSaa ? 'var(--color-info)' : '#34d399';
+  const accentBg = isSaa ? 'rgba(96,165,250,0.12)' : 'rgba(52,211,153,0.12)';
+  const accentBorder = isSaa ? 'rgba(96,165,250,0.35)' : 'rgba(52,211,153,0.35)';
+  const title = isSaa ? '🌱 Såguide' : '🪴 Planteguide';
+
+  const bedButtons = crop.beds.map(bed => {
+    const bs = bedSizes[bed.replace(/-.*/, '')] || { width: 1.2, length: 11 };
+    const widthCm = Math.round(bs.width * 100);
+    const gang = Math.round(((widthCm - (crop.rows - 1) * crop.rowSpacing) / 2) * 10) / 10;
+    const gangStr = !isNaN(gang) && gang > 0 ? gang + ' cm gangavstand' : '';
+    return '<button onclick="selectModusBed(this.dataset.bed)" data-bed="' + bed + '" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid ' + accentBorder + ';background:var(--bg-card);color:var(--text-head);cursor:pointer;font-size:15px;font-family:inherit;text-align:left;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
+      + '<span style="font-weight:500">' + bed + '</span>'
+      + '<span style="font-size:12px;color:var(--text-muted)">' + widthCm + ' cm bred' + (gangStr ? ' · ' + gangStr : '') + '</span>'
+      + '</button>';
+  }).join('');
+
+  const html = '<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">' + title + '</div>'
+    + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:14px;border-radius:12px;background:' + accentBg + ';border:1px solid ' + accentBorder + '">'
+    + '<span style="font-size:40px">' + crop.emoji + '</span>'
+    + '<div><div style="font-size:20px;color:var(--text-head)">' + crop.name + '</div>'
+    + (crop.family ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + crop.family + '</div>' : '')
+    + '</div></div>'
+    + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.08em">Velg seng å jobbe med nå</div>'
+    + bedButtons;
+
+  document.getElementById('modal-modus-inner').innerHTML = html;
+}
+
+function selectModusBed(bedId) {
+  modusBedId = bedId;
   renderModus();
-  document.getElementById('modal-modus').style.display = 'flex';
 }
 
 function renderModus() {
@@ -5590,6 +5639,7 @@ function renderModus() {
     +'<span style="font-size:40px">'+crop.emoji+'</span>'
     +'<div><div style="font-size:20px;color:var(--text-head);font-weight:400">'+crop.name+'</div>'
     +(crop.family ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">'+crop.family+'</div>' : '')
+    +(modusBedId ? '<div style="font-size:12px;color:'+accentColor+';margin-top:4px;font-weight:500">📍 '+modusBedId+'</div>' : '')
     +'</div></div>';
 
   // Log date row
@@ -5605,7 +5655,7 @@ function renderModus() {
     const plants = calcPlants(crop);
     const sownDateVal = crop.sownDate || '–';
     const isDirectSow = !crop.plantedDate;
-    const gang = calcGang(crop);
+    const gang = calcGang(crop, modusBedId || (crop.beds && crop.beds[0]));
     const gangStr = gang !== null ? gang+' cm' : '–';
     const bedDisplay = crop.beds && crop.beds.length ? crop.beds.join(', ') : '–';
     const baseFields = [
@@ -5633,10 +5683,10 @@ function renderModus() {
       +'</div>';
     details += logSection;
   } else {
-    const gang = calcGang(crop);
+    const gang = calcGang(crop, modusBedId || (crop.beds && crop.beds[0]));
     const gangStr = gang !== null ? gang+' cm' : '–';
     const plantedDateVal = crop.plantedDate || '–';
-    const bedDisplay = crop.beds && crop.beds.length ? crop.beds.join(', ') : '–';
+    const bedDisplay = modusBedId || (crop.beds && crop.beds.length ? crop.beds.join(', ') : '–');
     const baseFields = [
       ['Seng(er)', '<span style="cursor:pointer;font-size:14px" onclick="openBedPickerGuide('+crop.id+')">'+bedDisplay+'</span>', null],
       ['Plantedato', plantedDateVal, 'modus-plantdate'],
