@@ -510,13 +510,13 @@
     <div class="modal-title" id="modal-crop-title">Ny vekst</div>
 
     <style>
-      .crop-section { margin-bottom: 8px; border-radius: 12px; overflow: hidden; background: var(--bg-card); }
-      .crop-section-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; user-select: none; font-size: 13px; font-weight: 600; color: var(--text-head); letter-spacing: 0.04em; }
-      .crop-section-header .cs-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; }
+      .crop-section { margin-bottom: 6px; border-radius: 10px; overflow: hidden; background: var(--bg-card); }
+      .crop-section-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; user-select: none; font-size: 12px; font-weight: 600; color: var(--text-head); letter-spacing: 0.04em; }
+      .crop-section-header .cs-arrow { font-size: 9px; color: var(--text-muted); transition: transform 0.2s; }
       .crop-section-header.open .cs-arrow { transform: rotate(180deg); }
-      .crop-section-body { padding: 0 14px 14px; display: none; }
+      .crop-section-body { padding: 0 10px 10px; display: none; }
       .crop-section-body.open { display: block; }
-      .log-entry-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .log-entry-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
       .log-entry-row .date-display { flex: 1; }
     </style>
 
@@ -535,8 +535,8 @@
 
     <!-- Teknisk -->
     <div class="crop-section">
-      <div class="crop-section-header" onclick="toggleCropSection(this)">Teknisk <span class="cs-arrow">▼</span></div>
-      <div class="crop-section-body">
+      <div class="crop-section-header open" onclick="toggleCropSection(this)">Teknisk <span class="cs-arrow">▼</span></div>
+      <div class="crop-section-body open">
         <div class="form-grid">
           <div><label class="field-label">Senger</label><div onclick="openBedPicker()" style="min-height:40px;padding:10px 12px;border-radius:10px;background:var(--bg-input);cursor:pointer;font-size:14px;font-family:inherit;color:var(--text-head)" id="c-beds-display">Velg senger 🗺</div><input type="hidden" id="c-beds"><div id="c-beds-error" style="display:none;color:var(--color-danger);font-size:12px;margin-top:4px"></div></div>
           <div><label class="field-label">Rader (per bed)</label><input class="field-input" id="c-rows" type="number" value="2"></div>
@@ -549,8 +549,8 @@
 
     <!-- Datoer -->
     <div class="crop-section">
-      <div class="crop-section-header" onclick="toggleCropSection(this)">Datoer <span class="cs-arrow">▼</span></div>
-      <div class="crop-section-body">
+      <div class="crop-section-header open" onclick="toggleCropSection(this)">Datoer <span class="cs-arrow">▼</span></div>
+      <div class="crop-section-body open">
         <div class="form-grid">
           <div>
             <label class="field-label">Sådato (fra)</label>
@@ -592,8 +592,8 @@
 
     <!-- Økonomi -->
     <div class="crop-section">
-      <div class="crop-section-header" onclick="toggleCropSection(this)">Økonomi <span class="cs-arrow">▼</span></div>
-      <div class="crop-section-body">
+      <div class="crop-section-header open" onclick="toggleCropSection(this)">Økonomi <span class="cs-arrow">▼</span></div>
+      <div class="crop-section-body open">
         <div class="form-grid">
           <div><label class="field-label">Salgsenhet</label>
             <select class="field-input" id="c-unit" onchange="updateUnitLabels()">
@@ -3974,7 +3974,6 @@ function renderVekster() {
       ` : `
         <button onclick="openTableView('crops')" id="vekster-tabell-btn" style="padding:0 10px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap;border-radius:20px">Tabell</button>
         <div style="flex:1;display:flex;align-items:center;background:var(--task-bg);border:none;border-radius:20px;padding:4px 10px;gap:6px">
-          <span style="color:var(--text-dim);font-size:12px">⊕</span>
           <input id="search-input" type="text" placeholder="Søk…" value="${cropSearch}" oninput="onSearchInput()" onkeydown="onSearchKey(event)" style="background:transparent;border:none;outline:none;color:var(--text-head);font-size:12px;font-family:inherit;width:100%;caret-color:var(--accent)" autocomplete="off">
           ${cropSearch ? `<button onclick="clearSearch()" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0;line-height:1">✕</button>` : ''}
         </div>
@@ -4054,9 +4053,13 @@ function renderVekster() {
               + (c.plantedDate ? '<div>🪴 Plantedato: <span>' + c.plantedDate + '</span></div>' : '')
               + '</div>'
               + (logDone(c.sowLog) ? '<div class="crop-notes">🌾 Sålogg: ' + logDisplay(c.sowLog) + '</div>' : '')
-              + (c.plantLog ? '<div class="crop-notes">🪴 Plantelogg: ' + c.plantLog + '</div>' : '')
+              + (logDone(c.plantLog) ? '<div class="crop-notes">🪴 Plantelogg: ' + logDisplay(c.plantLog) + '</div>' : '')
               + (c.notes ? '<div class="crop-notes">📝 ' + c.notes + '</div>' : '')
-              + '<div style="display:flex;gap:6px;margin-top:8px">'              + '<button onclick="event.stopPropagation();openEditCrop(' + c.id + ')" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>'              + (c.sownDate ? '<button onclick="event.stopPropagation();startModus(\'saa\',' + c.id + ')" style="flex:1;background:rgba(96,165,250,0.1);border:none;border-radius:20px;color:var(--color-info);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">🌱 Såguide</button>' : '')              + (c.plantedDate ? '<button onclick="event.stopPropagation();startModus(\'plant\',' + c.id + ')" style="flex:1;background:rgba(52,211,153,0.1);border:none;border-radius:20px;color:var(--accent-soft);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">🪴 Planteguide</button>' : '')              + '</div>'
+              + '<div style="display:flex;gap:6px;margin-top:8px">'
+              + '<button onclick="event.stopPropagation();openEditCrop(' + c.id + ')" style="flex:1;background:var(--bg-input);border:none;border-radius:20px;color:var(--text-muted);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">✏️ Rediger</button>'
+              + (c.sownDate ? '<button onclick="event.stopPropagation();startModus(\'saa\',' + c.id + ')" style="flex:1;background:rgba(96,165,250,0.1);border:none;border-radius:20px;color:var(--color-info);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">🌱 Såguide</button>' : '')
+              + (c.plantedDate ? '<button onclick="event.stopPropagation();startModus(\'plant\',' + c.id + ')" style="flex:1;background:rgba(52,211,153,0.1);border:none;border-radius:20px;color:var(--accent-soft);cursor:pointer;padding:8px;font-size:13px;font-family:inherit">🪴 Planteguide</button>' : '')
+              + '</div>'
               : '')
             + '</div>';
         }).join('');
@@ -4243,6 +4246,37 @@ function expandGroup(nameOrEl) {
 function collapseGroup(name) {
   collapsedGroups.delete(name);
   renderVekster();
+}
+
+
+function saveCropField(cropId, field, value) {
+  const crop = crops.find(c => c.id === cropId);
+  if (!crop) return;
+  snapshot();
+  const numFields = ['rowSpacing','plantSpacing','rows','seedsPerCluster','pricePerKg','weightG','pricePerUnit','unitsPerPlant','plantsPerUnit'];
+  if (numFields.includes(field)) {
+    crop[field] = +value || 0;
+  } else if (field === 'beds') {
+    crop.beds = value.split(',').map(s => s.trim()).filter(Boolean);
+  } else {
+    crop[field] = value;
+  }
+  saveToLocal();
+  scheduleSync();
+  // Re-render just the crop card to update derived values (plants, value, gang)
+  renderCropListOnly();
+}
+
+function inlineField(cropId, field, val, opts={}) {
+  const id = 'il-' + cropId + '-' + field;
+  const type = opts.number ? 'text" inputmode="numeric" pattern="[0-9.]*' : 'text';
+  const extra = opts.wide ? 'width:100%' : 'min-width:60px';
+  return '<input id="' + id + '" value="' + String(val||'').replace(/"/g,'&quot;') + '"'
+    + ' type="' + type + '"'
+    + ' onclick="event.stopPropagation()"'
+    + ' onchange="event.stopPropagation();saveCropField(' + cropId + ',\'' + field + '\',this.value)"'
+    + ' oninput="event.stopPropagation()"'
+    + ' style="background:var(--bg-card);border:none;border-bottom:1px solid rgba(128,128,128,0.2);color:var(--text-head);font-size:13px;font-family:inherit;padding:2px 4px;outline:none;' + extra + ';border-radius:0;touch-action:manipulation">';
 }
 
 function toggleCropExpand(id) {
