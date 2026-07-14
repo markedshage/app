@@ -8184,13 +8184,13 @@ function importCustomersFromExcel(event) {
 
 function exportCustomersToExcel() {
   const wb = XLSX.utils.book_new();
-  const headers = ['Navn', 'Telefon', 'Kassetype', 'Kassetypeid'];
+  const headers = ['Navn', 'Telefon', 'Epost', 'Kassetype', 'Kassetype-ID'];
   const rows = deliveryCustomers.map(cu => {
     const bt = boxTypes.find(t => t.id == cu.boxTypeId);
     return [cu.name, cu.phone || '', cu.email || '', bt ? bt.name : '', cu.boxTypeId || ''];
   });
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [{wch:24},{wch:16},{wch:20},{wch:20}];
+  ws['!cols'] = [{wch:24},{wch:16},{wch:28},{wch:20},{wch:16}];
   styleHeaderRow(ws, headers.length);
   XLSX.utils.book_append_sheet(wb, ws, 'Kunder');
   const d = new Date();
