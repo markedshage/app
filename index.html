@@ -794,6 +794,144 @@ let showBedNotes = (() => { try { return !!localStorage.getItem('mh_bed_notes');
 
 
 
+
+let _chipLongPressTimer = null;
+
+function bedChipTouchStart(btn, bedId) {
+  _chipLongPressTimer = setTimeout(() => {
+    openSegmentPicker(btn, bedId);
+  }, 700);
+}
+
+function bedChipTouchEnd() {
+  if (_chipLongPressTimer) { clearTimeout(_chipLongPressTimer); _chipLongPressTimer = null; }
+}
+
+function openSegmentPicker(btn, bedId) {
+  document.getElementById('segment-picker-modal')?.remove();
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#faf8f5' : '#1a2e1b';
+  const bedLen = getBedLength(bedId);
+  const steps = bedLen * 2; // 0.5m segments
+  
+  // Get existing selection
+  const currentBeds = (document.getElementById('c-beds')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const existingSpec = currentBeds.find(b => parseBedSpec(b).bedId === bedId);
+  const parsed = existingSpec ? parseBedSpec(existingSpec) : null;
+  let selStart = parsed?.startM !== undefined ? Math.round(parsed.startM * 2) : null;
+  let selEnd = parsed?.endM !== undefined ? Math.round(parsed.endM * 2) : null;
+
+  const modal = document.createElement('div');
+  modal.id = 'segment-picker-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  const buildSegments = () => {
+    let html = '<div id="seg-grid" style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0;user-select:none;touch-action:none">';
+    for (let i = 0; i < steps; i++) {
+      const mStart = i * 0.5;
+      const mEnd = mStart + 0.5;
+      const inSel = selStart !== null && i >= selStart && i <= selEnd;
+      html += '<div data-seg="' + i + '" style="width:32px;height:48px;flex-shrink:0;border-radius:6px;background:' + (inSel ? 'var(--accent)' : 'var(--bg-card)') + ';display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer;font-size:9px;color:' + (inSel ? 'var(--bg-main)' : 'var(--text-muted)') + ';border:1px solid rgba(128,128,128,0.1)">' + mStart.toFixed(1) + '</div>';
+    }
+    html += '</div>';
+    return html;
+  };
+
+  const selectedLabel = () => selStart !== null ? (selStart*0.5).toFixed(1) + 'm – ' + ((selEnd+1)*0.5).toFixed(1) + 'm' : 'Hele sengen';
+
+  modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;width:100%;max-width:480px;padding:20px">'
+    + '<div style="font-size:14px;color:var(--text-head);margin-bottom:4px">Seng ' + bedId + ' — velg område</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Hold og dra for å markere. Senglengde: ' + bedLen + 'm</div>'
+    + '<div id="seg-label" style="font-size:13px;color:var(--accent-soft);margin-bottom:8px">' + selectedLabel() + '</div>'
+    + buildSegments()
+    + '<div style="display:flex;gap:8px;margin-top:16px">'
+    + '<button onclick="clearSegment(\'' + bedId + '\')" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">Hele sengen</button>'
+    + '<button onclick="applySegment(\'' + bedId + '\')" style="flex:2;padding:10px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Bruk</button>'
+    + '</div></div>';
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+
+  // Drag selection logic
+  const grid = document.getElementById('seg-grid');
+  let dragging = false, dragFrom = null;
+
+  function getSegFromEvent(e) {
+    const touch = e.touches ? e.touches[0] : e;
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    return el?.dataset?.seg !== undefined ? +el.dataset.seg : null;
+  }
+
+  function updateDrag(toSeg) {
+    if (dragFrom === null || toSeg === null) return;
+    selStart = Math.min(dragFrom, toSeg);
+    selEnd = Math.max(dragFrom, toSeg);
+    // Update colors
+    grid.querySelectorAll('[data-seg]').forEach(el => {
+      const i = +el.dataset.seg;
+      const inSel = i >= selStart && i <= selEnd;
+      el.style.background = inSel ? 'var(--accent)' : 'var(--bg-card)';
+      el.style.color = inSel ? 'var(--bg-main)' : 'var(--text-muted)';
+    });
+    const labelEl = document.getElementById('seg-label');
+    if (labelEl) labelEl.textContent = (selStart*0.5).toFixed(1) + 'm – ' + ((selEnd+1)*0.5).toFixed(1) + 'm';
+  }
+
+  grid.addEventListener('mousedown', e => { dragging=true; dragFrom=getSegFromEvent(e); updateDrag(dragFrom); });
+  grid.addEventListener('mousemove', e => { if(dragging) updateDrag(getSegFromEvent(e)); });
+  grid.addEventListener('mouseup', () => { dragging=false; });
+  grid.addEventListener('touchstart', e => { e.preventDefault(); dragging=true; dragFrom=getSegFromEvent(e); updateDrag(dragFrom); }, {passive:false});
+  grid.addEventListener('touchmove', e => { e.preventDefault(); if(dragging) updateDrag(getSegFromEvent(e)); }, {passive:false});
+  grid.addEventListener('touchend', () => { dragging=false; });
+}
+
+function clearSegment(bedId) {
+  // Remove segment spec for this bed — use plain bedId
+  applySegmentSpec(bedId, null, null);
+}
+
+function applySegment(bedId) {
+  const segs = document.getElementById('seg-grid')?.querySelectorAll('[data-seg]');
+  let start = null, end = null;
+  if (segs) {
+    segs.forEach(el => {
+      if (el.style.background.includes('var(--accent)')) {
+        const i = +el.dataset.seg;
+        if (start === null) start = i;
+        end = i;
+      }
+    });
+  }
+  applySegmentSpec(bedId, start !== null ? start * 0.5 : null, end !== null ? (end+1) * 0.5 : null);
+}
+
+function applySegmentSpec(bedId, startM, endM) {
+  const spec = (startM !== null && endM !== null) ? formatBedSpec(bedId, startM, endM) : bedId;
+  // Update c-beds value
+  const inp = document.getElementById('c-beds');
+  if (inp) {
+    const beds = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+    const idx = beds.findIndex(b => parseBedSpec(b).bedId === bedId);
+    if (idx >= 0) beds[idx] = spec;
+    else beds.push(spec);
+    inp.value = beds.join(', ');
+  }
+  const disp = document.getElementById('c-beds-display');
+  if (disp) {
+    const beds = (inp?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+    disp.textContent = beds.length ? beds.join(', ') : 'Velg senger 🗺';
+  }
+  // Mark chip as selected
+  const chip = document.querySelector('#bed-picker-modal [data-bed="' + bedId + '"]');
+  if (chip) {
+    chip.style.background = 'var(--accent)';
+    chip.style.color = 'var(--bg-main)';
+    chip.dataset.spec = spec;
+    chip.textContent = spec !== bedId ? bedId + ' (' + (spec.split('@')[1]||'') + 'm)' : bedId;
+  }
+  document.getElementById('segment-picker-modal')?.remove();
+}
+
 function closeBedPicker() { document.getElementById("bed-picker-modal")?.remove(); }
 function closeBedSettings() { document.getElementById("bed-settings-modal")?.remove(); }
 
@@ -823,7 +961,17 @@ function openBedPicker() {
     + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
     + beds.map(id => {
         const sel = currentBeds.includes(id);
-        return '<button onclick="toggleBedChip(this,this.dataset.bed)" data-bed="' + id + '" style="padding:6px 12px;border-radius:20px;border:none;background:' + (sel?'var(--accent)':'var(--bg-card)') + ';color:' + (sel?'var(--bg-main)':'var(--text-muted)') + ';cursor:pointer;font-size:13px;font-family:inherit">' + id + '</button>';
+        // Check if this bed has a segment spec
+        const existingSpec = currentBeds.find(b => parseBedSpec(b).bedId === id);
+        const hasSegment = existingSpec && existingSpec.includes('@');
+        const chipLabel = hasSegment ? id + ' (' + existingSpec.split('@')[1] + 'm)' : id;
+        return '<button onclick="toggleBedChip(this,this.dataset.bed)"'
+          + ' data-bed="' + id + '"'
+          + ' data-spec="' + (existingSpec||id) + '"'
+          + ' ontouchstart="bedChipTouchStart(this,this.dataset.bed)"'
+          + ' ontouchend="bedChipTouchEnd()" ontouchmove="bedChipTouchEnd()"'
+          + ' oncontextmenu="event.preventDefault();openSegmentPicker(this,this.dataset.bed)"'
+          + ' style="padding:6px 12px;border-radius:20px;border:none;background:' + (sel?'var(--accent)':'var(--bg-card)') + ';color:' + (sel?'var(--bg-main)':'var(--text-muted)') + ';cursor:pointer;font-size:13px;font-family:inherit">' + chipLabel + '</button>';
       }).join('')
     + '</div></div>'
   ).join('');
@@ -928,8 +1076,20 @@ function openBedSettings() {
   };
   const sep = () => { const d = document.createElement('div'); d.style.cssText = 'height:1px;background:var(--border);margin:4px 0'; return d; };
 
-  float.appendChild(row('➕', 'Ny seng', 'var(--text-head)', () => { openAddBed(); float.remove(); }));
+  const tableOpen = !!document.getElementById('table-view-overlay');
+  // Kart
+  float.appendChild(row('🗺', 'Kart', 'var(--text-head)', () => { openGardenMap(); float.remove(); }));
   float.appendChild(sep());
+  // Tabelloversikt toggle
+  const tblToggle = rowToggle('📋', 'Tabelloversikt', () => {
+    const wasOpen = !!document.getElementById('table-view-overlay');
+    if (wasOpen) { closeTableView(); }
+    else { openTableView('beds'); }
+    setTimeout(() => { float.remove(); openBedSettings(); }, 50);
+  }, tableOpen);
+  float.appendChild(tblToggle);
+  float.appendChild(sep());
+  // Toggles
   float.appendChild(rowToggle('📊', 'Statistikk', () => {
     toggleBedStats();
     const t = float.querySelector('#bst-📊');
@@ -940,6 +1100,8 @@ function openBedSettings() {
     const t = float.querySelector('#bst-📝');
     if (t) { t.style.background = showBedNotes ? 'var(--accent)' : 'rgba(128,128,128,0.3)'; t.firstChild.style.left = showBedNotes ? '18px' : '2px'; }
   }, showBedNotes));
+  float.appendChild(sep());
+  float.appendChild(row('➕', 'Ny seng', 'var(--text-head)', () => { openAddBed(); float.remove(); }));
 
   document.body.appendChild(float);
   setTimeout(() => {
@@ -1155,6 +1317,7 @@ document.addEventListener('click', e => {
 });
 
 function showTab(name) {
+  closeTableView(); // close table overlay on tab switch
   currentTab = name;
   try { localStorage.setItem('mh_tab', name); } catch(e) {}
   expandedCrops = new Set(); // reset expanded state on tab switch
@@ -1237,6 +1400,13 @@ function render() {
 // Returns { bedId, start, end } where start/end are meters (1-based), null=whole bed
 function parseBedSpec(spec) {
   spec = spec.trim();
+  // New format: A1@1.0-3.5 (meter-based)
+  const meterMatch = spec.match(/^([A-Za-z]+\d+)@([\d.]+)-([\d.]+)$/);
+  if (meterMatch) {
+    const bedId = meterMatch[1].toUpperCase();
+    return { bedId, startM: parseFloat(meterMatch[2]), endM: parseFloat(meterMatch[3]), start: null, end: null, format: 'meter' };
+  }
+  // Legacy format: A1-3:7
   const segMatch = spec.match(/^([A-Za-z]+\d+)-(\d+)(?::(\d+))?$/);
   if (segMatch) {
     const bedId = segMatch[1].toUpperCase();
@@ -1245,6 +1415,18 @@ function parseBedSpec(spec) {
     return { bedId, start, end };
   }
   return { bedId: spec.toUpperCase(), start: null, end: null };
+}
+
+// Format a bed selection as A1@startM-endM
+function formatBedSpec(bedId, startM, endM) {
+  if (startM === null || endM === null) return bedId;
+  return bedId + '@' + startM.toFixed(1) + '-' + endM.toFixed(1);
+}
+
+// Get bed length in meters
+function getBedLength(bedId) {
+  const rawId = bedId.replace(/@.*/, '');
+  return (bedSizes[rawId] || { length: 11 }).length;
 }
 
 function segmentLength(spec) {
@@ -3380,13 +3562,7 @@ function renderSenger() {
   const isLight = document.body.classList.contains('light');
 
   let html = `
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px">
-      <select onchange="setBedField(this.value)" style="padding:6px 10px;border-radius:20px;background:var(--bg-card);color:var(--text-muted);font-size:12px;font-family:inherit;cursor:pointer;outline:none;">
-        ${fields.map(f => `<option value="${f}" ${bedFieldFilter===f?'selected':''}>${f==='alle'?'Felt':'Felt '+f}</option>`).join('')}
-      </select>
-      <button onclick="openGardenMap()" style="padding:7px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Kart</button>
-      <button onclick="openBedSettings()" style="padding:7px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">⚙️ Innstillinger</button>
-    </div>`;
+`;
 
   // Group beds by field letter
   const byField = {};
@@ -3420,11 +3596,23 @@ function renderSenger() {
       }).length;
       const _avgVal = _bedsWithVal > 0 ? fieldTotalVal / beds.length : 0;
       const _avgStr = _avgVal >= 100 ? '~' + (Math.round(_avgVal/100)/10).toLocaleString('nb-NO') + 'k' : '';
-      html += `<div style="margin:${letter === fieldKeys[0] ? '0' : '20px'} 0 10px;text-align:center">
-        <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${showBedStats && _fkStr ? `<span style="font-size:14px;color:var(--color-value);font-weight:700">${_fkStr}</span>` : ''}${showBedStats && _avgStr ? `<span style="font-size:12px;color:var(--text-muted)"> · snitt ${_avgStr}/seng</span>` : ''}
+      const isFirstField = letter === fieldKeys[0];
+      const tableOpen = !!document.getElementById('table-view-overlay');
+      html += `<div id="${isFirstField ? 'senger-toolbar' : ''}" style="display:flex;align-items:center;justify-content:space-between;margin:${isFirstField ? '0' : '20px'} 0 10px">
+        <div style="visibility:${tableOpen && isFirstField ? 'hidden' : 'visible'}">
+          <span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span>${showBedStats && _fkStr ? `<span style="font-size:14px;color:var(--color-value);font-weight:700">${_fkStr}</span>` : ''}${showBedStats && _avgStr ? `<span style="font-size:12px;color:var(--text-muted)"> · snitt ${_avgStr}/seng</span>` : ''}
+        </div>
+        ${isFirstField ? `<button onclick="openBedSettings()" style="padding:5px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Alternativer</button>` : ''}
       </div>`;
     }
 
+    if (fields.length <= 2 && letter === fieldKeys[0]) {
+      const tableOpen2 = !!document.getElementById('table-view-overlay');
+      html += `<div id="senger-toolbar" style="display:flex;align-items:center;justify-content:space-between;margin:0 0 10px">
+        <div style="visibility:${tableOpen2 ? 'hidden' : 'visible'}"><span style="font-size:14px;font-weight:700;color:var(--text-head);letter-spacing:0.05em;text-transform:uppercase">Felt ${letter}:</span></div>
+        <button onclick="openBedSettings()" style="padding:5px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Alternativer</button>
+      </div>`;
+    }
     beds.forEach(bed => {
       const bedCropList = getCropsInBed(bed);
       const sz = bedSizes[bed];
@@ -3776,22 +3964,27 @@ function renderVekster() {
   const currentSortLabel = SORT_FIELDS.find(f => f.key === cropSortField)?.label || 'Navn';
   const dirSymbol = cropSortDir === 'asc' ? '↑' : '↓';
 
+  const tableIsOpen = !!document.getElementById('table-view-overlay');
   document.getElementById('tab-vekster').innerHTML = `
-    <button class="add-btn" onclick="openAddCrop()">+ Legg til vekst</button>
-    <div style="display:flex;align-items:stretch;gap:6px;margin-bottom:14px">
-      <div style="display:flex;flex-shrink:0;border-radius:20px;border:none;overflow:hidden">
-        <button onclick="toggleFilterMenu(event)" id="filter-btn" style="padding:0 10px;background:var(--bg-card);color:${cropFilter==='alle'?'#9ca3af':'#6ee7b7'};cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap">${cropFilter==='alle'?'Alle statuser':STATUS[cropFilter].label}</button>
-      </div>
-      <div style="flex:1;display:flex;align-items:center;background:var(--task-bg);border:none;border-radius:20px;padding:4px 10px;gap:6px">
-        <span style="color:var(--text-dim);font-size:12px">⌕</span>
-        <input id="search-input" type="text" placeholder="Søk…" value="${cropSearch}" oninput="onSearchInput()" onkeydown="onSearchKey(event)" style="background:transparent;border:none;outline:none;color:var(--text-head);font-size:12px;font-family:inherit;width:100%;caret-color:var(--accent)" autocomplete="off">
-        ${cropSearch ? `<button onclick="clearSearch()" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0;line-height:1">✕</button>` : ''}
-      </div>
-      <div style="display:flex;flex-shrink:0;border-radius:20px;border:none;overflow:hidden">
-        <button onclick="toggleSortDir()" style="padding:0 7px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;border-right:1px solid rgba(255,255,255,0.15)">${dirSymbol}</button>
-        <button onclick="toggleSortMenu(event)" id="sort-btn" style="padding:0 8px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap">${currentSortLabel}</button>
-      </div>
+    <div id="vekster-toolbar" style="display:flex;align-items:stretch;gap:6px;margin-bottom:14px">
+      ${tableIsOpen ? `
+        <button onclick="openTableView('crops')" style="padding:0 12px;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap;border-radius:20px">Tabell</button>
+        <div style="flex:1"></div>
+        <button onclick="toggleTableColDropdown(this)" style="padding:5px 12px;border-radius:20px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit">Kolonner ▾</button>
+      ` : `
+        <button onclick="openTableView('crops')" id="vekster-tabell-btn" style="padding:0 10px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap;border-radius:20px">Tabell</button>
+        <div style="flex:1;display:flex;align-items:center;background:var(--task-bg);border:none;border-radius:20px;padding:4px 10px;gap:6px">
+          <span style="color:var(--text-dim);font-size:12px">⊕</span>
+          <input id="search-input" type="text" placeholder="Søk…" value="${cropSearch}" oninput="onSearchInput()" onkeydown="onSearchKey(event)" style="background:transparent;border:none;outline:none;color:var(--text-head);font-size:12px;font-family:inherit;width:100%;caret-color:var(--accent)" autocomplete="off">
+          ${cropSearch ? `<button onclick="clearSearch()" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0;line-height:1">✕</button>` : ''}
+        </div>
+        <div style="display:flex;flex-shrink:0;border-radius:20px;overflow:hidden">
+          <button onclick="toggleSortDir()" style="padding:0 7px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;border-right:1px solid rgba(255,255,255,0.15)">${dirSymbol}</button>
+          <button onclick="toggleSortMenu(event)" id="sort-btn" style="padding:0 8px;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;border:none;white-space:nowrap">${currentSortLabel}</button>
+        </div>
+      `}
     </div>
+    <button class="add-btn" onclick="openAddCrop()">+ Legg til vekst</button>
     <div id="crop-list">
     ${(() => {
       const groups = {};
@@ -6858,6 +7051,301 @@ function openVersionLog() {
   document.body.appendChild(modal);
 }
 
+
+
+// ══════════════════════════════════════════════════════
+// TABELLOVERSIKT
+// ══════════════════════════════════════════════════════
+let tableViewType = null; // 'crops' | 'beds'
+let tableSortCol = null;
+let tableSortDir = 1; // 1=asc, -1=desc
+let tableHiddenCols = {};
+
+const CROP_COLS = [
+  { key:'emoji',        label:'Emoji',        type:'text',   width:60 },
+  { key:'name',         label:'Navn',         type:'text',   width:140 },
+  { key:'family',       label:'Sort',         type:'text',   width:140 },
+  { key:'category',     label:'Kategori',     type:'select', width:120, options:() => cropCategories },
+  { key:'status',       label:'Status',       type:'select', width:110, options:() => ['planlagt','sådd','plantet','høstet'] },
+  { key:'beds',         label:'Senger',       type:'text',   width:120 },
+  { key:'rows',         label:'Rader',        type:'number', width:70 },
+  { key:'rowSpacing',   label:'Radavstand',   type:'number', width:90 },
+  { key:'plantSpacing', label:'Planteavstand',type:'number', width:110 },
+  { key:'seedsPerCluster',label:'Frø/klynge',type:'number', width:90 },
+  { key:'sownDate',     label:'Sådato',       type:'date',   width:110 },
+  { key:'sownByDate',   label:'Såfrist',      type:'date',   width:110 },
+  { key:'sowLog',       label:'Sålogg',       type:'log',    width:130 },
+  { key:'plantedDate',  label:'Plantedato',   type:'date',   width:110 },
+  { key:'plantedByDate',label:'Plantefrist',  type:'date',   width:110 },
+  { key:'plantLog',     label:'Plantelogg',   type:'log',    width:130 },
+  { key:'unit',         label:'Salgsenhet',   type:'select', width:100, options:() => ['stk','bunt','boks'] },
+  { key:'pricePerKg',   label:'Pris/kg',      type:'number', width:80 },
+  { key:'weightG',      label:'Vekt (g)',      type:'number', width:80 },
+  { key:'pricePerUnit', label:'Pris/stk',     type:'number', width:80 },
+  { key:'unitsPerPlant',label:'Stk/plante',   type:'number', width:90 },
+  { key:'plantsPerUnit',label:'Planter/stk',  type:'number', width:100 },
+  { key:'notes',        label:'Notater',      type:'text',   width:180 },
+];
+
+const BED_COLS = [
+  { key:'id',     label:'Seng-ID', type:'readonly', width:80 },
+  { key:'field',  label:'Felt',    type:'readonly', width:60 },
+  { key:'length', label:'Lengde (m)', type:'number', width:100 },
+  { key:'width',  label:'Bredde (m)', type:'number', width:100 },
+  { key:'note',   label:'Notat',   type:'text',   width:200 },
+  { key:'crops',  label:'Vekster', type:'readonly', width:180 },
+];
+
+function openTableView(type) {
+  // If already open and same type, close it (toggle)
+  const existing = document.getElementById('table-view-overlay');
+  if (existing) { closeTableView(); return; }
+  tableViewType = type;
+  if (!tableHiddenCols[type]) tableHiddenCols[type] = {};
+  tableSortCol = null;
+  tableSortDir = 1;
+  renderTableView();
+}
+
+function toggleTableColDropdown(btn) {
+  // Remove existing floating dropdown if any
+  let d = document.getElementById('table-col-dropdown-float');
+  if (d) { d.remove(); return; } // toggle off
+
+  // Get the source dropdown content
+  const src = document.getElementById('table-col-dropdown');
+  if (!src) return;
+
+  // Create floating dropdown anchored to button
+  const rect = btn ? btn.getBoundingClientRect() : { left: 0, bottom: 60 };
+  const isLight = document.body.classList.contains('light');
+  const float = document.createElement('div');
+  float.id = 'table-col-dropdown-float';
+  float.style.cssText = 'position:fixed;left:' + Math.min(rect.left, window.innerWidth-220) + 'px;top:' + (rect.bottom+4) + 'px;background:' + (isLight?'#fffbf5':'#1a2e1b') + ';border-radius:14px;padding:8px;min-width:200px;max-height:60vh;overflow-y:auto;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,0.4)';
+  float.innerHTML = src.innerHTML;
+  document.body.appendChild(float);
+
+  // Close on outside click
+  setTimeout(() => {
+    function outside(e) {
+      if (!float.contains(e.target) && e.target !== btn) {
+        float.remove();
+        document.removeEventListener('mousedown', outside);
+      }
+    }
+    document.addEventListener('mousedown', outside);
+  }, 50);
+}
+function closeTableColDropdown() {
+  document.getElementById('table-col-dropdown-float')?.remove();
+}
+
+function closeTableView() {
+  document.getElementById('table-view-overlay')?.remove();
+  document.getElementById('table-col-dropdown-float')?.remove();
+  document.body.style.overflow = '';
+  if (typeof renderVekster === 'function' && currentTab === 'vekster') renderVekster();
+  if (typeof renderSenger === 'function' && currentTab === 'senger') renderSenger();
+}
+
+function tableToggleCol(key) {
+  const t = tableViewType;
+  // Save scroll position before re-render
+  const dd = document.getElementById('table-col-dropdown');
+  const scrollTop = dd ? dd.scrollTop : 0;
+  tableHiddenCols[t][key] = !tableHiddenCols[t][key];
+  renderTableView();
+  // Re-open dropdown and restore scroll
+  // Update only the checkbox state in the floating dropdown — no re-render
+  const float = document.getElementById('table-col-dropdown-float');
+  if (float) {
+    const boxes = float.querySelectorAll('input[type=checkbox]');
+    const hidden = tableHiddenCols[tableViewType] || {};
+    const cols = tableViewType === 'crops' ? CROP_COLS : BED_COLS;
+    boxes.forEach((cb, i) => {
+      if (cols[i]) cb.checked = !hidden[cols[i].key];
+    });
+  }
+}
+
+function tableSort(key) {
+  if (tableSortCol === key) tableSortDir = -tableSortDir;
+  else { tableSortCol = key; tableSortDir = 1; }
+  renderTableView();
+}
+
+function getTableVal(obj, key, type) {
+  if (type === 'beds') {
+    if (key === 'id') return obj.id;
+    if (key === 'field') return parseBedId(obj.id)?.field || '';
+    if (key === 'crops') return getCropsInBed(obj.id).map(c => c.family||c.name).join(', ');
+    return (obj.sizes || {})[key] ?? '';
+  }
+  // crops
+  if (key === 'beds') return (obj.beds||[]).join(', ');
+  if (key === 'sowLog') return logDisplay(obj.sowLog);
+  if (key === 'plantLog') return logDisplay(obj.plantLog);
+  return obj[key] ?? '';
+}
+
+function getSortVal(obj, key, type) {
+  const v = getTableVal(obj, key, type);
+  if (typeof v === 'number') return v;
+  return String(v||'').toLowerCase();
+}
+
+function renderTableView() {
+  document.getElementById('table-view-overlay')?.remove();
+  const type = tableViewType;
+  const cols = type === 'crops' ? CROP_COLS : BED_COLS;
+  const hidden = tableHiddenCols[type] || {};
+  const visCols = cols.filter(c => !hidden[c.key]);
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#faf8f5' : '#111c12';
+  const headerBg = isLight ? 'rgba(250,248,245,0.95)' : 'rgba(17,28,18,0.95)';
+
+  // Build rows
+  let rows = [];
+  if (type === 'crops') {
+    rows = [...crops];
+  } else {
+    rows = BED_IDS.map(id => ({ id, sizes: bedSizes[id] || {} }));
+  }
+
+  // Sort
+  if (tableSortCol) {
+    rows.sort((a,b) => {
+      const av = getSortVal(a, tableSortCol, type);
+      const bv = getSortVal(b, tableSortCol, type);
+      return av < bv ? -tableSortDir : av > bv ? tableSortDir : 0;
+    });
+  }
+
+  // Column toggle dropdown (hidden by default)
+  const toggleItems = cols.map(c =>
+    '<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-radius:8px;font-size:13px;color:var(--text-head)" '
+    + 'onmouseover="this.style.background=\'rgba(128,128,128,0.08)\'" onmouseout="this.style.background=\'transparent\'">'
+    + '<input type="checkbox" ' + (!hidden[c.key] ? 'checked' : '') + ' onchange="tableToggleCol(\'' + c.key + '\')" '
+    + 'style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer"> ' + c.label + '</label>'
+  ).join('');
+
+  const colDropdown = '<div id="table-col-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--bg-modal);border-radius:14px;padding:8px;min-width:200px;max-height:60vh;overflow-y:auto;z-index:100;box-shadow:0 12px 40px rgba(0,0,0,0.4)">'
+    + toggleItems + '</div>';
+
+  // Table header
+  const thead = '<thead>'
+    + '<tr>'
+    + visCols.map(c => {
+        const arrow = tableSortCol===c.key ? (tableSortDir===1?'↑':'↓') : '';
+        return '<th data-sortkey="' + c.key + '" onclick="tableSort(this.dataset.sortkey)" style="position:sticky;top:0;position:sticky;top:0;background:' + headerBg + ';padding:9px 10px;text-align:left;font-size:10px;color:var(--text-muted);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;white-space:nowrap;min-width:' + c.width + 'px;user-select:none;border-bottom:1px solid rgba(128,128,128,0.12)">'  
+          + c.label + (arrow ? ' <span style="color:var(--accent)">' + arrow + '</span>' : ' <span style="opacity:0.25">↕</span>') + '</th>';
+      }).join('')
+    + '</tr></thead>';
+
+  // Table body with zebra striping
+  const tbody = '<tbody>'
+    + rows.map((row, ri) => {
+        const rowId = row.id;
+        const zebra = ri % 2 === 1 ? 'background:rgba(128,128,128,0.03)' : '';
+        return '<tr style="' + zebra + ';border-bottom:1px solid rgba(128,128,128,0.06)">'
+          + visCols.map(c => {
+              const val = getTableVal(row, c.key, type);
+              if (c.type === 'readonly') {
+                return '<td style="padding:7px 10px;font-size:13px;color:var(--text-muted);white-space:nowrap">' + (val||'–') + '</td>';
+              } else if (c.type === 'select') {
+                const opts = c.options ? c.options() : [];
+                return '<td style="padding:4px 8px"><select data-type="' + type + '" data-rowid="' + rowId + '" data-key="' + c.key + '" onchange="tableEditCell(this.dataset.type,this.dataset.rowid,this.dataset.key,this.value)" style="background:transparent;border:none;color:var(--text-head);font-size:13px;font-family:inherit;width:100%;outline:none;cursor:pointer;padding:4px 0">'
+                  + opts.map(o => '<option value="' + o + '"' + (val===o?' selected':'') + '>' + o + '</option>').join('')
+                  + '</select></td>';
+              } else if (c.type === 'log') {
+                return '<td style="padding:7px 10px;font-size:12px;color:var(--text-muted)">' + (val||'–') + '</td>';
+              } else {
+                const iNum = c.type==='number';
+                const inputAttrs = 'data-type="' + type + '" data-rowid="' + rowId + '" data-key="' + c.key + '"' + (iNum ? ' inputmode="numeric" pattern="[0-9.]*"' : '');
+                const inputVal = String(val||'').replace(/"/g, '&quot;');
+                return '<td style="padding:4px 8px"><input type="text" ' + inputAttrs + ' value="' + inputVal + '" onchange="tableEditCell(this.dataset.type,this.dataset.rowid,this.dataset.key,this.value)" style="background:transparent;border:none;border-bottom:1px solid rgba(128,128,128,0.15);color:var(--text-head);font-size:13px;font-family:inherit;width:100%;min-width:' + Math.max(c.width-20,50) + 'px;padding:5px 2px;outline:none"></td>';
+              }
+            }).join('')
+          + '</tr>';
+      }).join('')
+    + '</tbody>';
+
+  const title = type === 'crops' ? '⊞ Vekster' : '⊞ Senger';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'table-view-overlay';
+  // z-index 40 = below header (50) so header stays on top
+  // Measure from bottom of toolbar (or header if toolbar not found)
+  const toolbarId = type === 'crops' ? 'vekster-toolbar' : 'senger-toolbar';
+  const toolbarEl = document.getElementById(toolbarId);
+  const headerEl = document.querySelector('header');
+  let topOffset;
+  if (toolbarEl) {
+    const rect = toolbarEl.getBoundingClientRect();
+    topOffset = Math.round(rect.bottom) + 8;
+  } else {
+    topOffset = headerEl ? Math.round(headerEl.getBoundingClientRect().height) : 56;
+  }
+  overlay.style.cssText = 'position:fixed;left:0;right:0;top:' + topOffset + 'px;bottom:0;z-index:40;background:' + bg + ';display:flex;flex-direction:column;overflow:hidden;border-top:1px solid rgba(128,128,128,0.12)';
+  // Prevent body scroll while overlay is open
+  document.body.style.overflow = 'hidden';
+  overlay.innerHTML =
+    // Just the table — no toolbar, colDropdown injected via vekster toolbar
+    '<div style="flex:1;overflow:auto;padding-bottom:80px" onclick="closeTableColDropdown()">'
+    + '<table style="border-collapse:collapse;width:100%;min-width:600px">'
+    + thead + tbody
+    + '</table>'
+    + '<div id="table-col-dropdown-container">' + colDropdown + '</div>'
+    + '</div>';
+
+  document.body.appendChild(overlay);
+  // Re-render senger toolbar so field header hides correctly
+  if (type === 'beds' && typeof renderSenger === 'function') renderSenger();
+  // Re-render vekster toolbar to show table-mode UI (search replaced by Kolonner)
+  if (type === 'crops' && typeof renderVekster === 'function') renderVekster();
+  // Insert column dropdown into toolbar Kolonner button wrapper too
+  setTimeout(() => {
+    const wrap = document.getElementById('kolonner-toolbar-wrap');
+    if (wrap && !wrap.querySelector('#table-col-dropdown-toolbar')) {
+      const ddClone = document.getElementById('table-col-dropdown');
+      if (ddClone) {
+        const clone = ddClone.cloneNode(true);
+        clone.id = 'table-col-dropdown-toolbar';
+        clone.style.right = 'auto';
+        clone.style.left = '0';
+        wrap.appendChild(clone);
+      }
+    }
+  }, 50);
+}
+
+
+function tableEditCell(type, rowId, key, value) {
+  if (type === 'crops') {
+    const crop = crops.find(c => String(c.id) === String(rowId));
+    if (!crop) return;
+    snapshot();
+    if (key === 'beds') {
+      crop.beds = value.split(',').map(s=>s.trim()).filter(Boolean);
+    } else if (['rows','rowSpacing','plantSpacing','seedsPerCluster','pricePerKg','weightG','pricePerUnit','unitsPerPlant','plantsPerUnit'].includes(key)) {
+      crop[key] = +value || 0;
+    } else {
+      crop[key] = value;
+    }
+    saveToLocal(); scheduleSync();
+    renderCropListOnly && renderCropListOnly();
+  } else {
+    // beds
+    if (!bedSizes[rowId]) bedSizes[rowId] = { length:11, width:1.2 };
+    snapshot();
+    if (key === 'length' || key === 'width') {
+      bedSizes[rowId][key] = +value || 0;
+    } else if (key === 'note') {
+      bedSizes[rowId].note = value;
+    }
+    saveToLocal(); scheduleSync();
+  }
+}
 
 function initSync() {
   const DEFAULT_KEY = '$2a$10$H3ZyijeCyakGbK9kSCv3U.NqxD/DZNaug3LPpodQYWWiAF270R3oq';
