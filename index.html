@@ -6484,13 +6484,13 @@ function buildWorkbook() {
   XLSX.utils.book_append_sheet(wb, wsOppgaver, 'Oppgaver');
 
   // ── Sheet 4: Kunder ──────────────────────────────────────────
-  const customerHeaders = ['Navn', 'Telefon', 'Epost', 'Kassetype', 'Kassetypeid'];
+  const customerHeaders = ['Navn', 'Telefon', 'Epost', 'Kassetype', 'Kassetype-ID'];
   const customerRows = deliveryCustomers.map(cu => {
     const bt = boxTypes.find(t => t.id == cu.boxTypeId);
     return [cu.name, cu.phone || '', cu.email || '', bt ? bt.name : '', cu.boxTypeId || ''];
   });
   const wsKunder = XLSX.utils.aoa_to_sheet([customerHeaders, ...customerRows]);
-  wsKunder['!cols'] = [{wch:24},{wch:16},{wch:20},{wch:20}];
+  wsKunder['!cols'] = [{wch:24},{wch:16},{wch:28},{wch:20},{wch:16}];
   styleHeaderRow(wsKunder, customerHeaders.length);
   XLSX.utils.book_append_sheet(wb, wsKunder, 'Kunder');
 
@@ -8155,12 +8155,13 @@ function importCustomersFromExcel(event) {
         if (!r[0]) continue;
         const name = String(r[0] || '').trim();
         const phone = String(r[1] || '').trim();
-        const btName = String(r[2] || '').trim();
-        const btIdRaw = String(r[3] || '').trim();
+        const email = String(r[2] || '').trim();
+        const btName = String(r[3] || '').trim();
+        const btIdRaw = String(r[4] || '').trim();
         let boxTypeId = null;
         if (btIdRaw) { const bt = boxTypes.find(t => String(t.id) === btIdRaw); if (bt) boxTypeId = bt.id; }
         if (!boxTypeId && btName) { const bt = boxTypes.find(t => t.name.toLowerCase() === btName.toLowerCase()); if (bt) boxTypeId = bt.id; }
-        newCustomers.push({ id: Date.now() + i * 7, name, phone, boxTypeId, notes: '', custom: {} });
+        newCustomers.push({ id: Date.now() + i * 7, name, phone, email, boxTypeId, notes: '', custom: {} });
       }
 
       if (!newCustomers.length) { showSyncToast('Ingen gyldige kunder i filen'); return; }
