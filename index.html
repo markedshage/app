@@ -1526,7 +1526,7 @@ function openStatPopup(type) {
   modal.innerHTML = `<div style="background:${bg};border-radius:16px;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid ${borderColor};flex-shrink:0">
       <div style="font-size:15px;font-weight:500;color:var(--text-head)">${title}</div>
-      <button onclick="closeBedNoteModal()" style="background:none;font-size:22px;color:var(--text-muted);padding:0;line-height:1">×</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;padding:0;line-height:1">×</button>
     </div>
     <div style="overflow-y:auto;padding:12px 20px 24px">
       ${sorted.length === 0 ? `<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0">Ingen vekster å vise</div>` : ''}
