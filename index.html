@@ -282,7 +282,7 @@
   .modal { background: var(--bg-modal); border-radius: 16px; padding: 24px 20px 28px; width: 100%; max-width: 600px; max-height: 88vh; overflow-y: auto; }
   .modal-title { font-size: 17px; font-weight: 400; color: var(--accent-soft); margin-bottom: 18px; }
   .field-label { font-size: 10px; color: #6b7280; display: block; margin-bottom: 4px; letter-spacing: 0.1em; text-transform: uppercase; }
-  .field-input { width: 100%; background: var(--bg-input); border: none; border-radius: 8px; padding: 10px 12px; color: var(--text-head); font-size: 15px; font-family: inherit; outline: none; transition: box-shadow 0.15s; }
+  .field-input { width: 100%; background: var(--bg-input); border: none; border-radius: 8px; padding: 7px 10px; color: var(--text-head); font-size: 13px; font-family: inherit; outline: none; transition: box-shadow 0.15s; }
   .field-input:focus { box-shadow: 0 0 0 2px var(--accent); }
   .field-input:focus { outline: none; border-color: rgba(52,211,153,0.4); }
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
@@ -609,6 +609,7 @@
           <div id="c-plantsperunit-wrap" style="display:none"><label class="field-label" id="c-plantsperunit-label">Planter per stk</label><input class="field-input" id="c-plantsperunit" type="number" step="1" min="1" value="" placeholder="f.eks. 5" oninput="recalcValueFromPlantsPerUnit()"></div>
           <div id="c-vekttotal-wrap"><label id="c-vekttotal-label" class="field-label">Vekt total (g)</label><input class="field-input" id="c-vekttotal" type="number" step="1" value="" min="0" oninput="recalcUnitsPerPlantFromVekt()" placeholder="Auto fra vekt×enheter"></div>
           <div id="c-valuetotal-wrap"><label class="field-label">Verdi total <span style="font-size:10px;color:var(--text-muted)">(beregnet)</span></label><input class="field-input" id="c-valuetotal" type="number" step="1" value="" min="0" readonly style="opacity:0.7;cursor:default"></div>
+          <div style="grid-column:1/-1"><label class="field-label">Svinn (%)</label><input class="field-input" id="c-svinn" type="range" min="0" max="100" step="10" value="0" oninput="document.getElementById('c-svinn-val').textContent=this.value+'%';recalcVektTotal()" style="padding:6px 0;cursor:pointer"><span id="c-svinn-val" style="font-size:12px;color:var(--text-muted);margin-left:8px">0%</span></div>
         </div>
       </div>
     </div>
@@ -826,12 +827,11 @@ function openSegmentPicker(btn, bedId) {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
 
   const buildSegments = () => {
-    let html = '<div id="seg-grid" style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0;user-select:none;touch-action:none">';
+    let html = '<div id="seg-grid" style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 8px;user-select:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth">';
     for (let i = 0; i < steps; i++) {
       const mStart = i * 0.5;
-      const mEnd = mStart + 0.5;
       const inSel = selStart !== null && i >= selStart && i <= selEnd;
-      html += '<div data-seg="' + i + '" style="width:32px;height:48px;flex-shrink:0;border-radius:6px;background:' + (inSel ? 'var(--accent)' : 'var(--bg-card)') + ';display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer;font-size:9px;color:' + (inSel ? 'var(--bg-main)' : 'var(--text-muted)') + ';border:1px solid rgba(128,128,128,0.1)">' + mStart.toFixed(1) + '</div>';
+      html += '<div data-seg="' + i + '" style="width:36px;height:52px;flex-shrink:0;border-radius:6px;background:' + (inSel ? 'var(--accent)' : 'var(--bg-card)') + ';display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer;font-size:9px;color:' + (inSel ? 'var(--bg-main)' : 'var(--text-muted)') + ';border:1px solid rgba(128,128,128,0.1)">' + mStart.toFixed(1) + '</div>';
     }
     html += '</div>';
     return html;
@@ -879,10 +879,50 @@ function openSegmentPicker(btn, bedId) {
 
   grid.addEventListener('mousedown', e => { dragging=true; dragFrom=getSegFromEvent(e); updateDrag(dragFrom); });
   grid.addEventListener('mousemove', e => { if(dragging) updateDrag(getSegFromEvent(e)); });
-  grid.addEventListener('mouseup', () => { dragging=false; });
-  grid.addEventListener('touchstart', e => { e.preventDefault(); dragging=true; dragFrom=getSegFromEvent(e); updateDrag(dragFrom); }, {passive:false});
-  grid.addEventListener('touchmove', e => { e.preventDefault(); if(dragging) updateDrag(getSegFromEvent(e)); }, {passive:false});
-  grid.addEventListener('touchend', () => { dragging=false; });
+  grid.addEventListener('mouseup', e => {
+    if (!dragging) return;
+    dragging = false;
+    // If tapped a single already-selected segment, deselect
+    const seg = getSegFromEvent(e);
+    if (seg !== null && seg === dragFrom && selStart !== null && seg >= selStart && seg <= selEnd && selStart === selEnd) {
+      selStart = null; selEnd = null;
+      grid.querySelectorAll('[data-seg]').forEach(el => { el.style.background='var(--bg-card)'; el.style.color='var(--text-muted)'; });
+      const labelEl = document.getElementById('seg-label'); if (labelEl) labelEl.textContent = 'Hele sengen';
+    }
+  });
+
+  // Touch: detect tap vs drag. Allow native scroll if not dragging over a segment
+  let touchStartX = 0, touchStartY = 0, touchMoved = false;
+  grid.addEventListener('touchstart', e => {
+    const seg = getSegFromEvent(e);
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchMoved = false;
+    if (seg !== null) { dragging=true; dragFrom=seg; }
+  }, {passive:true});
+  grid.addEventListener('touchmove', e => {
+    const dx = Math.abs(e.touches[0].clientX - touchStartX);
+    const dy = Math.abs(e.touches[0].clientY - touchStartY);
+    if (!touchMoved && dx < 8 && dy < 8) return; // not moved yet
+    touchMoved = true;
+    if (!dragging) return;
+    // Only prevent default (block scroll) if dragging horizontally over segments
+    if (dx > dy) e.preventDefault();
+    updateDrag(getSegFromEvent(e));
+  }, {passive:false});
+  grid.addEventListener('touchend', e => {
+    if (!dragging) return;
+    dragging = false;
+    const seg = getSegFromEvent(e.changedTouches?.[0] ? {touches:e.changedTouches} : e);
+    // Tap on already-selected single segment = deselect
+    if (!touchMoved && seg !== null && selStart !== null && seg >= selStart && seg <= selEnd && selStart === selEnd) {
+      selStart = null; selEnd = null;
+      grid.querySelectorAll('[data-seg]').forEach(el => { el.style.background='var(--bg-card)'; el.style.color='var(--text-muted)'; });
+      const labelEl = document.getElementById('seg-label'); if (labelEl) labelEl.textContent = 'Hele sengen';
+    } else if (!touchMoved && seg !== null) {
+      updateDrag(seg);
+    }
+  });
 }
 
 function clearSegment(bedId) {
@@ -1272,6 +1312,7 @@ function showFloatingGearMenu(triggerBtn) {
     float.appendChild(sep());
     float.appendChild(row('⬆', 'Importer fra Excel', 'var(--text-head)', () => { document.getElementById('excel-import-input')?.click(); float.remove(); }));
     float.appendChild(row('⬇', 'Eksporter til Excel', 'var(--text-head)', () => { exportToExcel(); float.remove(); }));
+    float.appendChild(row('⬇', 'Eksporter kundeliste', 'var(--text-head)', () => { float.remove(); openKundelisteExport(); }));
 
     document.body.appendChild(float);
     // Auto-close when clicking outside — but exclude trigger buttons
@@ -1623,11 +1664,12 @@ function calcPlants(crop) {
     const plantsPerRow = Math.floor(lenCm / plantSpacing) + 1;
     total += rows * plantsPerRow;
   });
-  return total;
+  const svinnFactor = 1 - ((crop.svinn || 0) / 100);
+  return Math.round(total * svinnFactor);
 }
 
 function calcValue(crop) {
-  const plants = calcPlants(crop);
+  const plants = calcPlants(crop); // svinn already applied in calcPlants
   // plantsPerUnit mode: unitsPerPlant===0, use plantsPerUnit instead
   if ((crop.unitsPerPlant === 0 || crop.unitsPerPlant === '0') && crop.plantsPerUnit > 0 && crop.pricePerUnit) {
     return Math.round((plants / crop.plantsPerUnit) * crop.pricePerUnit);
@@ -4727,12 +4769,13 @@ function openEditCrop(id) {
   const puField = document.getElementById('c-priceunit');
   if (puField) { puField.value = c.pricePerUnit || 0; puField.dataset.custom = c.pricePerUnitCustom ? '1' : ''; recalcPricePerUnit(); }
   document.getElementById('c-notes').value = c.notes;
+  const svEl = document.getElementById('c-svinn');
+  if (svEl) { svEl.value = c.svinn || 0; document.getElementById('c-svinn-val').textContent = (c.svinn||0) + '%'; }
   document.getElementById('modal-crop-delete-wrap').style.display = 'block';
   // Reset sections: Generelt open, others closed
   document.querySelectorAll('.crop-section-header').forEach(h => {
-    const isGenerelt = h.textContent.trim().startsWith('Generelt');
-    h.classList.toggle('open', isGenerelt);
-    h.nextElementSibling.classList.toggle('open', isGenerelt);
+    h.classList.add('open');
+    h.nextElementSibling.classList.add('open');
   });
   document.getElementById('modal-crop').style.display = 'flex';
 }
@@ -4773,12 +4816,12 @@ function openAddCrop() {
   document.getElementById('c-weightg').value = 0;
   const puF = document.getElementById('c-priceunit'); if (puF) { puF.value = 0; delete puF.dataset.custom; }
   document.getElementById('c-notes').value = '';
-  document.getElementById('modal-crop-delete-wrap').style.display = 'none';
+  const svElAdd = document.getElementById('c-svinn');
+  if (svElAdd) { svElAdd.value = 0; document.getElementById('c-svinn-val').textContent = '0%'; }  document.getElementById('modal-crop-delete-wrap').style.display = 'none';
   // Reset sections: Generelt open, others closed
   document.querySelectorAll('.crop-section-header').forEach(h => {
-    const isGenerelt = h.textContent.trim().startsWith('Generelt');
-    h.classList.toggle('open', isGenerelt);
-    h.nextElementSibling.classList.toggle('open', isGenerelt);
+    h.classList.add('open');
+    h.nextElementSibling.classList.add('open');
   });
   document.getElementById('modal-crop').style.display = 'flex';
 }
@@ -4849,6 +4892,7 @@ function saveCrop() {
     pricePerUnit: parseFloat(document.getElementById('c-priceunit')?.value) || 0,
     pricePerUnitCustom: !!document.getElementById('c-priceunit')?.dataset.custom,
     notes: document.getElementById('c-notes').value || '',
+    svinn: +(document.getElementById('c-svinn')?.value || 0),
   };
   const existingCrop = editingCropId !== null ? crops.find(c => c.id === editingCropId) : null;
   const prevStatus = existingCrop ? existingCrop.status : 'planlagt';
@@ -7379,6 +7423,81 @@ function tableEditCell(type, rowId, key, value) {
     }
     saveToLocal(); scheduleSync();
   }
+}
+
+
+function closeKundelisteModal() { document.getElementById("kundeliste-export-modal")?.remove(); }
+
+function openKundelisteExport() {
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#faf8f5' : '#1a2e1b';
+  const modal = document.createElement('div');
+  modal.id = 'kundeliste-export-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  const types = [{id: '__alle__', name: 'Alle'}].concat(boxTypes.map(t => ({id: t.id, name: t.name})));
+
+  const buttons = types.map(t =>
+    '<button onclick="exportKundeliste(' + JSON.stringify(t.id) + ')" style="display:block;width:100%;padding:11px 14px;border-radius:10px;border:none;background:var(--bg-input);color:var(--text-head);cursor:pointer;font-size:14px;font-family:inherit;text-align:left;margin-bottom:8px">' + t.name + '</button>'
+  ).join('');
+
+  modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;padding:20px;width:100%;max-width:360px">'
+    + '<div style="font-size:15px;color:var(--text-head);font-weight:500;margin-bottom:14px">Velg kassetype</div>'
+    + buttons
+    + '<button onclick="closeKundelisteModal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit;margin-top:4px">Avbryt</button>'
+    + '</div>';
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function exportKundeliste(boxTypeId) {
+  document.getElementById('kundeliste-export-modal')?.remove();
+
+  // Filter customers
+  const customers = boxTypeId === '__alle__'
+    ? deliveryCustomers
+    : deliveryCustomers.filter(c => String(c.boxTypeId) === String(boxTypeId));
+
+  // Kassetype name
+  const btName = boxTypeId === '__alle__' ? 'Alle' : (boxTypes.find(t => String(t.id) === String(boxTypeId))?.name || 'Ukjent');
+
+  // Filename: (Kassetype) kundeliste til Sender (dd.mm)
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const filename = btName + ' kundeliste til Sender ' + dd + '.' + mm + '.xlsx';
+
+  // Build workbook with exact template structure
+  // Columns: Email, Groups, Phone, Email status, Sms status, Transactional Email Status, Transactional Sms Status, Location, Created, First name, Last name
+  const headers = ['Email', 'Groups', 'Phone', 'Email status', 'Sms status', 'Transactional Email Status', 'Transactional Sms Status', 'Location', 'Created', 'First name', 'Last name'];
+
+  const rows = customers.map(c => {
+    const nameParts = (c.name || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ');
+    return [
+      c.email || '',  // Email
+      '',             // Groups
+      '',             // Phone
+      'active',       // Email status
+      '',             // Sms status
+      'active',       // Transactional Email Status
+      '',             // Transactional Sms Status
+      '',             // Location
+      '',             // Created
+      firstName,      // First name
+      lastName        // Last name
+    ];
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [
+    {wch:28},{wch:10},{wch:14},{wch:14},{wch:12},{wch:22},{wch:22},{wch:12},{wch:12},{wch:16},{wch:20}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
 }
 
 function initSync() {
