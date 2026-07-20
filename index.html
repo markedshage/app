@@ -848,10 +848,13 @@ function openSegmentPicker(btn, bedId) {
   }
   modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;width:100%;max-width:480px;padding:20px">'
     + '<div style="font-size:14px;color:var(--text-head);margin-bottom:4px">Seng ' + bedId + ' — velg område</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Hold og dra for å markere. Senglengde: ' + bedLen + 'm</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Trykk på felt for å velge. Dra i scrollebaren for å bla.</div>'
     + '<div id="seg-label" style="font-size:13px;color:var(--accent-soft);margin-bottom:8px">' + selectedLabel() + '</div>'
     + buildSegments()
-    + '<div style="display:flex;gap:8px;margin-top:16px">'
+    + '<div id="seg-scrollbar-track" style="height:28px;background:rgba(128,128,128,0.15);border-radius:14px;margin:8px 0 14px;position:relative;touch-action:none">'
+    + '<div id="seg-scrollbar-thumb" style="position:absolute;top:3px;height:22px;background:var(--accent);border-radius:11px;cursor:grab;touch-action:none;min-width:44px"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
     + '<button onclick="clearSegment(\'' + bedId + '\')" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">Hele sengen</button>'
     + '<button onclick="applySegment(\'' + bedId + '\')" style="flex:2;padding:10px;border-radius:10px;border:none;background:var(--accent);color:var(--bg-main);cursor:pointer;font-size:14px;font-family:inherit">Bruk</button>'
     + '</div></div>';
