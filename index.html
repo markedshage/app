@@ -827,7 +827,7 @@ function openSegmentPicker(btn, bedId) {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
 
   const buildSegments = () => {
-    let html = '<div id="seg-grid" style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 8px;user-select:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth">';
+    let html = '<div id="seg-grid" style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 14px;user-select:none;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y">';
     for (let i = 0; i < steps; i++) {
       const mStart = i * 0.5;
       const inSel = selStart !== null && i >= selStart && i <= selEnd;
@@ -839,6 +839,13 @@ function openSegmentPicker(btn, bedId) {
 
   const selectedLabel = () => selStart !== null ? (selStart*0.5).toFixed(1) + 'm – ' + ((selEnd+1)*0.5).toFixed(1) + 'm' : 'Hele sengen';
 
+  // Inject scrollbar CSS
+  if (!document.getElementById('seg-scroll-style')) {
+    const st = document.createElement('style');
+    st.id = 'seg-scroll-style';
+    st.textContent = '#seg-grid::-webkit-scrollbar{height:6px}#seg-grid::-webkit-scrollbar-track{background:rgba(128,128,128,0.1);border-radius:3px}#seg-grid::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}';
+    document.head.appendChild(st);
+  }
   modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;width:100%;max-width:480px;padding:20px">'
     + '<div style="font-size:14px;color:var(--text-head);margin-bottom:4px">Seng ' + bedId + ' — velg område</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Hold og dra for å markere. Senglengde: ' + bedLen + 'm</div>'
@@ -866,63 +873,62 @@ function openSegmentPicker(btn, bedId) {
     if (dragFrom === null || toSeg === null) return;
     selStart = Math.min(dragFrom, toSeg);
     selEnd = Math.max(dragFrom, toSeg);
-    // Update colors
+    refreshGrid();
+  }
+
+  function toggleSeg(seg) {
+    if (selStart !== null && seg >= selStart && seg <= selEnd) {
+      // Clicked inside selection — deselect if single, else shrink range
+      if (selStart === selEnd) { selStart = null; selEnd = null; }
+      else if (seg === selStart) selStart++;
+      else if (seg === selEnd) selEnd--;
+      else { selStart = seg; selEnd = seg; } // middle tap = select just this one
+    } else {
+      // Extend selection to include this segment
+      if (selStart === null) { selStart = seg; selEnd = seg; }
+      else { selStart = Math.min(selStart, seg); selEnd = Math.max(selEnd, seg); }
+    }
+    refreshGrid();
+  }
+
+  function refreshGrid() {
     grid.querySelectorAll('[data-seg]').forEach(el => {
       const i = +el.dataset.seg;
-      const inSel = i >= selStart && i <= selEnd;
+      const inSel = selStart !== null && i >= selStart && i <= selEnd;
       el.style.background = inSel ? 'var(--accent)' : 'var(--bg-card)';
       el.style.color = inSel ? 'var(--bg-main)' : 'var(--text-muted)';
     });
     const labelEl = document.getElementById('seg-label');
-    if (labelEl) labelEl.textContent = (selStart*0.5).toFixed(1) + 'm – ' + ((selEnd+1)*0.5).toFixed(1) + 'm';
+    if (labelEl) labelEl.textContent = selStart !== null
+      ? (selStart*0.5).toFixed(1) + 'm – ' + ((selEnd+1)*0.5).toFixed(1) + 'm'
+      : 'Hele sengen';
   }
 
-  grid.addEventListener('mousedown', e => { dragging=true; dragFrom=getSegFromEvent(e); updateDrag(dragFrom); });
-  grid.addEventListener('mousemove', e => { if(dragging) updateDrag(getSegFromEvent(e)); });
+  grid.addEventListener('mousedown', e => { dragging=true; dragFrom=getSegFromEvent(e); if(dragFrom!==null) updateDrag(dragFrom); });
+  grid.addEventListener('mousemove', e => { if(dragging && dragFrom!==null) updateDrag(getSegFromEvent(e)); });
   grid.addEventListener('mouseup', e => {
     if (!dragging) return;
-    dragging = false;
-    // If tapped a single already-selected segment, deselect
     const seg = getSegFromEvent(e);
-    if (seg !== null && seg === dragFrom && selStart !== null && seg >= selStart && seg <= selEnd && selStart === selEnd) {
-      selStart = null; selEnd = null;
-      grid.querySelectorAll('[data-seg]').forEach(el => { el.style.background='var(--bg-card)'; el.style.color='var(--text-muted)'; });
-      const labelEl = document.getElementById('seg-label'); if (labelEl) labelEl.textContent = 'Hele sengen';
-    }
+    dragging = false;
+    if (seg !== null && seg === dragFrom) toggleSeg(seg); // click = toggle
   });
 
-  // Touch: detect tap vs drag. Allow native scroll if not dragging over a segment
-  let touchStartX = 0, touchStartY = 0, touchMoved = false;
+  // Touch: tap to toggle individual segments, scroll freely
+  let tapStartX = 0, tapStartY = 0;
   grid.addEventListener('touchstart', e => {
-    const seg = getSegFromEvent(e);
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchMoved = false;
-    if (seg !== null) { dragging=true; dragFrom=seg; }
+    tapStartX = e.touches[0].clientX;
+    tapStartY = e.touches[0].clientY;
   }, {passive:true});
-  grid.addEventListener('touchmove', e => {
-    const dx = Math.abs(e.touches[0].clientX - touchStartX);
-    const dy = Math.abs(e.touches[0].clientY - touchStartY);
-    if (!touchMoved && dx < 8 && dy < 8) return; // not moved yet
-    touchMoved = true;
-    if (!dragging) return;
-    // Only prevent default (block scroll) if dragging horizontally over segments
-    if (dx > dy) e.preventDefault();
-    updateDrag(getSegFromEvent(e));
-  }, {passive:false});
   grid.addEventListener('touchend', e => {
-    if (!dragging) return;
-    dragging = false;
-    const seg = getSegFromEvent(e.changedTouches?.[0] ? {touches:e.changedTouches} : e);
-    // Tap on already-selected single segment = deselect
-    if (!touchMoved && seg !== null && selStart !== null && seg >= selStart && seg <= selEnd && selStart === selEnd) {
-      selStart = null; selEnd = null;
-      grid.querySelectorAll('[data-seg]').forEach(el => { el.style.background='var(--bg-card)'; el.style.color='var(--text-muted)'; });
-      const labelEl = document.getElementById('seg-label'); if (labelEl) labelEl.textContent = 'Hele sengen';
-    } else if (!touchMoved && seg !== null) {
-      updateDrag(seg);
-    }
-  });
+    const dx = Math.abs(e.changedTouches[0].clientX - tapStartX);
+    const dy = Math.abs(e.changedTouches[0].clientY - tapStartY);
+    if (dx > 10 || dy > 10) return; // was a scroll, not a tap
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const seg = el?.dataset?.seg !== undefined ? +el.dataset.seg : null;
+    if (seg === null) return;
+    toggleSeg(seg);
+  }, {passive:true});
 }
 
 function clearSegment(bedId) {
