@@ -859,8 +859,66 @@ function openSegmentPicker(btn, bedId) {
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
 
-  // Drag selection logic
+  // Hide native scrollbar
   const grid = document.getElementById('seg-grid');
+  grid.style.scrollbarWidth = 'none';
+  grid.style.msOverflowStyle = 'none';
+  if (!document.getElementById('seg-scroll-style')) {
+    const st = document.createElement('style');
+    st.id = 'seg-scroll-style';
+    st.textContent = '#seg-grid::-webkit-scrollbar{display:none}';
+    document.head.appendChild(st);
+  }
+
+  // Wire up custom scrollbar
+  const track = document.getElementById('seg-scrollbar-track');
+  const thumb = document.getElementById('seg-scrollbar-thumb');
+  function updateThumb() {
+    if (!grid || !track || !thumb) return;
+    const ratio = grid.clientWidth / grid.scrollWidth;
+    const thumbW = Math.max(40, track.clientWidth * ratio);
+    const maxScroll = grid.scrollWidth - grid.clientWidth;
+    const scrollRatio = maxScroll > 0 ? grid.scrollLeft / maxScroll : 0;
+    thumb.style.width = thumbW + 'px';
+    thumb.style.left = (scrollRatio * (track.clientWidth - thumbW)) + 'px';
+  }
+  grid.addEventListener('scroll', updateThumb);
+  setTimeout(updateThumb, 50);
+
+  // Drag thumb
+  let thumbDragging = false, thumbStartX = 0, thumbStartScroll = 0;
+  function thumbDragStart(clientX) {
+    thumbDragging = true;
+    thumbStartX = clientX;
+    thumbStartScroll = grid.scrollLeft;
+    thumb.style.cursor = 'grabbing';
+  }
+  function thumbDragMove(clientX) {
+    if (!thumbDragging) return;
+    const dx = clientX - thumbStartX;
+    const trackW = track.clientWidth;
+    const thumbW = thumb.clientWidth;
+    const maxThumbLeft = trackW - thumbW;
+    const maxScroll = grid.scrollWidth - grid.clientWidth;
+    grid.scrollLeft = thumbStartScroll + (dx / maxThumbLeft) * maxScroll;
+  }
+  function thumbDragEnd() { thumbDragging = false; thumb.style.cursor = 'grab'; }
+
+  thumb.addEventListener('mousedown', e => { e.preventDefault(); thumbDragStart(e.clientX); });
+  document.addEventListener('mousemove', e => thumbDragMove(e.clientX));
+  document.addEventListener('mouseup', thumbDragEnd);
+  thumb.addEventListener('touchstart', e => { e.stopPropagation(); thumbDragStart(e.touches[0].clientX); }, {passive:true});
+  thumb.addEventListener('touchmove', e => { e.preventDefault(); thumbDragMove(e.touches[0].clientX); }, {passive:false});
+  thumb.addEventListener('touchend', thumbDragEnd);
+  // Click on track = jump
+  track.addEventListener('click', e => {
+    if (e.target === thumb) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / track.clientWidth;
+    grid.scrollLeft = ratio * (grid.scrollWidth - grid.clientWidth);
+  });
+
+  // Drag selection logic
   let dragging = false, dragFrom = null;
 
   function getSegFromEvent(e) {
