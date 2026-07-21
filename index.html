@@ -1351,9 +1351,11 @@ function showFloatingGearMenu(triggerBtn) {
     float.appendChild(sep());
     float.appendChild(row('🏷', 'Kategorier', 'var(--text-head)', () => { openCategorySettings(); float.remove(); }));
     float.appendChild(sep());
-    float.appendChild(row('⬆', 'Importer fra Excel', 'var(--text-head)', () => { document.getElementById('excel-import-input')?.click(); float.remove(); }));
-    float.appendChild(row('⬇', 'Eksporter til Excel', 'var(--text-head)', () => { exportToExcel(); float.remove(); }));
-    float.appendChild(row('⬇', 'Eksporter kundeliste', 'var(--text-head)', () => { float.remove(); openKundelisteExport(); }));
+    float.appendChild(row('', 'Importer fra Excel', 'var(--text-head)', () => { document.getElementById('excel-import-input')?.click(); float.remove(); }));
+    float.appendChild(row('', 'Eksporter til Excel', 'var(--text-head)', () => { exportToExcel(); float.remove(); }));
+    float.appendChild(row('', 'Eksport til Sender', 'var(--text-head)', () => { float.remove(); openKundelisteExport(); }));
+    float.appendChild(row('', 'Importer kunder', 'var(--text-head)', () => { float.remove(); document.getElementById('gear-customer-import')?.click(); }));
+    float.appendChild(row('', 'Eksporter kunder', 'var(--text-head)', () => { float.remove(); exportCustomersToExcel(); }));
 
     document.body.appendChild(float);
     // Auto-close when clicking outside — but exclude trigger buttons
@@ -6639,7 +6641,7 @@ function buildWorkbook() {
     const bt = boxTypes.find(t => t.id == bw.boxTypeId);
     const items = (bw.items||[]).map(item => { const cr = crops.find(c=>c.id===item.cropId); return cr ? cr.name + ' ' + (item.qty||'') + ' ' + (item.unit||'') : ''; }).filter(Boolean).join(', ');
     const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-    const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id||cu.name] !== false);
+    const activeCu = btCu.filter(cu => isCuActiveForWeek(cu, bw));
     const total = activeCu.length + (bw.extraBoxes||0);
     return [bt?.name||'', bw.week||'', bw.year||'', items, total||'', bw.harvested ? 'Ja' : 'Nei'];
   });
@@ -8179,10 +8181,15 @@ function openAddCustomer(editIdx) {
         <input id="cu-name" placeholder="Navn" value="${cu.name}" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
         <input id="cu-phone" placeholder="Telefon" value="${cu.phone||''}" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
         <input id="cu-email" placeholder="E-post" type="email" value="${cu.email||''}" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
-        <select id="cu-boxtype" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
+        <select id="cu-boxtype" onchange="updateWeekPicker()" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit">
           <option value="">Velg kassetype...</option>
           ${boxTypes.map(bt=>'<option value="'+bt.id+'" '+(cu.boxTypeId==bt.id?'selected':'')+'>'+bt.name+'</option>').join('')}
         </select>
+        <div id="cu-week-picker" style="display:none">
+          <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">Uker (trykk for å toggle av/på)</div>
+          <div id="cu-week-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <textarea id="cu-notes" placeholder="Kort notat..." rows="2" style="padding:10px;border-radius:8px;border:none;background:var(--bg-input);color:var(--text-head);font-size:14px;font-family:inherit;resize:vertical">${cu.notes||''}</textarea>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button onclick="document.getElementById('cust-modal').remove()" style="flex:1;padding:11px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;font-family:inherit">Avbryt</button>
@@ -8190,7 +8197,10 @@ function openAddCustomer(editIdx) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  modal._editIdx = editIdx;
   modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+  // Init week picker if boxtype already set
+  setTimeout(() => updateWeekPicker(), 50);
   ['uvasket','vasket'].forEach(t => {
     const btn = document.getElementById('btn-'+t);
     if (btn) btn.addEventListener('click', () => {
@@ -8202,6 +8212,94 @@ function openAddCustomer(editIdx) {
   });
 }
 
+
+
+function updateWeekPicker() {
+  const btId = document.getElementById('cu-boxtype')?.value;
+  const picker = document.getElementById('cu-week-picker');
+  const btnContainer = document.getElementById('cu-week-btns');
+  if (!picker || !btnContainer) return;
+  if (!btId) { picker.style.display = 'none'; return; }
+
+  // Generate weeks from boxType's startWeek/endWeek range
+  const bt = boxTypes.find(t => String(t.id) === String(btId));
+  if (!bt) { picker.style.display = 'none'; return; }
+  const start = bt.startWeek || 1;
+  const end = bt.endWeek || 52;
+  const freqStr = bt.frequency || 'weekly';
+  const step = freqStr === 'biweekly' ? 2 : freqStr === 'monthly' ? 4 : 1;
+  const uniqueWeeks = [];
+  for (let w = start; w <= end; w += step) uniqueWeeks.push(w);
+  if (!uniqueWeeks.length) { picker.style.display = 'none'; return; }
+
+  // Get current customer's skipWeeks
+  const modal = document.getElementById('cust-modal');
+  const editIdx = modal?._editIdx;
+  const cu = editIdx !== undefined ? deliveryCustomers[editIdx] : null;
+  const skipWeeks = (cu && cu.skipWeeks) ? cu.skipWeeks : {};
+
+  picker.style.display = 'block';
+  btnContainer.innerHTML = uniqueWeeks.map(week => {
+    const skipped = skipWeeks[String(btId)]?.[String(week)];
+    return '<button type="button" data-week="' + week + '" data-btid="' + btId + '" onclick="toggleCustomerWeek(this,this.dataset.btid,+this.dataset.week)" '
+      + 'style="padding:6px 10px;border-radius:8px;border:none;background:' + (skipped ? 'rgba(255,100,100,0.15)' : 'var(--accent-bg)') + ';'
+      + 'color:' + (skipped ? 'var(--color-danger)' : 'var(--accent-soft)') + ';cursor:pointer;font-size:13px;font-family:inherit;'
+      + 'text-decoration:' + (skipped ? 'line-through' : 'none') + '">Uke ' + week + '</button>';
+  }).join('');
+}
+
+function toggleCustomerWeek(btn, btId, week) {
+  const modal = document.getElementById('cust-modal');
+  const editIdx = modal?._editIdx;
+  const cu = editIdx !== undefined ? deliveryCustomers[editIdx] : null;
+  if (!cu) return; // can only toggle for existing customers
+
+  if (!cu.skipWeeks) cu.skipWeeks = {};
+  if (!cu.skipWeeks[String(btId)]) cu.skipWeeks[String(btId)] = {};
+  const key = String(week);
+  cu.skipWeeks[String(btId)][key] = !cu.skipWeeks[String(btId)][key];
+  saveLevering();
+
+  const skipped = cu.skipWeeks[String(btId)][key];
+  btn.style.background = skipped ? 'rgba(255,100,100,0.15)' : 'var(--accent-bg)';
+  btn.style.color = skipped ? 'var(--color-danger)' : 'var(--accent-soft)';
+  btn.style.textDecoration = skipped ? 'line-through' : 'none';
+}
+
+
+
+function sendGroupSMS(btId, week, year) {
+  const bt = boxTypes.find(t => String(t.id) === String(btId));
+  const bw = boxWeeks.find(b => String(b.boxTypeId) === String(btId) && +b.week === +week && +b.year === +year);
+  const customers = deliveryCustomers.filter(cu => String(cu.boxTypeId) === String(btId));
+  const active = bw
+    ? customers.filter(cu => isCuActiveForWeek(cu, bw))
+    : customers;
+
+  const phones = active.map(cu => (cu.phone||'').replace(/\s/g,'')).filter(Boolean);
+
+  if (!phones.length) {
+    alert('Ingen kunder med telefonnummer for denne kassetypen denne uken.');
+    return;
+  }
+
+  // sms: with multiple recipients uses comma-separated list
+  // Works on iOS and Android
+  const smsUrl = 'sms:' + phones.join(',');
+  window.location.href = smsUrl;
+}
+
+function isCuActiveForWeek(cu, bw) {
+  if (bw.customerWeek && bw.customerWeek[cu.id || cu.name] === false) return false;
+  if (cu.skipWeeks) {
+    const skW = cu.skipWeeks[String(bw.boxTypeId)] || cu.skipWeeks[bw.boxTypeId];
+    if (skW && (skW[String(bw.week)] || skW[bw.week])) {
+      console.log('[skipWeeks] Skipping', cu.name, 'for week', bw.week, 'btId', bw.boxTypeId);
+      return false;
+    }
+  }
+  return true;
+}
 
 function toggleCuDay(i) {
   const hidden = document.getElementById('cu-days-val');
@@ -8226,7 +8324,7 @@ function phoneButtons(phone) {
     '<button onclick="event.stopPropagation();window.location.href=\'' + scheme + p + '\';" '
     + 'style="background:none;border:none;border-radius:6px;width:24px;height:20px;font-size:13px;cursor:pointer;padding:0;line-height:1;display:flex;align-items:center;justify-content:center">'
     + icon + '</button>';
-  return '<div onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;justify-content:center">'
+  return '<div onclick="event.stopPropagation()" style="display:flex;flex-direction:row;gap:8px;flex-shrink:0;align-items:center">'
     + btn('📞', 'tel:') + btn('💬', 'sms:') + '</div>';
 }
 
@@ -8268,7 +8366,10 @@ function saveCustomer(editIdx) {
   const notes = document.getElementById('cu-notes')?.value.trim() || '';
   if (!name) return;
   if (editIdx !== undefined) {
+    // preserve skipWeeks (already updated live in toggleCustomerWeek)
+    const existingSW = deliveryCustomers[editIdx].skipWeeks;
     deliveryCustomers[editIdx] = {...deliveryCustomers[editIdx], name, phone, email, boxTypeId, notes};
+    if (existingSW) deliveryCustomers[editIdx].skipWeeks = existingSW;
   } else {
     deliveryCustomers.push({id: Date.now(), name, phone, email, boxTypeId, notes, custom:{}});
   }
@@ -8345,13 +8446,10 @@ function openKasseOppsett() {
 
     html += '</div>'; // close opsett-tab-kassetyper
     html += '<div id="opsett-tab-kunder" style="display:none">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">'
-      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;flex-shrink:0">Kunder</div>'
-      + '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'
-      + '<label style="padding:5px 10px;border-radius:16px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Importer<input type="file" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none"></label>'
-      + '<button onclick="exportCustomersToExcel()" style="padding:5px 10px;border-radius:16px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">Eksporter</button>'
-      + '<button onclick="openAddCustomer()" style="padding:5px 10px;border-radius:16px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap">+ Ny</button>'
-      + '</div></div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      + '<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">Kunder</div>'
+      + '<button onclick="openAddCustomer()" style="padding:5px 12px;border-radius:16px;border:none;background:var(--accent-bg);color:var(--accent-soft);cursor:pointer;font-size:12px;font-family:inherit">+ Ny</button>'
+      + '</div>';
 
 
     if (!deliveryCustomers.length) {
@@ -8660,6 +8758,7 @@ function renderLevKasse(el) {
     + '<div style="font-size:18px;font-weight:600;color:var(--text-head)">Uke ' + kasseViewWeek + '</div>'
     + '<div style="font-size:11px;color:' + (isCurrentWeek ? 'var(--accent-soft)' : 'var(--text-muted)') + ';margin-top:1px">' + (isCurrentWeek ? '● Denne uken' : kasseViewYear + ' · ' + (vIdx + 1) + '/' + displayWeeks.length) + '</div>'
     + '</div>'
+    + '<button onclick="sendGroupSMS(' + kasseViewTypeId + ',' + kasseViewWeek + ',' + kasseViewYear + ')" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">💬</button>'
     + '<button ' + (nextW ? 'onclick="kasseNavWeek(' + nextW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (nextW ? 1 : 0.25) + '">›</button>'
     + '</div>';
 
@@ -8678,7 +8777,7 @@ function renderLevKasse(el) {
     if (!bw.customerWeek) bw.customerWeek = {};
     if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
     const btCustomersForPlan = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
-    const activeCustomers = btCustomersForPlan.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const activeCustomers = btCustomersForPlan.filter(cu => isCuActiveForWeek(cu, bw));
     const totalKasser = activeCustomers.length + (bw.extraBoxes || 0);
     const boxVal2 = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
     const contentPerBox = boxVal2; // value of content in ONE box
@@ -8788,7 +8887,7 @@ function renderLevKasse(el) {
         if (!cr) return;
         const perKasse = calcItemValue(cr, item.qty||0, item.unit);
         const btCuForNeed = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
-        const activeCuForNeed = btCuForNeed.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+        const activeCuForNeed = btCuForNeed.filter(cu => isCuActiveForWeek(cu, bw));
         const totalCount2 = activeCuForNeed.length + (bw.extraBoxes || 0);
         const totalNeeded = (item.qty||0) * totalCount2;
         html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">'
@@ -8824,7 +8923,7 @@ function renderLevKasse(el) {
     if (!bw.customerWeek) bw.customerWeek = {};
     if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
     const btCuPlukk = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
-    const activeCuPlukk = btCuPlukk.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const activeCuPlukk = btCuPlukk.filter(cu => isCuActiveForWeek(cu, bw));
     const totalBoxes = activeCuPlukk.length + (bw.extraBoxes || 0);
     const items = bw.items || [];
     if (!bw.checklist) bw.checklist = {};
@@ -8909,7 +9008,7 @@ function renderLevKasse(el) {
     if (!bw.customerWeek) bw.customerWeek = {};
     if (bw.extraBoxes === undefined) bw.extraBoxes = 0;
     const btCuLev = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
-    const activeCuLev = btCuLev.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const activeCuLev = btCuLev.filter(cu => isCuActiveForWeek(cu, bw));
     const totalBoxes = activeCuLev.length + (bw.extraBoxes || 0);
     const isLight2 = isLight;
 
@@ -8955,13 +9054,12 @@ function renderLevKasse(el) {
           + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;'
           + 'transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
           + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
-          + 'background:' + cbBg + ';'
-          + 'color:' + (isLight2 ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
+          + 'background:' + cbBg + ';border:2px solid ' + (delivered ? 'transparent' : 'rgba(128,128,128,0.35)') + ';box-sizing:border-box'
+          + ';color:' + (isLight2 ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
           + (delivered ? '✓' : '') + '</div>'
-          + '<div style="width:36px;height:36px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;' + (delivered ? 'opacity:0.4' : '') + '">👤</div>'
           + '<div style="flex:1;' + (delivered ? 'opacity:0.45' : '') + '">'
           + '<div style="font-size:16px;color:var(--text-head);' + (delivered ? 'text-decoration:line-through' : '') + '">' + cu.name + '</div>'
-          + (cu.phone ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + cu.phone + '</div>' : '')
+          + (cu.notes ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">' + cu.notes + '</div>' : '')
           + '</div>'
           + (!delivered ? phoneButtons(cu.phone) : '')
           + (delivered ? '<div style="font-size:12px;color:var(--accent-soft);flex-shrink:0">Levert ✓</div>' : '')
@@ -8979,7 +9077,7 @@ function renderLevKasse(el) {
       + '</div></div>';
     html += '<div id="extra-kasse-rows-' + bw.id + '">';
     for (let xi = 0; xi < (bw.extraBoxes||0); xi++) {
-      const delivered = !!bw.extraCheck[xi];
+      const delivered = !!bw.extraCheck[String(xi)];
       const bg = delivered ? (isLight2 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
       const bd = delivered ? (isLight2 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') : 'var(--border)';
       const cbBg = delivered ? 'var(--accent)' : 'transparent';
@@ -9030,7 +9128,7 @@ function openKassekundePanel(bwId) {
 
   function renderPanel() {
     if (!bw.customerWeek) bw.customerWeek = {};
-    const activeCu = btCustomers.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+    const activeCu = btCustomers.filter(cu => isCuActiveForWeek(cu, bw));
     const total = activeCu.length + (bw.extraBoxes || 0);
 
     let html = '<div style="background:var(--bg-modal);border:none;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:600px;max-height:80vh;overflow-y:auto">'
@@ -9100,7 +9198,7 @@ function toggleKassekundePlan(el) {
   refreshKasseNeedRows(bwId);
   // Also update the antall kasser button count display
   const btCuForCount = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCuForCount = btCuForCount.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const activeCuForCount = btCuForCount.filter(cu => isCuActiveForWeek(cu, bw));
   const newTotal = activeCuForCount.length + (bw.extraBoxes || 0);
   const countBtn = document.querySelector('[data-bwid="' + bwId + '"]');
   if (countBtn) {
@@ -9124,7 +9222,7 @@ function refreshKassePriceCard(bwId) {
   const bt = boxTypes.find(t => t.id == bw.boxTypeId);
   if (!bt) return;
   const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const activeCu = btCu.filter(cu => isCuActiveForWeek(cu, bw));
   const totalKasser = activeCu.length + (bw.extraBoxes || 0);
   const boxVal = (bw.items||[]).reduce((s,it) => s + calcItemValue(crops.find(c=>c.id===it.cropId), it.qty||0, it.unit), 0);
   const contentPerBox = boxVal;
@@ -9162,7 +9260,7 @@ function refreshKasseNeedRows(bwId) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw) return;
   const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const activeCu = btCu.filter(cu => isCuActiveForWeek(cu, bw));
   const totalCount = activeCu.length + (bw.extraBoxes || 0);
   (bw.items||[]).forEach((item, ii) => {
     const cr = crops.find(c => c.id == item.cropId);
@@ -9179,7 +9277,15 @@ function refreshKasseNeedRows(bwId) {
 function adjustExtraBoxes(bwId, delta) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw) return;
-  bw.extraBoxes = Math.max(0, (bw.extraBoxes || 0) + delta);
+  const newCount = Math.max(0, (bw.extraBoxes || 0) + delta);
+  // Clear name and check state for removed boxes (all indices >= newCount)
+  if (delta < 0) {
+    for (let i = newCount; i < (bw.extraBoxes||0); i++) {
+      if (bw.extraNames) delete bw.extraNames[i];
+      if (bw.extraCheck) { delete bw.extraCheck[i]; delete bw.extraCheck[String(i)]; }
+    }
+  }
+  bw.extraBoxes = newCount;
   saveLevering();
 
   // Update count display in all views
@@ -9191,7 +9297,7 @@ function adjustExtraBoxes(bwId, delta) {
 
   // Update total count button in Plan view
   const btCuForCount = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCuForCount = btCuForCount.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const activeCuForCount = btCuForCount.filter(cu => isCuActiveForWeek(cu, bw));
   const newTotal = activeCuForCount.length + (bw.extraBoxes || 0);
   const countBtn = document.querySelector('button[data-bwid="' + bwId + '"]');
   if (countBtn) {
@@ -9216,14 +9322,17 @@ function adjustExtraBoxes(bwId, delta) {
     const isLight = document.body.classList.contains('light');
     let rowsHtml = '';
     for (let xi = 0; xi < (bw.extraBoxes||0); xi++) {
-      const delivered = !!(bw.extraCheck && bw.extraCheck[xi]);
+      const delivered = !!(bw.extraCheck && bw.extraCheck[String(xi)]);
       const bg = delivered ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
       const cbBg = delivered ? 'var(--accent)' : 'transparent';
-      rowsHtml += '<div data-lev-bwid="' + bwId + '" data-lev-extra="' + xi + '" onclick="kasseLeveringCheckExtra(this)"'
-        + ' style="display:flex;align-items:center;gap:14px;padding:14px;background:' + bg + ';border-radius:14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s">'
-        + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:' + cbBg + ';color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';font-size:16px">' + (delivered ? '✓' : '') + '</div>'
-        + '<div style="width:36px;height:36px;border-radius:50%;background:' + (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px"' + (delivered ? ' style="opacity:0.4"' : '') + '>📦</div>'
-        + '<div style="flex:1' + (delivered ? ';opacity:0.45' : '') + '"><div style="font-size:16px;color:var(--text-head)' + (delivered ? ';text-decoration:line-through' : '') + '">Ekstra kasse ' + (xi + 1) + '</div></div>'
+      const extraName = (bw.extraNames && bw.extraNames[xi]) || ('Ekstra kasse ' + (xi + 1));
+      rowsHtml += '<div id="extra-row-' + bwId + '-' + xi + '"'
+        + ' data-lev-bwid="' + bwId + '" data-lev-extra="' + xi + '"'
+        + ' onclick="kasseLeveringCheckExtra(this)"'
+        + ' onpointerdown="extraKassePressStart(event,this)" onpointerup="extraKassePressEnd()" onpointercancel="extraKassePressEnd()"'
+        + ' style="display:flex;align-items:center;gap:14px;padding:14px;background:' + bg + ';border-radius:14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;user-select:none">'
+        + '<div class="extra-cb" style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:' + cbBg + ';border:2px solid ' + (delivered?'transparent':'rgba(128,128,128,0.35)') + ';box-sizing:border-box;color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';font-size:16px">' + (delivered ? '✓' : '') + '</div>'
+        + '<div class="extra-name-cell" style="flex:1' + (delivered ? ';opacity:0.45' : '') + '"><span style="font-size:16px;color:var(--text-head)' + (delivered ? ';text-decoration:line-through' : '') + '">' + extraName + '</span></div>'
         + '</div>';
     }
     extraContainer.innerHTML = rowsHtml;
@@ -9292,7 +9401,7 @@ function kasseLeveringCheckByIdx(el) {
   const bt = boxTypes.find(t => t.id == bw.boxTypeId);
   if (!bt) return;
   const btCustomers = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCu = btCustomers.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const activeCu = btCustomers.filter(cu => isCuActiveForWeek(cu, bw));
   const cu = activeCu[cuIdx];
   if (!cu) return;
   const cuKey = cu.id || cu.name;
@@ -9303,16 +9412,122 @@ function kasseLeveringCheckByIdx(el) {
   if (cont) renderLevKasse(cont);
 }
 
+
+let _extraPressTimer = null, _extraPressEl = null;
+
+function extraKassePressStart(e, el) {
+  _extraPressEl = el;
+  el._longPressed = false;
+  _extraPressTimer = setTimeout(() => {
+    _extraPressTimer = null;
+    el._longPressed = true;
+    openExtraKasseRename(el.dataset.levBwid, +el.dataset.levExtra);
+  }, 600);
+}
+
+function extraKassePressEnd() {
+  if (_extraPressTimer) { clearTimeout(_extraPressTimer); _extraPressTimer = null; }
+}
+
+function openExtraKasseRename(bwId, xi) {
+  const row = document.getElementById('extra-row-' + bwId + '-' + xi);
+  const bw = boxWeeks.find(b => String(b.id) === String(bwId));
+  if (!bw || !row) return;
+  const current = (bw.extraNames && bw.extraNames[xi]) || ('Ekstra kasse ' + (xi + 1));
+  const cell = row.querySelector('.extra-name-cell');
+  if (!cell) return;
+
+  // Replace span with input
+  cell.innerHTML = '<input id="ek-rename-' + bwId + '-' + xi + '" value="' + current.replace(/"/g,'&quot;') + '"'
+    + ' type="text" onclick="event.stopPropagation()"'
+    + ' style="background:transparent;border:none;border-bottom:1px solid var(--accent);color:var(--text-head);font-size:16px;font-family:inherit;width:100%;outline:none;padding:0">';
+  
+  const input = document.getElementById('ek-rename-' + bwId + '-' + xi);
+  if (!input) return;
+  // Prevent click on row from triggering checkbox
+  row.onclick = null;
+  input.focus(); input.select();
+
+  function save() {
+    if (!bw.extraNames) bw.extraNames = {};
+    const val = input.value.trim() || ('Ekstra kasse ' + (xi + 1));
+    bw.extraNames[xi] = val;
+    saveLevering();
+    cell.innerHTML = '<span style="font-size:16px;color:var(--text-head)">' + val + '</span>';
+    // Restore click
+    row.onclick = function() { kasseLeveringCheckExtra(this); };
+  }
+  input.addEventListener('blur', save, {once:true});
+  input.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();input.blur();} });
+}
+
+function openExtraKasseRenameById(bwId, xi) { openExtraKasseRename(bwId, xi); }
+
+function _deadCodeExtraRename() {
+  const nameDiv = null;
+  if (!nameDiv) return;
+  nameDiv.innerHTML = '<input id="extra-name-input" value="' + current.replace(/"/g,'&quot;') + '"'
+    + ' onclick="event.stopPropagation()"'
+    + ' style="background:transparent;border:none;border-bottom:1px solid var(--accent);color:var(--text-head);font-size:16px;font-family:inherit;width:100%;outline:none;padding:0"'
+    + ' autofocus>';
+  const input = document.getElementById('extra-name-input');
+  if (input) {
+    input.focus();
+    input.select();
+    const save = () => {
+      if (!bw.extraNames) bw.extraNames = {};
+      bw.extraNames[xi] = input.value.trim() || ('Ekstra kasse ' + (xi + 1));
+      saveLevering();
+      const cont = document.getElementById('extra-kasse-rows-' + bwId);
+      if (cont) {
+        const isLight = document.body.classList.contains('light');
+        const delivered = !!(bw.extraCheck && bw.extraCheck[String(xi)]);
+        const bg = delivered ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
+        const cbBg = delivered ? 'var(--accent)' : 'transparent';
+        el.querySelector('[style*="background:' + cbBg + '"]');
+        nameDiv.innerHTML = '<div style="font-size:16px;color:var(--text-head)' + (delivered?';text-decoration:line-through':'') + '">' + bw.extraNames[xi] + '</div>';
+      }
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+  }
+}
+
 function kasseLeveringCheckExtra(el) {
+  if (el._longPressed) { el._longPressed = false; return; } // ignore click after long press
   const bwId = el.dataset.levBwid;
   const xi = +el.dataset.levExtra;
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw) return;
   if (!bw.extraCheck) bw.extraCheck = {};
-  bw.extraCheck[xi] = !bw.extraCheck[xi];
+  bw.extraCheck[String(xi)] = !bw.extraCheck[String(xi)];
   saveLevering();
-  const cont = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
-  if (cont) renderLevKasse(cont);
+  // Targeted re-render of just this row
+  const row = document.getElementById('extra-row-' + bwId + '-' + xi);
+  if (row) {
+    const delivered = !!bw.extraCheck[String(xi)];
+    const isLight = document.body.classList.contains('light');
+    const bg = delivered ? (isLight?'rgba(0,0,0,0.03)':'rgba(255,255,255,0.03)') : 'var(--bg-card)';
+    const cbBg = delivered ? 'var(--accent)' : 'transparent';
+    const extraName = (bw.extraNames && bw.extraNames[xi]) || ('Ekstra kasse ' + (xi+1));
+    row.style.background = bg;
+    const cb = row.querySelector('.extra-cb');
+    if (cb) { cb.style.background = cbBg; cb.style.border = '2px solid ' + (delivered?'transparent':'rgba(128,128,128,0.35)'); cb.textContent = delivered?'✓':''; cb.style.color = isLight?'#1c1410':'#0d1a0e'; }
+    const nameCell = row.querySelector('.extra-name-cell');
+    if (nameCell) nameCell.innerHTML = '<span style="font-size:16px;color:var(--text-head)' + (delivered?';text-decoration:line-through':'') + '">' + extraName + '</span>';
+    const levert = row.querySelector('.levert-label');
+    // Add/remove levert label
+    let lv = row.querySelector('.levert-label');
+    if (delivered && !lv) {
+      lv = document.createElement('div');
+      lv.className = 'levert-label';
+      lv.style.cssText = 'font-size:12px;color:var(--accent-soft);flex-shrink:0';
+      lv.textContent = 'Levert ✓';
+      row.appendChild(lv);
+    } else if (!delivered && lv) { lv.remove(); }
+    // Restore onclick if it was removed during rename
+    row.onclick = function() { kasseLeveringCheckExtra(this); };
+  }
 }
 
 function kasseLeveringCheck(bwId, cuKey) {
@@ -9349,7 +9564,7 @@ function bwHasUnloggedDelta(bw) {
   if (!bw?.items?.length) return false;
   if (!bw.loggedQtys) return true; // never logged at all
   const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCu = btCu.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const activeCu = btCu.filter(cu => isCuActiveForWeek(cu, bw));
   const totalCount = activeCu.length + (bw.extraBoxes || 0);
   return bw.items.some(item => {
     if (!item.qty) return false;
@@ -9378,7 +9593,7 @@ function updateKasseItem(bwId, idx, field, val) {
   const cr = crops.find(c => c.id == item.cropId);
   // Update totals display
   const btCuForNeed = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCuForNeed = btCuForNeed.filter(cu => bw.customerWeek?.[cu.id || cu.name] !== false);
+  const activeCuForNeed = btCuForNeed.filter(cu => isCuActiveForWeek(cu, bw));
   const totalCount2 = activeCuForNeed.length + (bw.extraBoxes || 0);
   const totalNeeded = (item.qty||0) * totalCount2;
   const needEl = document.getElementById('kasse-need-' + bwId + '-' + idx);
@@ -9555,7 +9770,11 @@ function autoHarvestBoxWeek(bwId) {
   if (!bw.loggedQtys) bw.loggedQtys = {}; // cropId → total qty already logged this week
 
   const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
-  const activeCu = btCu.filter(cu => bw.customerWeek[cu.id || cu.name] !== false);
+  const activeCu = btCu.filter(cu => {
+    if (bw.customerWeek[cu.id || cu.name] === false) return false;
+    if (cu.skipWeeks && cu.skipWeeks[String(bw.boxTypeId)] && cu.skipWeeks[String(bw.boxTypeId)][String(bw.week)]) return false;
+    return true;
+  });
   const totalCount = activeCu.length + (bw.extraBoxes || 0);
   if (!totalCount) { showSyncToast('Ingen aktive kasser denne uken'); return; }
 
@@ -10722,6 +10941,7 @@ function loadLevering() {
 
 
 </script>
-<input type="file" id="excel-import-input" accept=".xlsx" onchange="importFromExcel(event)" style="display:none">
+<input type="file" id="gear-customer-import" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none">
+  <input type="file" id="excel-import-input" accept=".xlsx" onchange="importFromExcel(event)" style="display:none">
 </body>
 </html>
