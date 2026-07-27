@@ -408,6 +408,7 @@
   #sync-loading-overlay.fade-out { opacity: 0; pointer-events: none; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 </head>
 <body>
@@ -1356,6 +1357,8 @@ function showFloatingGearMenu(triggerBtn) {
     float.appendChild(row('', 'Eksport til Sender', 'var(--text-head)', () => { float.remove(); openKundelisteExport(); }));
     float.appendChild(row('', 'Importer kunder', 'var(--text-head)', () => { float.remove(); document.getElementById('gear-customer-import')?.click(); }));
     float.appendChild(row('', 'Eksporter kunder', 'var(--text-head)', () => { float.remove(); exportCustomersToExcel(); }));
+    float.appendChild(row('', 'Full backup (Excel)', 'var(--text-head)', () => { float.remove(); exportFullBackup(); }));
+    float.appendChild(row('', 'Importer backup', 'var(--text-head)', () => { float.remove(); document.getElementById('full-backup-import')?.click(); }));
 
     document.body.appendChild(float);
     // Auto-close when clicking outside — but exclude trigger buttons
@@ -6981,7 +6984,7 @@ async function runDailyBackup() {
       crops, tasks: tasks.filter(t => !String(t.id).startsWith('crop-')),
       bedSizes, bedIDs: BED_IDS, gardenMap: gardenMap || null,
       taskHistory: taskHistory || [],
-      levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog },
+      levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog, prepTasks },
       saved: new Date().toISOString(),
       backupDay: DAYS_BACKUP[dayIdx]
     });
@@ -7543,6 +7546,268 @@ function exportKundeliste(boxTypeId) {
   XLSX.writeFile(wb, filename);
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// FULL BACKUP EXPORT / IMPORT
+// ══════════════════════════════════════════════════════════════════
+
+function splitJsonStr(str, maxLen) {
+  // Split a long JSON string into chunks fitting maxLen
+  const chunks = [];
+  for (let i = 0; i < str.length; i += maxLen) chunks.push(str.slice(i, i+maxLen));
+  return chunks.length ? chunks : [''];
+}
+
+function jsonCell(obj) { return JSON.stringify(obj ?? null); }
+
+function exportFullBackup() {
+  const MAX = 30000;
+
+  // ── Build all 4 workbooks first ──────────────────────────────
+
+  // DOC 1: Vekster og Senger
+  const wb1 = XLSX.utils.book_new();
+  const cropHeaders = ['id','name','emoji','status','beds','family','category',
+    'rowSpacing','plantSpacing','rows','seedsPerCluster',
+    'sownDate','sownByDate','sowLog','plantedDate','plantedByDate','plantLog',
+    'pricePerKg','weightG','pricePerUnit','pricePerUnitCustom','unit',
+    'unitsPerPlant','vektTotal','plantsPerUnit','svinn','notes'];
+  const cropRows = crops.map(c => cropHeaders.map(k => {
+    const v = c[k];
+    if (Array.isArray(v)) return JSON.stringify(v);
+    return (v === undefined || v === null) ? '' : v;
+  }));
+  XLSX.utils.book_append_sheet(wb1, XLSX.utils.aoa_to_sheet([cropHeaders, ...cropRows]), 'Vekster');
+  const bedRows = [['id','length','width','note'],
+    ...BED_IDS.map(id => { const b = bedSizes[id]||{}; return [id, b.length||11, b.width||1.2, b.note||'']; })];
+  XLSX.utils.book_append_sheet(wb1, XLSX.utils.aoa_to_sheet(bedRows), 'Senger');
+  XLSX.utils.book_append_sheet(wb1, XLSX.utils.aoa_to_sheet([['kategori'],...(cropCategories||[]).map(c=>[c])]), 'Kategorier');
+
+  // DOC 2: Oppgaver
+  const wb2 = XLSX.utils.book_new();
+  const taskHeaders = ['id','text','priority','date','done','notes','cropId','bedId','repeat','repeatInterval'];
+  const taskToRow = t => taskHeaders.map(k => k==='done' ? (t[k]?1:0) : (t[k]??''));
+  XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([taskHeaders, ...(tasks||[]).map(taskToRow)]), 'Oppgaver');
+  XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([taskHeaders, ...(taskHistory||[]).map(taskToRow)]), 'Oppgavehistorikk');
+  const toRows = [['prioritet','rekkefølge_json']];
+  Object.entries(taskOrder||{}).forEach(([k,v]) => toRows.push([k, JSON.stringify(v)]));
+  XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet(toRows), 'Oppgaverekkefølge');
+  XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([['taskId'],...[...focusTaskIds].map(id=>[id])]), 'FokusOppgaver');
+
+  // DOC 3: Kasser og Levering
+  const wb3 = XLSX.utils.book_new();
+  const cuHeaders = ['id','name','phone','email','boxTypeId','notes','skipWeeks_json'];
+  const cuRows = (deliveryCustomers||[]).map(cu => [cu.id,cu.name||'',cu.phone||'',cu.email||'',cu.boxTypeId||'',cu.notes||'',JSON.stringify(cu.skipWeeks||null)]);
+  XLSX.utils.book_append_sheet(wb3, XLSX.utils.aoa_to_sheet([cuHeaders,...cuRows]), 'Kunder');
+  const btHeaders = ['id','name','weekdays_json','startWeek','endWeek','frequency','salePrice','baseItems_json'];
+  const btRows = (boxTypes||[]).map(bt => [bt.id,bt.name,JSON.stringify(bt.weekdays),bt.startWeek||'',bt.endWeek||'',bt.frequency||'',bt.salePrice||'',JSON.stringify(bt.baseItems)]);
+  XLSX.utils.book_append_sheet(wb3, XLSX.utils.aoa_to_sheet([btHeaders,...btRows]), 'Kassetyper');
+  const bwHeaders = ['id','boxTypeId','week','year','count','items_json','customerAdj_json','customerWeek_json','deliveryCheck_json','extraBoxes','extraCheck_json','extraNames_json','checklist_json'];
+  const bwRows = (boxWeeks||[]).map(bw => [bw.id,bw.boxTypeId,bw.week,bw.year,bw.count||0,JSON.stringify(bw.items),JSON.stringify(bw.customerAdj),JSON.stringify(bw.customerWeek),JSON.stringify(bw.deliveryCheck),bw.extraBoxes||0,JSON.stringify(bw.extraCheck),JSON.stringify(bw.extraNames),JSON.stringify(bw.checklist)]);
+  XLSX.utils.book_append_sheet(wb3, XLSX.utils.aoa_to_sheet([bwHeaders,...bwRows]), 'Kasseuker');
+  const ptRows = [['bwId','taskIdx','id','text','done']];
+  Object.entries(prepTasks||{}).forEach(([bwId,ts]) => (ts||[]).forEach((t,i) => ptRows.push([bwId,i,t.id,t.text||'',t.done?1:0])));
+  XLSX.utils.book_append_sheet(wb3, XLSX.utils.aoa_to_sheet(ptRows), 'PrepGjøremål');
+  const mktHeaders = ['id','cropId','qty','unit','price','note'];
+  XLSX.utils.book_append_sheet(wb3, XLSX.utils.aoa_to_sheet([mktHeaders,...(deliveryMarket||[]).map(m=>mktHeaders.map(k=>m[k]??''))]), 'Marked');
+  const hlHeaders = ['id','date','cropId','bedId','qty','unit','dest','note'];
+  XLSX.utils.book_append_sheet(wb3, XLSX.utils.aoa_to_sheet([hlHeaders,...(harvestLog||[]).map(h=>hlHeaders.map(k=>h[k]??''))]), 'Høstelogg');
+
+  // DOC 4: Kart
+  const wb4 = XLSX.utils.book_new();
+  const mapStr = JSON.stringify(gardenMap||null);
+  const mapChunks = []; for (let i=0;i<mapStr.length;i+=MAX) mapChunks.push(mapStr.slice(i,i+MAX));
+  XLSX.utils.book_append_sheet(wb4, XLSX.utils.aoa_to_sheet([['del','json_chunk'],...mapChunks.map((c,i)=>[i,c])]), 'Kart');
+  XLSX.utils.book_append_sheet(wb4, XLSX.utils.aoa_to_sheet([['bedId'],...BED_IDS.map(id=>[id])]), 'SengIDs');
+
+  // ── Zip all 4 files into one download ────────────────────────
+  const zip = new JSZip();
+  [[wb1,'Backup_1_Vekster_Senger.xlsx'],[wb2,'Backup_2_Oppgaver.xlsx'],
+   [wb3,'Backup_3_Kasser_Levering.xlsx'],[wb4,'Backup_4_Kart.xlsx']
+  ].forEach(([wb, name]) => {
+    const data = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    zip.file(name, data);
+  });
+  const today = new Date();
+  const dateStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  zip.generateAsync({type:'blob'}).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Markedshage_Backup_' + dateStr + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    showSyncToast('✓ Backup lastet ned som zip');
+  });
+}
+
+
+function importFullBackup(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  const result = {};
+  let pending = files.length;
+
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const sheetNames = wb.SheetNames;
+        const get = name => wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1}) : null;
+
+        // ── Doc 1: Vekster og Senger ──
+        if (sheetNames.includes('Vekster')) {
+          const rows = get('Vekster');
+          const headers = rows[0];
+          result.crops = rows.slice(1).filter(r=>r[0]).map(r => {
+            const c = {};
+            headers.forEach((h,i) => {
+              let v = r[i] ?? '';
+              if (h==='beds' || h==='sowLog' || h==='plantLog') {
+                try { v = JSON.parse(v); } catch(e) { v = v ? [v] : []; }
+              }
+              if (['rowSpacing','plantSpacing','rows','seedsPerCluster','pricePerKg','weightG',
+                   'pricePerUnit','unitsPerPlant','vektTotal','plantsPerUnit','svinn'].includes(h)) {
+                v = +v || 0;
+              }
+              if (h==='pricePerUnitCustom') v = !!v;
+              c[h] = v;
+            });
+            return c;
+          });
+        }
+        if (sheetNames.includes('Senger')) {
+          const rows = get('Senger');
+          result.bedSizes = {};
+          result.bedIDs = [];
+          rows.slice(1).filter(r=>r[0]).forEach(r => {
+            result.bedIDs.push(String(r[0]));
+            result.bedSizes[r[0]] = {length:+r[1]||11, width:+r[2]||1.2, note:r[3]||''};
+          });
+        }
+        if (sheetNames.includes('Kategorier')) {
+          const rows = get('Kategorier');
+          result.cropCategories = rows.slice(1).map(r=>r[0]).filter(Boolean);
+        }
+
+        // ── Doc 2: Oppgaver ──
+        if (sheetNames.includes('Oppgaver')) {
+          const rows = get('Oppgaver'); const h = rows[0];
+          result.tasks = rows.slice(1).filter(r=>r[0]).map(r => { const t={}; h.forEach((k,i)=>{ t[k]=r[i]??''; }); t.done=!!t.done; return t; });
+        }
+        if (sheetNames.includes('Oppgavehistorikk')) {
+          const rows = get('Oppgavehistorikk'); const h = rows[0];
+          result.taskHistory = rows.slice(1).filter(r=>r[0]).map(r => { const t={}; h.forEach((k,i)=>{ t[k]=r[i]??''; }); t.done=!!t.done; return t; });
+        }
+        if (sheetNames.includes('Oppgaverekkefølge')) {
+          const rows = get('Oppgaverekkefølge');
+          result.taskOrder = {};
+          rows.slice(1).filter(r=>r[0]).forEach(r => { try { result.taskOrder[r[0]] = JSON.parse(r[1]); } catch(e){} });
+        }
+        if (sheetNames.includes('FokusOppgaver')) {
+          const rows = get('FokusOppgaver');
+          result.focusTaskIds = rows.slice(1).map(r=>r[0]).filter(Boolean);
+        }
+
+        // ── Doc 3: Kasser og Levering ──
+        if (sheetNames.includes('Kunder')) {
+          const rows = get('Kunder'); const h = rows[0];
+          result.customers = rows.slice(1).filter(r=>r[0]).map(r => {
+            const cu={}; h.forEach((k,i)=>cu[k]=r[i]??'');
+            try { cu.skipWeeks = JSON.parse(cu.skipWeeks_json||'null'); } catch(e){}
+            delete cu.skipWeeks_json;
+            return cu;
+          });
+        }
+        if (sheetNames.includes('Kassetyper')) {
+          const rows = get('Kassetyper'); const h = rows[0];
+          result.boxTypes = rows.slice(1).filter(r=>r[0]).map(r => {
+            const bt={}; h.forEach((k,i)=>bt[k]=r[i]??'');
+            try { bt.weekdays = JSON.parse(bt.weekdays_json||'[]'); } catch(e){ bt.weekdays=[]; }
+            try { bt.baseItems = JSON.parse(bt.baseItems_json||'[]'); } catch(e){ bt.baseItems=[]; }
+            delete bt.weekdays_json; delete bt.baseItems_json;
+            bt.startWeek=+bt.startWeek||0; bt.endWeek=+bt.endWeek||0;
+            return bt;
+          });
+        }
+        if (sheetNames.includes('Kasseuker')) {
+          const rows = get('Kasseuker'); const h = rows[0];
+          result.boxWeeks = rows.slice(1).filter(r=>r[0]).map(r => {
+            const bw={}; h.forEach((k,i)=>bw[k]=r[i]??'');
+            ['items','customerAdj','customerWeek','deliveryCheck','extraCheck','extraNames','checklist'].forEach(f => {
+              try { bw[f] = JSON.parse(bw[f+'_json']||'null') ?? (f==='items'?[]:(f==='extraBoxes'?0:{})); } catch(e){ bw[f]={}; }
+              delete bw[f+'_json'];
+            });
+            bw.week=+bw.week; bw.year=+bw.year; bw.extraBoxes=+bw.extraBoxes||0;
+            return bw;
+          });
+        }
+        if (sheetNames.includes('PrepGjøremål')) {
+          const rows = get('PrepGjøremål');
+          result.prepTasks = {};
+          rows.slice(1).filter(r=>r[0]).forEach(r => {
+            const bwId=String(r[0]); if(!result.prepTasks[bwId]) result.prepTasks[bwId]=[];
+            result.prepTasks[bwId].push({id:r[2],text:r[3]||'',done:!!r[4]});
+          });
+        }
+        if (sheetNames.includes('Marked')) {
+          const rows = get('Marked'); const h = rows[0];
+          result.market = rows.slice(1).filter(r=>r[0]).map(r=>{const m={}; h.forEach((k,i)=>m[k]=r[i]??''); return m;});
+        }
+        if (sheetNames.includes('Høstelogg')) {
+          const rows = get('Høstelogg'); const h = rows[0];
+          result.harvestLog = rows.slice(1).filter(r=>r[0]).map(r=>{const h2={}; h.forEach((k,i)=>h2[k]=r[i]??''); return h2;});
+        }
+
+        // ── Doc 4: Kart ──
+        if (sheetNames.includes('Kart')) {
+          const rows = get('Kart');
+          const mapStr = rows.slice(1).sort((a,b)=>+a[0]-+b[0]).map(r=>r[1]||'').join('');
+          try { result.gardenMap = JSON.parse(mapStr); } catch(e){ result.gardenMap = null; }
+        }
+        if (sheetNames.includes('SengIDs') && !result.bedIDs) {
+          const rows = get('SengIDs');
+          result.bedIDs = rows.slice(1).map(r=>String(r[0])).filter(Boolean);
+        }
+      } catch(err) { console.error('Import error in', file.name, err); }
+
+      pending--;
+      if (pending === 0) applyFullBackupImport(result);
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function applyFullBackupImport(r) {
+  if (!confirm('Importer backup? Dette erstatter ALL eksisterende data i appen.')) return;
+  snapshot();
+  if (r.crops)         crops = r.crops;
+  if (r.tasks)         tasks = r.tasks;
+  if (r.taskHistory)   taskHistory = r.taskHistory;
+  if (r.taskOrder)     taskOrder = r.taskOrder;
+  if (r.focusTaskIds)  focusTaskIds = new Set(r.focusTaskIds);
+  if (r.cropCategories) cropCategories = r.cropCategories;
+  if (r.bedSizes)      bedSizes = r.bedSizes;
+  if (r.bedIDs)        BED_IDS = r.bedIDs;
+  if (r.gardenMap)     gardenMap = r.gardenMap;
+  if (r.customers)     deliveryCustomers = r.customers;
+  if (r.boxTypes)      boxTypes = r.boxTypes;
+  if (r.boxWeeks)      boxWeeks = r.boxWeeks;
+  if (r.prepTasks)     prepTasks = r.prepTasks;
+  if (r.market)        deliveryMarket = r.market;
+  if (r.harvestLog)    harvestLog = r.harvestLog;
+  sanitizeCrops();
+  saveToLocal();
+  saveLevering();
+  scheduleSync();
+  render();
+  showSyncToast('✓ Full backup importert');
+}
+
 function initSync() {
   const DEFAULT_KEY = '$2a$10$H3ZyijeCyakGbK9kSCv3U.NqxD/DZNaug3LPpodQYWWiAF270R3oq';
   const DEFAULT_BIN = '69b17723c3097a1dd517e7da';
@@ -7719,6 +7984,9 @@ async function syncLoadOnStart() {
     if (hasNoLocal || remoteIsNewer) {
       if (remote.crops)   crops    = remote.crops.map ? remote.crops : [];
       if (remote.tasks)   tasks    = remote.tasks;
+      if (remote.taskOrder) { taskOrder = remote.taskOrder; try { localStorage.setItem('mh_task_order', JSON.stringify(taskOrder)); } catch(e) {} }
+      if (remote.cropCategories && remote.cropCategories.length) { cropCategories = remote.cropCategories; try { localStorage.setItem('mh_crop_categories', JSON.stringify(cropCategories)); } catch(e) {} }
+      if (remote.focusTaskIds) { focusTaskIds = new Set(remote.focusTaskIds); try { localStorage.setItem('mh_focus_tasks', JSON.stringify([...focusTaskIds])); } catch(e) {} }
       // Restore backup bin IDs from cloud — merge: prefer cloud where local is missing
       if (remote.backupBins && remote.backupBins.length === 7) {
         const localBins = getBackupBins();
@@ -7743,7 +8011,7 @@ async function syncLoadOnStart() {
       if (remote.bedIDs && remote.bedIDs.length) BED_IDS = remote.bedIDs;
       if (remote.gardenMap) gardenMap = remote.gardenMap;
       if (remote.taskHistory) taskHistory = remote.taskHistory;
-      if (remote.levering) { if(remote.levering.customers) deliveryCustomers=remote.levering.customers; if(remote.levering.box) deliveryBox=remote.levering.box; if(remote.levering.boxTypes) boxTypes=remote.levering.boxTypes; if(remote.levering.boxWeeks) boxWeeks=remote.levering.boxWeeks; if(remote.levering.market) deliveryMarket=remote.levering.market; if(remote.levering.harvest) harvestLog=remote.levering.harvest; }
+      if (remote.levering) { if(remote.levering.customers) deliveryCustomers=remote.levering.customers; if(remote.levering.box) deliveryBox=remote.levering.box; if(remote.levering.boxTypes) boxTypes=remote.levering.boxTypes; if(remote.levering.boxWeeks) boxWeeks=remote.levering.boxWeeks; if(remote.levering.market) deliveryMarket=remote.levering.market; if(remote.levering.harvest) harvestLog=remote.levering.harvest; if(remote.levering.prepTasks) prepTasks=remote.levering.prepTasks; }
       saveToLocal();
       clearTimeout(syncTimer); syncTimer = null;
       syncTodayFocus();
@@ -7854,6 +8122,8 @@ async function syncSave() {
     if (c.unitsPerPlant && c.unitsPerPlant > 1) out.unitsPerPlant = c.unitsPerPlant;
     if (c.vektTotal) out.vektTotal = c.vektTotal;
     if (c.notes) out.notes = c.notes;
+    if (c.svinn) out.svinn = c.svinn;
+    if (c.plantsPerUnit) out.plantsPerUnit = c.plantsPerUnit;
     if (c._manuallyUnfocused) out._manuallyUnfocused = c._manuallyUnfocused;
     return out;
   };
@@ -7866,7 +8136,10 @@ async function syncSave() {
     bedIDs: BED_IDS,
     gardenMap: gardenMap || null,
     taskHistory: trimmedHistory,
-    levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog },
+    taskOrder: taskOrder || {},
+    cropCategories: cropCategories || [],
+    focusTaskIds: [...focusTaskIds],
+    levering: { customers: deliveryCustomers, box: deliveryBox, boxTypes, boxWeeks, market: deliveryMarket, harvest: harvestLog, prepTasks },
     backupBins: getBackupBins(),
     backupMeta: getBackupMeta(),
     saved: new Date().toISOString()
@@ -8053,6 +8326,12 @@ let leveringTab = (() => { try { return localStorage.getItem('mh_lev_tab') || 'o
 let kasseViewWeek = (() => { try { return +localStorage.getItem('mh_kasse_week') || getCurrentWeek(); } catch(e) { return getCurrentWeek(); } })();
 let kasseViewYear = (() => { try { return +localStorage.getItem('mh_kasse_year') || getCurrentYear(); } catch(e) { return getCurrentYear(); } })();
 let kasseViewTypeId = (() => { try { return localStorage.getItem('mh_kasse_type') || null; } catch(e) { return null; } })();
+
+let prepSortMode = false;    // sorting mode active
+let prepSortOrder = [];      // [{type:'item'|'task', idx}, ...]
+let prepTasks = {};          // {bwId: [{id, text, done}]}
+let prepChecked = {};        // {bwId: {itemIdx: bool}}
+
 let kasseModus = (() => { try { return localStorage.getItem('mh_kasse_modus') || 'plan'; } catch(e) { return 'plan'; } })(); // 'plan' | 'plukk' | 'levering' // 'kasse' | 'marked' | 'hoestlogg'
 let markedModus = (() => { try { return localStorage.getItem('mh_marked_modus') || 'plan'; } catch(e) { return 'plan'; } })();
 let markedViewIdx = null; // index into deliveryMarket of currently viewed market
@@ -8267,6 +8546,141 @@ function toggleCustomerWeek(btn, btId, week) {
 }
 
 
+
+
+function togglePrepSort(btn) {
+  prepSortMode = !prepSortMode;
+  if (!prepSortMode) {
+    // Apply sort order and re-render with new order
+    const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+    if (el) renderLevKasse(el);
+    // prepSortOrder stays so order is preserved until next activation
+  } else {
+    // Entering sort mode — just re-render to show sort UI
+    prepSortOrder = [];
+    const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+    if (el) renderLevKasse(el);
+  }
+  setTimeout(() => {
+    const b = document.getElementById('prep-sort-btn');
+    if (b) {
+      b.style.background = prepSortMode ? 'var(--accent-bg)' : 'var(--bg-card)';
+      b.style.color = prepSortMode ? 'var(--accent-soft)' : 'var(--text-muted)';
+    }
+  }, 0);
+}
+
+
+function prepItemClick(bwId, ii, el) {
+  if (prepSortMode) {
+    prepSortTap('item-'+ii, el);
+    return; // don't check
+  }
+  kassePakkCheck(bwId, ii, el);
+}
+function prepTaskClick(ti, cbEl) {
+  const row = cbEl.closest('[data-sort-key]');
+  if (prepSortMode) {
+    prepSortTap('task-'+ti, row);
+  } else {
+    prepTaskCheck(ti, row);
+  }
+}
+
+function prepSortTap(key, rowEl) {
+  const idx = prepSortOrder.indexOf(key);
+  if (idx >= 0) {
+    prepSortOrder.splice(idx, 1);
+  } else {
+    prepSortOrder.push(key);
+  }
+  // Update all visible sort numbers directly in DOM — no full re-render
+  document.querySelectorAll('[data-sort-key]').forEach(row => {
+    const k = row.dataset.sortKey;
+    const cb = row.querySelector('.prep-cb');
+    if (!cb) return;
+    const sortNum = prepSortOrder.indexOf(k);
+    const inSel = sortNum >= 0;
+    cb.style.background = 'transparent';
+    cb.style.borderColor = 'rgba(128,128,128,0.3)';
+    cb.style.fontSize = '16px';
+    cb.style.fontWeight = '700';
+    cb.style.color = 'var(--text-head)';
+    cb.textContent = inSel ? (sortNum+1) : '';
+  });
+}
+
+function prepAddTask(bwId) {
+  if (!prepTasks[bwId]) prepTasks[bwId] = [];
+  prepTasks[bwId].push({id: Date.now(), text: '', done: false});
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+  // Focus the new task input after render
+  setTimeout(() => {
+    const tasks = prepTasks[bwId];
+    const ti = tasks.length - 1;
+    prepTaskRename(ti, null, true);
+  }, 50);
+}
+
+function prepTaskCheck(ti, rowEl) {
+  // Find current bwId from context
+  const bwId = getCurrentBwId();
+  if (!bwId || !prepTasks[bwId] || !prepTasks[bwId][ti]) return;
+  prepTasks[bwId][ti].done = !prepTasks[bwId][ti].done;
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function prepTaskDelete(ti) {
+  const bwId = getCurrentBwId();
+  if (!bwId || !prepTasks[bwId]) return;
+  prepTasks[bwId].splice(ti, 1);
+  // Remove from sort order too
+  prepSortOrder = prepSortOrder.filter(k => k !== 'task-'+ti)
+    .map(k => {
+      const m = k.match(/^task-(\d+)$/);
+      if (m && +m[1] > ti) return 'task-'+(+m[1]-1);
+      return k;
+    });
+  const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+  if (el) renderLevKasse(el);
+}
+
+function prepTaskRename(ti, nameSpan, isNew) {
+  const bwId = getCurrentBwId();
+  if (!bwId || !prepTasks[bwId] || !prepTasks[bwId][ti]) return;
+  const task = prepTasks[bwId][ti];
+  // Find the span if not passed
+  if (!nameSpan) {
+    const rows = document.querySelectorAll('[data-sort-key="task-'+ti+'"]');
+    if (rows.length) nameSpan = rows[0].querySelector('span');
+  }
+  if (!nameSpan) return;
+  const parent = nameSpan.parentElement;
+  const input = document.createElement('input');
+  input.value = task.text || '';
+  input.placeholder = 'Skriv gjøremål...';
+  input.style.cssText = 'background:transparent;border:none;border-bottom:1px solid var(--accent);color:var(--text-head);font-size:16px;font-family:inherit;width:100%;outline:none;padding:0';
+  parent.innerHTML = '';
+  parent.appendChild(input);
+  input.focus();
+  if (isNew) input.select();
+  function save() {
+    task.text = input.value.trim() || 'Gjøremål';
+    const el = document.getElementById('lev-overlay-content') || document.getElementById('lev-tab-content');
+    if (el) renderLevKasse(el);
+  }
+  input.addEventListener('blur', save, {once:true});
+  input.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();input.blur();} });
+}
+
+function getCurrentBwId() {
+  // Find active bw from current view state
+  const bw = boxWeeks.find(b => String(b.boxTypeId) === String(kasseViewTypeId)
+    && +b.week === +kasseViewWeek && +b.year === +kasseViewYear);
+  return bw ? bw.id : null;
+}
 
 function sendGroupSMS(btId, week, year) {
   const bt = boxTypes.find(t => String(t.id) === String(btId));
@@ -8727,7 +9141,7 @@ function renderLevKasse(el) {
   const isPlukk = kasseModus === 'plukk';
   const isLevering = kasseModus === 'levering';
   html += '<div style="display:flex;background:' + (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)') + ';border-radius:14px;padding:4px;margin-bottom:20px;position:relative">';
-  [['plan','📋 Plan'],['plukk','📦 Plukk'],['levering','🚗 Levering']].forEach(([m, label]) => {
+  [['plan','📋 Plan'],['plukk','🧺 Prep'],['levering','🚗 Levering']].forEach(([m, label]) => {
     const active = kasseModus === m;
     html += '<button onclick="kasseSwitchModus(\'' + m + '\')"'
       + ' style="flex:1;padding:9px 4px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-family:inherit;font-weight:' + (active ? '600' : '400') + ';'
@@ -8752,14 +9166,17 @@ function renderLevKasse(el) {
   const RL = "document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content')";
   const isCurrentWeek = kasseViewWeek === getCurrentWeek() && kasseViewYear === getCurrentYear();
 
-  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
-    + '<button ' + (prevW ? 'onclick="kasseNavWeek(' + prevW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (prevW ? 1 : 0.25) + '">‹</button>'
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">'
+    + '<button ' + (prevW ? 'onclick="kasseNavWeek(' + prevW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:' + (prevW ? 1 : 0.25) + '">‹</button>'
+    + '<div style="flex:1;display:flex;align-items:center;gap:8px">'
+    + (isPlukk ? '<button onclick="togglePrepSort(this)" id="prep-sort-btn" style="width:30px;height:30px;border-radius:8px;border:none;background:' + (prepSortMode ? 'var(--accent-bg)' : 'var(--bg-card)') + ';color:' + (prepSortMode ? 'var(--accent-soft)' : 'var(--text-muted)') + ';cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">↑↓</button>' : '')
     + '<div style="flex:1;text-align:center">'
     + '<div style="font-size:18px;font-weight:600;color:var(--text-head)">Uke ' + kasseViewWeek + '</div>'
     + '<div style="font-size:11px;color:' + (isCurrentWeek ? 'var(--accent-soft)' : 'var(--text-muted)') + ';margin-top:1px">' + (isCurrentWeek ? '● Denne uken' : kasseViewYear + ' · ' + (vIdx + 1) + '/' + displayWeeks.length) + '</div>'
     + '</div>'
-    + '<button onclick="sendGroupSMS(' + kasseViewTypeId + ',' + kasseViewWeek + ',' + kasseViewYear + ')" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">💬</button>'
-    + '<button ' + (nextW ? 'onclick="kasseNavWeek(' + nextW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;opacity:' + (nextW ? 1 : 0.25) + '">›</button>'
+    + '<button onclick="sendGroupSMS(' + kasseViewTypeId + ',' + kasseViewWeek + ',' + kasseViewYear + ')" style="width:30px;height:30px;border-radius:8px;border:none;background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">💬</button>'
+    + '</div>'
+    + '<button ' + (nextW ? 'onclick="kasseNavWeek(' + nextW + ',' + kasseViewYear + ')"' : 'disabled') + ' style="width:36px;height:36px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:' + (nextW ? 1 : 0.25) + '">›</button>'
     + '</div>';
 
   const bw = getOrCreateBoxWeek(kasseViewTypeId, kasseViewWeek, kasseViewYear);
@@ -8961,33 +9378,68 @@ function renderLevKasse(el) {
         + '<button onclick="kasseSwitchModus(\'plan\')" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit">← Gå til Plan</button>'
         + '</div>';
     } else {
-      // Sjekkliste – store touch-targets
-      items.forEach((item, ii) => {
-        const cr = crops.find(c => c.id === item.cropId);
-        if (!cr) return;
-        const done = !!bw.checklist[ii];
-        const tot = (item.qty || 0) * totalBoxes;
-        html += '<div onclick="kassePakkCheck(\'' + bw.id + '\',' + ii + ',this)" data-done="' + done + '"'
-          + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
-          + 'background:' + (done ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)') + ';'
-          + ';'
-          + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
-          + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
-          + 'background:' + (done ? 'var(--accent)' : 'transparent') + ';'
-          + 'border:2px solid ' + (done ? 'var(--accent)' : (isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)')) + ';'
-          + 'color:' + (isLight ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
-          + (done ? '✓' : '') + '</div>'
-          + '<span style="font-size:28px;flex-shrink:0;' + (done ? 'opacity:0.4' : '') + '">' + cr.emoji + '</span>'
-          + '<div style="flex:1;' + (done ? 'opacity:0.45' : '') + '">'
-          + '<div style="font-size:16px;color:var(--text-head);' + (done ? 'text-decoration:line-through' : '') + '">' + (cr.family||cr.name) + '</div>'
-          + '<div style="font-size:13px;color:var(--text-muted);margin-top:2px">'
-          + (tot ? tot + ' ' + item.unit + ' totalt' : item.qty + ' ' + item.unit + ' per kasse')
-          + (item.qty && totalBoxes > 1 ? ' <span style="color:var(--text-dim)">(' + item.qty + ' × ' + totalBoxes + ')</span>' : '')
-          + '</div>'
-          + '</div>'
-          + '</div>';
+      // Build combined list: crop items + tasks, apply sort order
+      if (!prepTasks[bw.id]) prepTasks[bw.id] = [];
+      const bwTasks = prepTasks[bw.id];
+      let orderedEntries = [];
+      items.forEach((item, ii) => orderedEntries.push({type:'item', idx:ii, item}));
+      bwTasks.forEach((task, ti) => orderedEntries.push({type:'task', idx:ti, task}));
+      if (prepSortOrder.length) {
+        const sorted = [];
+        prepSortOrder.forEach(key => { const e = orderedEntries.find(e => e.type+'-'+e.idx === key); if (e) sorted.push(e); });
+        orderedEntries.forEach(e => { if (!prepSortOrder.includes(e.type+'-'+e.idx)) sorted.push(e); });
+        orderedEntries = sorted;
+      }
+      orderedEntries.forEach(entry => {
+        if (entry.type === 'item') {
+          const {item, idx: ii} = entry;
+          const cr = crops.find(c => c.id === item.cropId);
+          if (!cr) return;
+          const done = !!bw.checklist[ii];
+          const tot = (item.qty || 0) * totalBoxes;
+          const sortNum = prepSortOrder.indexOf('item-'+ii);
+          const showSort = prepSortMode && sortNum >= 0;
+          html += '<div onclick="prepItemClick(\''+bw.id+'\','+ii+',this)" data-sort-key="item-'+ii+'"'
+            + ' style="display:flex;align-items:center;gap:14px;padding:16px 14px;'
+            + 'background:' + (showSort ? 'var(--accent-bg)' : done ? (isLight?'rgba(0,0,0,0.03)':'rgba(255,255,255,0.03)') : 'var(--bg-card)') + ';'
+            + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent">'
+            + '<div class="prep-cb" style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
+            + 'background:' + (done && !prepSortMode ? 'var(--accent)' : 'transparent') + ';'
+            + 'border:2px solid ' + (done && !prepSortMode ? 'var(--accent)' : (isLight?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.25)')) + ';'
+            + 'color:' + (isLight?'#1c1410':'#0d1a0e') + ';font-size:16px;font-weight:700">'
+            + (showSort ? (sortNum+1) : done ? '✓' : '') + '</div>'
+            + '<span style="font-size:28px;flex-shrink:0;' + (!prepSortMode && done ? 'opacity:0.4' : '') + '">' + cr.emoji + '</span>'
+            + '<div style="flex:1;' + (!prepSortMode && done ? 'opacity:0.45' : '') + '">'
+            + '<div style="font-size:16px;color:var(--text-head);' + (!prepSortMode && done ? 'text-decoration:line-through' : '') + '">' + (cr.family||cr.name) + '</div>'
+            + '<div style="font-size:13px;color:var(--text-muted);margin-top:2px">'
+            + (tot ? tot+' '+item.unit+' totalt' : item.qty+' '+item.unit+' per kasse')
+            + (item.qty && totalBoxes>1 ? ' <span style="color:var(--text-dim)">('+item.qty+' × '+totalBoxes+')</span>' : '')
+            + '</div></div></div>';
+        } else {
+          const {task, idx: ti} = entry;
+          const done = !!task.done;
+          const sortNum = prepSortOrder.indexOf('task-'+ti);
+          const showSort = prepSortMode && sortNum >= 0;
+          html += '<div data-sort-key="task-'+ti+'"'
+            + ' style="display:flex;align-items:center;gap:14px;padding:14px;'
+            + 'background:' + (showSort ? 'var(--accent-bg)' : done ? (isLight?'rgba(0,0,0,0.03)':'rgba(255,255,255,0.03)') : 'var(--bg-card)') + ';'
+            + 'border-radius:14px;margin-bottom:8px;user-select:none;">'
+            + '<div class="prep-cb" onclick="prepTaskClick('+ti+',this)" style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;'
+            + 'background:' + (done && !prepSortMode ? 'var(--accent)' : 'transparent') + ';'
+            + 'border:2px solid ' + (done && !prepSortMode ? 'var(--accent)' : (isLight?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.25)')) + ';'
+            + 'color:' + (isLight?'#1c1410':'#0d1a0e') + ';font-size:16px;font-weight:700">'
+            + (showSort ? (sortNum+1) : done ? '✓' : '') + '</div>'
+            + '<div style="flex:1;' + (!prepSortMode && done ? 'opacity:0.45' : '') + ';cursor:text" onclick="if(!prepSortMode)prepTaskRename('+ti+',this)">'
+            + '<span style="font-size:16px;color:var(--text-head);' + (!prepSortMode && done ? 'text-decoration:line-through' : '') + '">' + (task.text||'Nytt gjøremål') + '</span>'
+            + '</div>'
+            + '<button onclick="prepTaskDelete('+ti+')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:4px;flex-shrink:0;line-height:1">×</button>'
+            + '</div>';
+        }
       });
 
+      // Nytt gjøremål-knapp
+      if (!prepTasks[bw.id]) prepTasks[bw.id] = [];
+      html += '<button onclick="prepAddTask(\'' + bw.id + '\')" style="width:100%;padding:12px;border-radius:14px;border:2px dashed rgba(128,128,128,0.2);background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit;margin-bottom:8px">+ Nytt gjøremål</button>';
 
       // Logg-knapp
       const hasNewDelta = bwHasUnloggedDelta(bw);
@@ -9984,7 +10436,7 @@ function renderMarkedDetail(el, mktIdx) {
 
   // ── Plan / Plukk toggle ──
   html += '<div style="display:flex;background:' + (isLight?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.06)') + ';border-radius:14px;padding:4px;margin-bottom:20px">';
-  [['plan','📋 Plan'],['plukk','📦 Plukk']].forEach(([m,label]) => {
+  [['plan','📋 Plan'],['plukk','🧺 Prep']].forEach(([m,label]) => {
     const active = markedModus === m;
     html += '<button onclick="markedModus=\'' + m + '\';try{localStorage.setItem(\'mh_marked_modus\',\'' + m + '\')}catch(e){}renderLevMarked(document.getElementById(\'lev-overlay-content\')||document.getElementById(\'lev-tab-content\'))"'
       + ' style="flex:1;padding:10px 8px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:' + (active?'600':'400') + ';'
@@ -10920,6 +11372,7 @@ function saveLevering() {
       boxWeeks,
       market: deliveryMarket,
       harvest: harvestLog,
+      prepTasks,
     }));
   } catch(e) {}
   scheduleSync();
@@ -10936,12 +11389,14 @@ function loadLevering() {
     if (d.harvest)   harvestLog        = d.harvest;
     if (d.boxTypes)  boxTypes          = d.boxTypes;
     if (d.boxWeeks)  boxWeeks          = d.boxWeeks;
+    if (d.prepTasks) prepTasks         = d.prepTasks;
   } catch(e) {}
 }
 
 
 </script>
-<input type="file" id="gear-customer-import" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none">
+<input type="file" id="full-backup-import" accept=".xlsx" multiple onchange="importFullBackup(event)" style="display:none">
+  <input type="file" id="gear-customer-import" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none">
   <input type="file" id="excel-import-input" accept=".xlsx" onchange="importFromExcel(event)" style="display:none">
 </body>
 </html>
