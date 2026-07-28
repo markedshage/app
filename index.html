@@ -7648,138 +7648,133 @@ function importFullBackup(event) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
 
+  const zipFile = files.find(f => f.name.endsWith('.zip'));
+  if (zipFile) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      JSZip.loadAsync(e.target.result).then(zip => {
+        const xlsxEntries = Object.values(zip.files).filter(f => f.name.endsWith('.xlsx'));
+        const result = {};
+        let pending = xlsxEntries.length;
+        if (!pending) { alert('Ingen xlsx-filer funnet i zip.'); return; }
+        xlsxEntries.forEach(entry => {
+          entry.async('arraybuffer').then(buf => {
+            processBackupWorkbook(new Uint8Array(buf), result);
+            if (--pending === 0) applyFullBackupImport(result);
+          });
+        });
+      }).catch(err => alert('Kunne ikke lese zip: ' + err));
+    };
+    reader.readAsArrayBuffer(zipFile);
+    return;
+  }
+
+  // Multiple xlsx files
   const result = {};
   let pending = files.length;
-
   files.forEach(file => {
     const reader = new FileReader();
     reader.onload = e => {
-      try {
-        const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
-        const sheetNames = wb.SheetNames;
-        const get = name => wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1}) : null;
-
-        // ── Doc 1: Vekster og Senger ──
-        if (sheetNames.includes('Vekster')) {
-          const rows = get('Vekster');
-          const headers = rows[0];
-          result.crops = rows.slice(1).filter(r=>r[0]).map(r => {
-            const c = {};
-            headers.forEach((h,i) => {
-              let v = r[i] ?? '';
-              if (h==='beds' || h==='sowLog' || h==='plantLog') {
-                try { v = JSON.parse(v); } catch(e) { v = v ? [v] : []; }
-              }
-              if (['rowSpacing','plantSpacing','rows','seedsPerCluster','pricePerKg','weightG',
-                   'pricePerUnit','unitsPerPlant','vektTotal','plantsPerUnit','svinn'].includes(h)) {
-                v = +v || 0;
-              }
-              if (h==='pricePerUnitCustom') v = !!v;
-              c[h] = v;
-            });
-            return c;
-          });
-        }
-        if (sheetNames.includes('Senger')) {
-          const rows = get('Senger');
-          result.bedSizes = {};
-          result.bedIDs = [];
-          rows.slice(1).filter(r=>r[0]).forEach(r => {
-            result.bedIDs.push(String(r[0]));
-            result.bedSizes[r[0]] = {length:+r[1]||11, width:+r[2]||1.2, note:r[3]||''};
-          });
-        }
-        if (sheetNames.includes('Kategorier')) {
-          const rows = get('Kategorier');
-          result.cropCategories = rows.slice(1).map(r=>r[0]).filter(Boolean);
-        }
-
-        // ── Doc 2: Oppgaver ──
-        if (sheetNames.includes('Oppgaver')) {
-          const rows = get('Oppgaver'); const h = rows[0];
-          result.tasks = rows.slice(1).filter(r=>r[0]).map(r => { const t={}; h.forEach((k,i)=>{ t[k]=r[i]??''; }); t.done=!!t.done; return t; });
-        }
-        if (sheetNames.includes('Oppgavehistorikk')) {
-          const rows = get('Oppgavehistorikk'); const h = rows[0];
-          result.taskHistory = rows.slice(1).filter(r=>r[0]).map(r => { const t={}; h.forEach((k,i)=>{ t[k]=r[i]??''; }); t.done=!!t.done; return t; });
-        }
-        if (sheetNames.includes('Oppgaverekkefølge')) {
-          const rows = get('Oppgaverekkefølge');
-          result.taskOrder = {};
-          rows.slice(1).filter(r=>r[0]).forEach(r => { try { result.taskOrder[r[0]] = JSON.parse(r[1]); } catch(e){} });
-        }
-        if (sheetNames.includes('FokusOppgaver')) {
-          const rows = get('FokusOppgaver');
-          result.focusTaskIds = rows.slice(1).map(r=>r[0]).filter(Boolean);
-        }
-
-        // ── Doc 3: Kasser og Levering ──
-        if (sheetNames.includes('Kunder')) {
-          const rows = get('Kunder'); const h = rows[0];
-          result.customers = rows.slice(1).filter(r=>r[0]).map(r => {
-            const cu={}; h.forEach((k,i)=>cu[k]=r[i]??'');
-            try { cu.skipWeeks = JSON.parse(cu.skipWeeks_json||'null'); } catch(e){}
-            delete cu.skipWeeks_json;
-            return cu;
-          });
-        }
-        if (sheetNames.includes('Kassetyper')) {
-          const rows = get('Kassetyper'); const h = rows[0];
-          result.boxTypes = rows.slice(1).filter(r=>r[0]).map(r => {
-            const bt={}; h.forEach((k,i)=>bt[k]=r[i]??'');
-            try { bt.weekdays = JSON.parse(bt.weekdays_json||'[]'); } catch(e){ bt.weekdays=[]; }
-            try { bt.baseItems = JSON.parse(bt.baseItems_json||'[]'); } catch(e){ bt.baseItems=[]; }
-            delete bt.weekdays_json; delete bt.baseItems_json;
-            bt.startWeek=+bt.startWeek||0; bt.endWeek=+bt.endWeek||0;
-            return bt;
-          });
-        }
-        if (sheetNames.includes('Kasseuker')) {
-          const rows = get('Kasseuker'); const h = rows[0];
-          result.boxWeeks = rows.slice(1).filter(r=>r[0]).map(r => {
-            const bw={}; h.forEach((k,i)=>bw[k]=r[i]??'');
-            ['items','customerAdj','customerWeek','deliveryCheck','extraCheck','extraNames','checklist'].forEach(f => {
-              try { bw[f] = JSON.parse(bw[f+'_json']||'null') ?? (f==='items'?[]:(f==='extraBoxes'?0:{})); } catch(e){ bw[f]={}; }
-              delete bw[f+'_json'];
-            });
-            bw.week=+bw.week; bw.year=+bw.year; bw.extraBoxes=+bw.extraBoxes||0;
-            return bw;
-          });
-        }
-        if (sheetNames.includes('PrepGjøremål')) {
-          const rows = get('PrepGjøremål');
-          result.prepTasks = {};
-          rows.slice(1).filter(r=>r[0]).forEach(r => {
-            const bwId=String(r[0]); if(!result.prepTasks[bwId]) result.prepTasks[bwId]=[];
-            result.prepTasks[bwId].push({id:r[2],text:r[3]||'',done:!!r[4]});
-          });
-        }
-        if (sheetNames.includes('Marked')) {
-          const rows = get('Marked'); const h = rows[0];
-          result.market = rows.slice(1).filter(r=>r[0]).map(r=>{const m={}; h.forEach((k,i)=>m[k]=r[i]??''); return m;});
-        }
-        if (sheetNames.includes('Høstelogg')) {
-          const rows = get('Høstelogg'); const h = rows[0];
-          result.harvestLog = rows.slice(1).filter(r=>r[0]).map(r=>{const h2={}; h.forEach((k,i)=>h2[k]=r[i]??''); return h2;});
-        }
-
-        // ── Doc 4: Kart ──
-        if (sheetNames.includes('Kart')) {
-          const rows = get('Kart');
-          const mapStr = rows.slice(1).sort((a,b)=>+a[0]-+b[0]).map(r=>r[1]||'').join('');
-          try { result.gardenMap = JSON.parse(mapStr); } catch(e){ result.gardenMap = null; }
-        }
-        if (sheetNames.includes('SengIDs') && !result.bedIDs) {
-          const rows = get('SengIDs');
-          result.bedIDs = rows.slice(1).map(r=>String(r[0])).filter(Boolean);
-        }
-      } catch(err) { console.error('Import error in', file.name, err); }
-
-      pending--;
-      if (pending === 0) applyFullBackupImport(result);
+      processBackupWorkbook(new Uint8Array(e.target.result), result);
+      if (--pending === 0) applyFullBackupImport(result);
     };
     reader.readAsArrayBuffer(file);
   });
+}
+
+function processBackupWorkbook(data, result) {
+  try {
+    const wb = XLSX.read(data, {type:'array'});
+    const get = name => wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1}) : null;
+    const sn = wb.SheetNames;
+
+    if (sn.includes('Vekster')) {
+      const rows = get('Vekster'), h = rows[0];
+      result.crops = rows.slice(1).filter(r=>r[0]).map(r => {
+        const c = {}; h.forEach((k,i) => {
+          let v = r[i] ?? '';
+          if (['beds','sowLog','plantLog'].includes(k)) { try { v = JSON.parse(v); } catch(e) { v = v ? [v] : []; } }
+          if (['rowSpacing','plantSpacing','rows','seedsPerCluster','pricePerKg','weightG','pricePerUnit','unitsPerPlant','vektTotal','plantsPerUnit','svinn'].includes(k)) v = +v || 0;
+          if (k==='pricePerUnitCustom') v = !!v;
+          c[k] = v;
+        }); return c;
+      });
+    }
+    if (sn.includes('Senger')) {
+      const rows = get('Senger'); result.bedSizes = {}; result.bedIDs = [];
+      rows.slice(1).filter(r=>r[0]).forEach(r => { result.bedIDs.push(String(r[0])); result.bedSizes[r[0]] = {length:+r[1]||11, width:+r[2]||1.2, note:r[3]||''}; });
+    }
+    if (sn.includes('Kategorier')) {
+      result.cropCategories = get('Kategorier').slice(1).map(r=>r[0]).filter(Boolean);
+    }
+    if (sn.includes('Oppgaver')) {
+      const rows = get('Oppgaver'), h = rows[0];
+      result.tasks = rows.slice(1).filter(r=>r[0]).map(r => { const t={}; h.forEach((k,i)=>t[k]=r[i]??''); t.done=!!t.done; return t; });
+    }
+    if (sn.includes('Oppgavehistorikk')) {
+      const rows = get('Oppgavehistorikk'), h = rows[0];
+      result.taskHistory = rows.slice(1).filter(r=>r[0]).map(r => { const t={}; h.forEach((k,i)=>t[k]=r[i]??''); t.done=!!t.done; return t; });
+    }
+    if (sn.includes('Oppgaverekkefølge')) {
+      result.taskOrder = {};
+      get('Oppgaverekkefølge').slice(1).filter(r=>r[0]).forEach(r => { try { result.taskOrder[r[0]] = JSON.parse(r[1]); } catch(e){} });
+    }
+    if (sn.includes('FokusOppgaver')) {
+      result.focusTaskIds = get('FokusOppgaver').slice(1).map(r=>r[0]).filter(Boolean);
+    }
+    if (sn.includes('Kunder')) {
+      const rows = get('Kunder'), h = rows[0];
+      result.customers = rows.slice(1).filter(r=>r[0]).map(r => {
+        const cu={}; h.forEach((k,i)=>cu[k]=r[i]??'');
+        try { cu.skipWeeks = JSON.parse(cu.skipWeeks_json||'null'); } catch(e){}
+        delete cu.skipWeeks_json; return cu;
+      });
+    }
+    if (sn.includes('Kassetyper')) {
+      const rows = get('Kassetyper'), h = rows[0];
+      result.boxTypes = rows.slice(1).filter(r=>r[0]).map(r => {
+        const bt={}; h.forEach((k,i)=>bt[k]=r[i]??'');
+        try { bt.weekdays = JSON.parse(bt.weekdays_json||'[]'); } catch(e){ bt.weekdays=[]; }
+        try { bt.baseItems = JSON.parse(bt.baseItems_json||'[]'); } catch(e){ bt.baseItems=[]; }
+        delete bt.weekdays_json; delete bt.baseItems_json;
+        bt.startWeek=+bt.startWeek||0; bt.endWeek=+bt.endWeek||0; return bt;
+      });
+    }
+    if (sn.includes('Kasseuker')) {
+      const rows = get('Kasseuker'), h = rows[0];
+      result.boxWeeks = rows.slice(1).filter(r=>r[0]).map(r => {
+        const bw={}; h.forEach((k,i)=>bw[k]=r[i]??'');
+        ['items','customerAdj','customerWeek','deliveryCheck','extraCheck','extraNames','checklist'].forEach(f => {
+          try { bw[f] = JSON.parse(bw[f+'_json']||'null') ?? (f==='items'?[]:({})); } catch(e){ bw[f]=f==='items'?[]:({}); }
+          delete bw[f+'_json'];
+        });
+        bw.week=+bw.week; bw.year=+bw.year; bw.extraBoxes=+bw.extraBoxes||0; return bw;
+      });
+    }
+    if (sn.includes('PrepGjøremål')) {
+      result.prepTasks = {};
+      get('PrepGjøremål').slice(1).filter(r=>r[0]).forEach(r => {
+        const bwId=String(r[0]); if(!result.prepTasks[bwId]) result.prepTasks[bwId]=[];
+        result.prepTasks[bwId].push({id:r[2],text:r[3]||'',done:!!r[4]});
+      });
+    }
+    if (sn.includes('Marked')) {
+      const rows = get('Marked'), h = rows[0];
+      result.market = rows.slice(1).filter(r=>r[0]).map(r=>{const m={}; h.forEach((k,i)=>m[k]=r[i]??''); return m;});
+    }
+    if (sn.includes('Høstelogg')) {
+      const rows = get('Høstelogg'), h = rows[0];
+      result.harvestLog = rows.slice(1).filter(r=>r[0]).map(r=>{const h2={}; h.forEach((k,i)=>h2[k]=r[i]??''); return h2;});
+    }
+    if (sn.includes('Kart')) {
+      const rows = get('Kart');
+      const mapStr = rows.slice(1).sort((a,b)=>+a[0]-+b[0]).map(r=>r[1]||'').join('');
+      try { result.gardenMap = JSON.parse(mapStr); } catch(e){ result.gardenMap = null; }
+    }
+    if (sn.includes('SengIDs') && !result.bedIDs) {
+      result.bedIDs = get('SengIDs').slice(1).map(r=>String(r[0])).filter(Boolean);
+    }
+  } catch(err) { console.error('processBackupWorkbook error:', err); }
 }
 
 function applyFullBackupImport(r) {
@@ -9777,7 +9772,7 @@ function adjustExtraBoxes(bwId, delta) {
       const delivered = !!(bw.extraCheck && bw.extraCheck[String(xi)]);
       const bg = delivered ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
       const cbBg = delivered ? 'var(--accent)' : 'transparent';
-      const extraName = (bw.extraNames && bw.extraNames[xi]) || ('Ekstra kasse ' + (xi + 1));
+      const extraName = (bw.extraNames && (bw.extraNames[String(xi)] || bw.extraNames[xi])) || ('Ekstra kasse ' + (xi + 1));
       rowsHtml += '<div id="extra-row-' + bwId + '-' + xi + '"'
         + ' data-lev-bwid="' + bwId + '" data-lev-extra="' + xi + '"'
         + ' onclick="kasseLeveringCheckExtra(this)"'
@@ -9903,7 +9898,7 @@ function openExtraKasseRename(bwId, xi) {
   function save() {
     if (!bw.extraNames) bw.extraNames = {};
     const val = input.value.trim() || ('Ekstra kasse ' + (xi + 1));
-    bw.extraNames[xi] = val;
+    bw.extraNames[String(xi)] = val;
     saveLevering();
     cell.innerHTML = '<span style="font-size:16px;color:var(--text-head)">' + val + '</span>';
     // Restore click
@@ -9946,7 +9941,8 @@ function _deadCodeExtraRename() {
 }
 
 function kasseLeveringCheckExtra(el) {
-  if (el._longPressed) { el._longPressed = false; return; } // ignore click after long press
+  if (el._longPressed) { el._longPressed = false; return; }
+  if (el._renaming) return; // don't toggle while renaming
   const bwId = el.dataset.levBwid;
   const xi = +el.dataset.levExtra;
   const bw = boxWeeks.find(b => b.id == bwId);
@@ -9965,8 +9961,10 @@ function kasseLeveringCheckExtra(el) {
     row.style.background = bg;
     const cb = row.querySelector('.extra-cb');
     if (cb) { cb.style.background = cbBg; cb.style.border = '2px solid ' + (delivered?'transparent':'rgba(128,128,128,0.35)'); cb.textContent = delivered?'✓':''; cb.style.color = isLight?'#1c1410':'#0d1a0e'; }
+    row.style.background = bg;
     const nameCell = row.querySelector('.extra-name-cell');
-    if (nameCell) nameCell.innerHTML = '<span style="font-size:16px;color:var(--text-head)' + (delivered?';text-decoration:line-through':'') + '">' + extraName + '</span>';
+    if (nameCell && !row._renaming) nameCell.innerHTML = '<span style="font-size:16px;color:var(--text-head)' + (delivered?';text-decoration:line-through':'') + '">' + extraName + '</span>';
+    if (nameCell) nameCell.style.opacity = delivered ? '0.45' : '1';
     const levert = row.querySelector('.levert-label');
     // Add/remove levert label
     let lv = row.querySelector('.levert-label');
@@ -11395,7 +11393,7 @@ function loadLevering() {
 
 
 </script>
-<input type="file" id="full-backup-import" accept=".xlsx" multiple onchange="importFullBackup(event)" style="display:none">
+<input type="file" id="full-backup-import" accept=".zip,.xlsx" multiple onchange="importFullBackup(event)" style="display:none">
   <input type="file" id="gear-customer-import" accept=".xlsx" onchange="importCustomersFromExcel(event)" style="display:none">
   <input type="file" id="excel-import-input" accept=".xlsx" onchange="importFromExcel(event)" style="display:none">
 </body>
