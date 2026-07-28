@@ -9469,7 +9469,7 @@ function renderLevKasse(el) {
     if (!bw.extraCheck) bw.extraCheck = {};
 
     const doneCuCount = activeCuLev.filter(cu => bw.deliveryCheck[cu.id || cu.name]).length;
-    const doneExtraCount = Array.from({length: bw.extraBoxes||0}, (_,i) => i).filter(i => bw.extraCheck[i]).length;
+    const doneExtraCount = Array.from({length: bw.extraBoxes||0}, (_,i) => i).filter(i => bw.extraCheck[String(i)]).length;
     const doneCount = doneCuCount + doneExtraCount;
     const allDelivered = totalBoxes > 0 && doneCount === totalBoxes;
 
@@ -9728,7 +9728,7 @@ function adjustExtraBoxes(bwId, delta) {
   // Clear name and check state for removed boxes (all indices >= newCount)
   if (delta < 0) {
     for (let i = newCount; i < (bw.extraBoxes||0); i++) {
-      if (bw.extraNames) delete bw.extraNames[i];
+      if (bw.extraNames) { delete bw.extraNames[i]; delete bw.extraNames[String(i)]; }
       if (bw.extraCheck) { delete bw.extraCheck[i]; delete bw.extraCheck[String(i)]; }
     }
   }
@@ -9880,7 +9880,7 @@ function openExtraKasseRename(bwId, xi) {
   const row = document.getElementById('extra-row-' + bwId + '-' + xi);
   const bw = boxWeeks.find(b => String(b.id) === String(bwId));
   if (!bw || !row) return;
-  const current = (bw.extraNames && bw.extraNames[xi]) || ('Ekstra kasse ' + (xi + 1));
+  const current = (bw.extraNames && bw.extraNames[String(xi)]) || ('Ekstra kasse ' + (xi + 1));
   const cell = row.querySelector('.extra-name-cell');
   if (!cell) return;
 
@@ -9923,7 +9923,7 @@ function _deadCodeExtraRename() {
     input.select();
     const save = () => {
       if (!bw.extraNames) bw.extraNames = {};
-      bw.extraNames[xi] = input.value.trim() || ('Ekstra kasse ' + (xi + 1));
+      bw.extraNames[String(xi)] = input.value.trim() || ('Ekstra kasse ' + (xi + 1));
       saveLevering();
       const cont = document.getElementById('extra-kasse-rows-' + bwId);
       if (cont) {
@@ -9957,7 +9957,7 @@ function kasseLeveringCheckExtra(el) {
     const isLight = document.body.classList.contains('light');
     const bg = delivered ? (isLight?'rgba(0,0,0,0.03)':'rgba(255,255,255,0.03)') : 'var(--bg-card)';
     const cbBg = delivered ? 'var(--accent)' : 'transparent';
-    const extraName = (bw.extraNames && bw.extraNames[xi]) || ('Ekstra kasse ' + (xi+1));
+    const extraName = (bw.extraNames && bw.extraNames[String(xi)]) || ('Ekstra kasse ' + (xi+1));
     row.style.background = bg;
     const cb = row.querySelector('.extra-cb');
     if (cb) { cb.style.background = cbBg; cb.style.border = '2px solid ' + (delivered?'transparent':'rgba(128,128,128,0.35)'); cb.textContent = delivered?'✓':''; cb.style.color = isLight?'#1c1410':'#0d1a0e'; }
