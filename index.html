@@ -1478,8 +1478,7 @@ function render() {
   if (currentTab === 'vekster')   renderVekster();
   if (currentTab === 'oppgaver')  renderOppgaver();
   if (currentTab === 'kalender')  renderKalender();
-  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) { leveringTab='hoestlogg'; renderLeveringInto(_rl); }})();
-  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) { leveringTab='hoestlogg'; renderLeveringInto(_rl); }})();
+  if (currentTab === 'levering')  (function(){const _rl=document.getElementById('lev-overlay-content')||document.getElementById('lev-tab-content'); if(_rl) renderLeveringInto(_rl); })();
 }
 
 // ── Segment helpers ──────────────────────────────────────────────────────────
@@ -9524,25 +9523,17 @@ function renderLevKasse(el) {
       + '</div></div>';
     html += '<div id="extra-kasse-rows-' + bw.id + '">';
     for (let xi = 0; xi < (bw.extraBoxes||0); xi++) {
-      const delivered = !!bw.extraCheck[String(xi)];
+      const delivered = !!(bw.extraCheck && bw.extraCheck[String(xi)]);
       const bg = delivered ? (isLight2 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'var(--bg-card)';
-      const bd = delivered ? (isLight2 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') : 'var(--border)';
       const cbBg = delivered ? 'var(--accent)' : 'transparent';
-      const cbBd = delivered ? 'var(--accent)' : (isLight2 ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)');
-      html += '<div data-lev-bwid="' + bw.id + '" data-lev-extra="' + xi + '" onclick="kasseLeveringCheckExtra(this)"'
-        + ' style="display:flex;align-items:center;gap:14px;padding:14px 14px;'
-        + 'background:' + bg + ';'
-        + 'border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;'
-        + 'transition:all 0.15s;-webkit-tap-highlight-color:transparent">'
-        + '<div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'
-        + 'background:' + cbBg + ';'
-        + 'color:' + (isLight2 ? '#1c1410' : '#0d1a0e') + ';font-size:16px">'
-        + (delivered ? '✓' : '') + '</div>'
-        + '<div style="width:36px;height:36px;border-radius:50%;background:' + (isLight2 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;' + (delivered ? 'opacity:0.4' : '') + '">📦</div>'
-        + '<div style="flex:1;' + (delivered ? 'opacity:0.45' : '') + '">'
-        + '<div style="font-size:16px;color:var(--text-head);' + (delivered ? 'text-decoration:line-through' : '') + '">Ekstra kasse ' + (xi + 1) + '</div>'
-        + '</div>'
-        + (delivered ? '<div style="font-size:12px;color:var(--accent-soft);flex-shrink:0">Levert ✓</div>' : '')
+      const extraName = (bw.extraNames && (bw.extraNames[String(xi)] || bw.extraNames[xi])) || ('Ekstra kasse ' + (xi + 1));
+      html += '<div id="extra-row-' + bw.id + '-' + xi + '"'
+        + ' data-lev-bwid="' + bw.id + '" data-lev-extra="' + xi + '"'
+        + ' onclick="kasseLeveringCheckExtra(this)"'
+        + ' onpointerdown="extraKassePressStart(event,this)" onpointerup="extraKassePressEnd()" onpointercancel="extraKassePressEnd()"'
+        + ' style="display:flex;align-items:center;gap:14px;padding:14px;background:' + bg + ';border-radius:14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;user-select:none">'
+        + '<div class="extra-cb" style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:' + cbBg + ';border:2px solid ' + (delivered?'transparent':'rgba(128,128,128,0.35)') + ';box-sizing:border-box;color:' + (isLight2?'#1c1410':'#0d1a0e') + ';font-size:16px">' + (delivered ? '✓' : '') + '</div>'
+        + '<div class="extra-name-cell" style="flex:1' + (delivered?';opacity:0.45':'') + '"><span style="font-size:16px;color:var(--text-head)' + (delivered?';text-decoration:line-through':'') + '">' + extraName + '</span></div>'
         + '</div>';
     }
     html += '</div>';
@@ -10798,19 +10789,20 @@ function renderLevOversikt(el) {
   const maxTrend = Math.max(...weekTrend.map(w => w.value), 1);
 
   // ── Planlagte grønnsakskasser: kassepris × planlagte uker ──
-  // When no customers: each planned week = max(1, extraBoxes for that week)
   const yr = new Date().getFullYear();
   const totalBoxesAllSeasons = boxTypes.reduce((total, bt) => {
     const weeks = getValidDeliveryWeeks(bt, yr);
     if (!weeks.length) return total;
     const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bt.id));
-    if (btCu.length > 0) {
-      return total + btCu.length * weeks.length;
-    }
-    // No customers — use extraBoxes per week or default 1
     return total + weeks.reduce((s, w) => {
       const bw = boxWeeks.find(b => String(b.boxTypeId) == String(bt.id) && +b.week === w && +b.year === yr);
-      return s + Math.max(1, bw?.extraBoxes || 0);
+      const activeCu = btCu.filter(cu => {
+        if (bw && bw.customerWeek && bw.customerWeek[cu.id || cu.name] === false) return false;
+        if (cu.skipWeeks && cu.skipWeeks[String(bt.id)] && cu.skipWeeks[String(bt.id)][String(w)]) return false;
+        return true;
+      });
+      const extra = bw?.extraBoxes || 0;
+      return s + activeCu.length + extra;
     }, 0);
   }, 0);
 
@@ -10819,14 +10811,16 @@ function renderLevOversikt(el) {
     const weeks = getValidDeliveryWeeks(bt, yr);
     if (!weeks.length) return total;
     const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bt.id));
-    if (btCu.length > 0) {
-      return total + btCu.length * weeks.length * bt.salePrice;
-    }
-    const boxCount = weeks.reduce((s, w) => {
+    return total + weeks.reduce((s, w) => {
       const bw = boxWeeks.find(b => String(b.boxTypeId) == String(bt.id) && +b.week === w && +b.year === yr);
-      return s + Math.max(1, bw?.extraBoxes || 0);
+      const activeCu = btCu.filter(cu => {
+        if (bw && bw.customerWeek && bw.customerWeek[cu.id || cu.name] === false) return false;
+        if (cu.skipWeeks && cu.skipWeeks[String(bt.id)] && cu.skipWeeks[String(bt.id)][String(w)]) return false;
+        return true;
+      });
+      const extra = bw?.extraBoxes || 0;
+      return s + (activeCu.length + extra) * bt.salePrice;
     }, 0);
-    return total + boxCount * bt.salePrice;
   }, 0);
 
   // Kasseprogresjon: avkrysset i Levering (deliveryCheck + extraCheck)
