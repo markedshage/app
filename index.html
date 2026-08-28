@@ -7480,67 +7480,86 @@ function openKundelisteExport() {
   modal.id = 'kundeliste-export-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
 
-  const types = [{id: '__alle__', name: 'Alle'}].concat(boxTypes.map(t => ({id: t.id, name: t.name})));
-
-  const buttons = types.map(t =>
-    '<button onclick="exportKundeliste(' + JSON.stringify(t.id) + ')" style="display:block;width:100%;padding:11px 14px;border-radius:10px;border:none;background:var(--bg-input);color:var(--text-head);cursor:pointer;font-size:14px;font-family:inherit;text-align:left;margin-bottom:8px">' + t.name + '</button>'
+  const buttons = boxTypes.map(t =>
+    '<button onclick="senderPickWeek(' + t.id + ')" style="display:block;width:100%;padding:11px 14px;border-radius:10px;border:none;background:var(--bg-input);color:var(--text-head);cursor:pointer;font-size:14px;font-family:inherit;text-align:left;margin-bottom:8px">' + t.name + '</button>'
   ).join('');
 
   modal.innerHTML = '<div style="background:' + bg + ';border-radius:16px;padding:20px;width:100%;max-width:360px">'
-    + '<div style="font-size:15px;color:var(--text-head);font-weight:500;margin-bottom:14px">Velg kassetype</div>'
-    + buttons
-    + '<button onclick="closeKundelisteModal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;font-family:inherit;margin-top:4px">Avbryt</button>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    + '<div style="font-size:15px;color:var(--text-head);font-weight:500">Velg kassetype</div>'
+    + '<button onclick="closeKundelisteModal()" style="background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;padding:0;line-height:1">×</button>'
+    + '</div>'
+    + (buttons || '<div style="font-size:13px;color:var(--text-muted)">Ingen kassetyper opprettet.</div>')
     + '</div>';
 
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
 }
 
-function exportKundeliste(boxTypeId) {
-  document.getElementById('kundeliste-export-modal')?.remove();
+function senderPickWeek(btId) {
+  const bt = boxTypes.find(t => String(t.id) === String(btId));
+  if (!bt) return;
+  const isLight = document.body.classList.contains('light');
+  const bg = isLight ? '#faf8f5' : '#1a2e1b';
+  const yr = new Date().getFullYear();
+  const currentWeek = getISOWeek(new Date());
 
-  // Filter customers
-  const customers = boxTypeId === '__alle__'
-    ? deliveryCustomers
-    : deliveryCustomers.filter(c => String(c.boxTypeId) === String(boxTypeId));
+  // Generate weeks from bt config
+  const freqStr = bt.frequency || 'weekly';
+  const step = freqStr === 'biweekly' ? 2 : freqStr === 'monthly' ? 4 : 1;
+  const weeks = [];
+  for (let w = (bt.startWeek||1); w <= (bt.endWeek||52); w += step) weeks.push(w);
 
-  // Kassetype name
-  const btName = boxTypeId === '__alle__' ? 'Alle' : (boxTypes.find(t => String(t.id) === String(boxTypeId))?.name || 'Ukjent');
+  const modal = document.getElementById('kundeliste-export-modal');
+  const inner = modal.querySelector('div');
 
-  // Filename: (Kassetype) kundeliste til Sender (dd.mm)
+  const weekBtns = weeks.map(w => {
+    const isCurrent = w === currentWeek;
+    return '<button onclick="exportSenderList(' + btId + ',' + w + ',' + yr + ')" '
+      + 'style="display:inline-block;padding:9px 14px;border-radius:10px;border:none;'
+      + 'background:' + (isCurrent ? 'var(--accent)' : 'var(--bg-input)') + ';'
+      + 'color:' + (isCurrent ? 'var(--bg-main)' : 'var(--text-head)') + ';'
+      + 'cursor:pointer;font-size:14px;font-family:inherit;margin:4px;font-weight:' + (isCurrent ? '600' : '400') + '">'
+      + 'Uke ' + w + '</button>';
+  }).join('');
+
+  inner.innerHTML = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+    + '<button onclick="openKundelisteExport()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:0">‹</button>'
+    + '<div style="font-size:15px;color:var(--text-head);font-weight:500;flex:1">' + bt.name + ' — velg uke</div>'
+    + '<button onclick="closeKundelisteModal()" style="background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;padding:0;line-height:1">×</button>'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:8px">' + weekBtns + '</div>';
+}
+
+function exportSenderList(btId, week, year) {
+  closeKundelisteModal();
+  const bt = boxTypes.find(t => String(t.id) === String(btId));
+  const btName = bt?.name || 'Ukjent';
+  const bw = boxWeeks.find(b => String(b.boxTypeId) === String(btId) && +b.week === +week && +b.year === +year);
+
+  // Filter active customers for this week
+  const btCu = deliveryCustomers.filter(cu => String(cu.boxTypeId) === String(btId));
+  const active = btCu.filter(cu => {
+    if (bw && bw.customerWeek && bw.customerWeek[cu.id || cu.name] === false) return false;
+    if (cu.skipWeeks && cu.skipWeeks[String(btId)] && cu.skipWeeks[String(btId)][String(week)]) return false;
+    return true;
+  });
+
   const now = new Date();
-  const dd = String(now.getDate()).padStart(2, '0');
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const filename = btName + ' kundeliste til Sender ' + dd + '.' + mm + '.xlsx';
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const filename = btName + ' Uke ' + week + ' Sender ' + dd + '.' + mm + '.xlsx';
 
-  // Build workbook with exact template structure
-  // Columns: Email, Groups, Phone, Email status, Sms status, Transactional Email Status, Transactional Sms Status, Location, Created, First name, Last name
-  const headers = ['Email', 'Groups', 'Phone', 'Email status', 'Sms status', 'Transactional Email Status', 'Transactional Sms Status', 'Location', 'Created', 'First name', 'Last name'];
-
-  const rows = customers.map(c => {
-    const nameParts = (c.name || '').trim().split(/\s+/);
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ');
-    return [
-      c.email || '',  // Email
-      '',             // Groups
-      '',             // Phone
-      'active',       // Email status
-      '',             // Sms status
-      'active',       // Transactional Email Status
-      '',             // Transactional Sms Status
-      '',             // Location
-      '',             // Created
-      firstName,      // First name
-      lastName        // Last name
-    ];
+  // New template: Email, First name, Last name
+  const headers = ['Email', 'First name', 'Last name'];
+  const rows = active.filter(c => c.email).map(c => {
+    const parts = (c.name||'').trim().split(/\s+/);
+    return [c.email, parts[0]||'', parts.slice(1).join(' ')];
   });
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [
-    {wch:28},{wch:10},{wch:14},{wch:14},{wch:12},{wch:22},{wch:22},{wch:12},{wch:12},{wch:16},{wch:20}
-  ];
+  ws['!cols'] = [{wch:30},{wch:18},{wch:24}];
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
   XLSX.writeFile(wb, filename);
 }
