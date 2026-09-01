@@ -8716,6 +8716,13 @@ function sendGroupSMS(btId, week, year) {
   window.location.href = smsUrl;
 }
 
+
+function roundQty(qty, unit) {
+  // kg uses decimals, everything else rounds to whole number
+  if (!unit || unit === 'kg') return qty;
+  return Math.round(qty);
+}
+
 function isCuActiveForWeek(cu, bw) {
   if (bw.customerWeek && bw.customerWeek[cu.id || cu.name] === false) return false;
   if (cu.skipWeeks) {
@@ -9319,7 +9326,7 @@ function renderLevKasse(el) {
         const btCuForNeed = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(kasseViewTypeId));
         const activeCuForNeed = btCuForNeed.filter(cu => isCuActiveForWeek(cu, bw));
         const totalCount2 = activeCuForNeed.length + (bw.extraBoxes || 0);
-        const totalNeeded = (item.qty||0) * totalCount2;
+        const totalNeeded = roundQty((item.qty||0) * totalCount2, item.unit);
         html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">'
           + '<span style="font-size:20px">' + cr.emoji + '</span>'
           + '<div style="flex:1">'
@@ -9409,7 +9416,7 @@ function renderLevKasse(el) {
           const cr = crops.find(c => c.id === item.cropId);
           if (!cr) return;
           const done = !!bw.checklist[ii];
-          const tot = (item.qty || 0) * totalBoxes;
+          const tot = roundQty((item.qty || 0) * totalBoxes, item.unit);
           const sortNum = prepSortOrder.indexOf('item-'+ii);
           const showSort = prepSortMode && sortNum >= 0;
           html += '<div onclick="prepItemClick(\''+bw.id+'\','+ii+',this)" data-sort-key="item-'+ii+'"'
@@ -9722,7 +9729,7 @@ function refreshKasseNeedRows(bwId) {
   (bw.items||[]).forEach((item, ii) => {
     const cr = crops.find(c => c.id == item.cropId);
     const needEl = document.getElementById('kasse-need-' + bwId + '-' + ii);
-    if (needEl) needEl.textContent = totalCount ? (item.qty||0) * totalCount + ' ' + item.unit + ' totalt' : '–';
+    if (needEl) needEl.textContent = totalCount ? roundQty((item.qty||0) * totalCount, item.unit) + ' ' + item.unit + ' totalt' : '–';
     const priceEl = document.getElementById('kasse-price-' + bwId + '-' + ii);
     if (priceEl && cr) {
       const perKasse = calcItemValue(cr, item.qty||0, item.unit);
@@ -10028,7 +10035,7 @@ function bwHasUnloggedDelta(bw) {
   const totalCount = activeCu.length + (bw.extraBoxes || 0);
   return bw.items.some(item => {
     if (!item.qty) return false;
-    const totalQty = item.qty * totalCount;
+    const totalQty = roundQty(item.qty * totalCount, item.unit);
     return totalQty > (bw.loggedQtys[item.cropId] || 0);
   });
 }
@@ -10036,7 +10043,7 @@ function bwHasUnloggedDelta(bw) {
 function updateKasseItem(bwId, idx, field, val) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw?.items?.[idx]) return;
-  bw.items[idx][field] = field === 'qty' ? +val : val;
+  bw.items[idx][field] = field === 'qty' ? roundQty(+val, bw.items[idx].unit) : val;
   // If there's now unlogged delta, re-enable the log button
   if (bw.harvested && bwHasUnloggedDelta(bw)) {
     bw.harvested = false;
@@ -10055,7 +10062,7 @@ function updateKasseItem(bwId, idx, field, val) {
   const btCuForNeed = deliveryCustomers.filter(cu => String(cu.boxTypeId) == String(bw.boxTypeId));
   const activeCuForNeed = btCuForNeed.filter(cu => isCuActiveForWeek(cu, bw));
   const totalCount2 = activeCuForNeed.length + (bw.extraBoxes || 0);
-  const totalNeeded = (item.qty||0) * totalCount2;
+  const totalNeeded = roundQty((item.qty||0) * totalCount2, item.unit);
   const needEl = document.getElementById('kasse-need-' + bwId + '-' + idx);
   if (needEl) needEl.textContent = totalCount2 ? totalNeeded + ' ' + item.unit + ' totalt' : '–';
   const priceEl = document.getElementById('kasse-price-' + bwId + '-' + idx);
@@ -10245,7 +10252,7 @@ function autoHarvestBoxWeek(bwId) {
   const toLog = [];
   bw.items.forEach(item => {
     if (!item.qty) return;
-    const totalQty = item.qty * totalCount;
+    const totalQty = roundQty(item.qty * totalCount, item.unit);
     const alreadyLogged = bw.loggedQtys[item.cropId] || 0;
     const delta = totalQty - alreadyLogged;
     if (delta > 0) toLog.push({ item, totalQty, delta });
@@ -10339,8 +10346,9 @@ function openEditBoxItem(i) { openAddBoxItem(i); }
 function saveBoxItem(editIdx) {
   snapshotLev();
   const cropId = +document.getElementById('bi-crop')?.value;
-  const qty = +document.getElementById('bi-qty')?.value;
+  const _qty = +document.getElementById('bi-qty')?.value;
   const unit = document.getElementById('bi-unit')?.value;
+  const qty = roundQty(_qty, unit);
   if (!cropId || !qty) return;
   if (editIdx !== undefined) deliveryBox[editIdx] = {cropId, qty, unit};
   else deliveryBox.push({cropId, qty, unit});
