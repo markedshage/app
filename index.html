@@ -1404,6 +1404,9 @@ document.addEventListener('click', e => {
 });
 
 function showTab(name) {
+  // Save scroll before tab switch
+  const _tv = document.getElementById('table-view-overlay');
+  if (_tv) tableScrollLeft = _tv.scrollLeft;
   closeTableView(); // close table overlay on tab switch
   currentTab = name;
   try { localStorage.setItem('mh_tab', name); } catch(e) {}
@@ -1415,6 +1418,15 @@ function showTab(name) {
     document.getElementById('tab-'+t).style.display = t === name ? '' : 'none';
   });
   render();
+  // Re-open table if it was active on this tab
+  if (tableViewType === 'crops' && name === 'vekster') {
+    renderTableView();
+    setTimeout(() => { const tv = document.getElementById('table-view-overlay'); if (tv) tv.scrollLeft = tableScrollLeft; }, 50);
+  }
+  if (tableViewType === 'beds' && name === 'senger') {
+    renderTableView();
+    setTimeout(() => { const tv = document.getElementById('table-view-overlay'); if (tv) tv.scrollLeft = tableScrollLeft; }, 50);
+  }
 }
 
 function syncCropTasks() {
@@ -4340,7 +4352,7 @@ function saveCropField(cropId, field, value) {
   const crop = crops.find(c => c.id === cropId);
   if (!crop) return;
   snapshot();
-  const numFields = ['rowSpacing','plantSpacing','rows','seedsPerCluster','pricePerKg','weightG','pricePerUnit','unitsPerPlant','plantsPerUnit'];
+  const numFields = ['rowSpacing','plantSpacing','rows','seedsPerCluster','pricePerKg','weightG','pricePerUnit','unitsPerPlant','plantsPerUnit','svinn'];
   if (numFields.includes(field)) {
     crop[field] = +value || 0;
   } else if (field === 'beds') {
@@ -4348,10 +4360,30 @@ function saveCropField(cropId, field, value) {
   } else {
     crop[field] = value;
   }
+
+  // ── Cross-column dependencies ────────────────────────────
+  // pricePerKg + weightG → auto-calc pricePerUnit (unless custom)
+  if ((field === 'pricePerKg' || field === 'weightG') && !crop.pricePerUnitCustom) {
+    if (crop.pricePerKg && crop.weightG) {
+      crop.pricePerUnit = Math.round(crop.pricePerKg * crop.weightG / 1000 * 10) / 10;
+    }
+  }
+  // pricePerUnit changed manually → mark as custom, clear auto
+  if (field === 'pricePerUnit') {
+    crop.pricePerUnitCustom = true;
+  }
+  // weightG changed → update pricePerUnit if not custom
+  if (field === 'weightG' && crop.pricePerKg && !crop.pricePerUnitCustom) {
+    crop.pricePerUnit = Math.round(crop.pricePerKg * crop.weightG / 1000 * 10) / 10;
+  }
+  // unitsPerPlant ↔ plantsPerUnit are mutually exclusive
+  if (field === 'unitsPerPlant' && +value > 0) crop.plantsPerUnit = 0;
+  if (field === 'plantsPerUnit' && +value > 0) crop.unitsPerPlant = 0;
+
   saveToLocal();
   scheduleSync();
-  // Re-render just the crop card to update derived values (plants, value, gang)
-  renderCropListOnly();
+  // Re-render the table row to reflect updated derived values
+  renderTableView();
 }
 
 function inlineField(cropId, field, val, opts={}) {
@@ -7183,6 +7215,7 @@ let tableViewType = null; // 'crops' | 'beds'
 let tableSortCol = null;
 let tableSortDir = 1; // 1=asc, -1=desc
 let tableHiddenCols = {};
+let tableScrollLeft = 0;  // remember horizontal scroll
 
 const CROP_COLS = [
   { key:'emoji',        label:'Emoji',        type:'text',   width:60 },
@@ -7222,12 +7255,14 @@ const BED_COLS = [
 function openTableView(type) {
   // If already open and same type, close it (toggle)
   const existing = document.getElementById('table-view-overlay');
-  if (existing) { closeTableView(); return; }
+  if (existing && tableViewType === type) { closeTableView(); return; }
+  if (existing) existing.remove(); // different type, replace
   tableViewType = type;
   if (!tableHiddenCols[type]) tableHiddenCols[type] = {};
   tableSortCol = null;
   tableSortDir = 1;
   renderTableView();
+  setTimeout(() => { const tv = document.getElementById('table-view-overlay'); if (tv) tv.scrollLeft = tableScrollLeft; }, 50);
 }
 
 function toggleTableColDropdown(btn) {
@@ -7264,11 +7299,34 @@ function closeTableColDropdown() {
 }
 
 function closeTableView() {
-  document.getElementById('table-view-overlay')?.remove();
+  const tv = document.getElementById('table-view-overlay');
+  if (tv) tableScrollLeft = tv.scrollLeft;
+  tv?.remove();
   document.getElementById('table-col-dropdown-float')?.remove();
   document.body.style.overflow = '';
+  tableViewType = null; // clear so tab switch doesn't re-open
   if (typeof renderVekster === 'function' && currentTab === 'vekster') renderVekster();
   if (typeof renderSenger === 'function' && currentTab === 'senger') renderSenger();
+}
+
+
+function tableToggleAllCols() {
+  const t = tableViewType;
+  const cols = t === 'crops' ? CROP_COLS : BED_COLS;
+  if (!tableHiddenCols[t]) tableHiddenCols[t] = {};
+  const allVisible = cols.every(c => !tableHiddenCols[t][c.key]);
+  // If all visible, hide all; otherwise show all
+  cols.forEach(c => { tableHiddenCols[t][c.key] = allVisible; });
+  renderTableView();
+  // Update floating dropdown checkboxes
+  const float = document.getElementById('table-col-dropdown-float');
+  if (float) {
+    const boxes = float.querySelectorAll('input[type=checkbox]');
+    boxes.forEach((cb, i) => { if (cols[i]) cb.checked = !tableHiddenCols[t][cols[i].key]; });
+    // Update alle checkbox
+    const alleCb = float.querySelector('input[type=checkbox]');
+    if (alleCb) alleCb.checked = cols.every(c => !tableHiddenCols[t][c.key]);
+  }
 }
 
 function tableToggleCol(key) {
@@ -7345,6 +7403,12 @@ function renderTableView() {
   }
 
   // Column toggle dropdown (hidden by default)
+  const allVisible = cols.every(c => !hidden[c.key]);
+  const alleBtn = '<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-radius:8px;font-size:13px;color:var(--text-head);border-bottom:1px solid rgba(128,128,128,0.12);margin-bottom:4px" '
+    + 'onmouseover="this.style.background=\'rgba(128,128,128,0.08)\'" onmouseout="this.style.background=\'transparent\'">'
+    + '<input type="checkbox" ' + (allVisible ? 'checked' : '') + ' onchange="tableToggleAllCols()" '
+    + 'style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer"> Alle</label>';
+
   const toggleItems = cols.map(c =>
     '<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-radius:8px;font-size:13px;color:var(--text-head)" '
     + 'onmouseover="this.style.background=\'rgba(128,128,128,0.08)\'" onmouseout="this.style.background=\'transparent\'">'
@@ -7353,7 +7417,7 @@ function renderTableView() {
   ).join('');
 
   const colDropdown = '<div id="table-col-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--bg-modal);border-radius:14px;padding:8px;min-width:200px;max-height:60vh;overflow-y:auto;z-index:100;box-shadow:0 12px 40px rgba(0,0,0,0.4)">'
-    + toggleItems + '</div>';
+    + alleBtn + toggleItems + '</div>';
 
   // Table header
   const thead = '<thead>'
@@ -7450,13 +7514,31 @@ function tableEditCell(type, rowId, key, value) {
     snapshot();
     if (key === 'beds') {
       crop.beds = value.split(',').map(s=>s.trim()).filter(Boolean);
-    } else if (['rows','rowSpacing','plantSpacing','seedsPerCluster','pricePerKg','weightG','pricePerUnit','unitsPerPlant','plantsPerUnit'].includes(key)) {
-      crop[key] = +value || 0;
+    } else if (['rows','rowSpacing','plantSpacing','seedsPerCluster','pricePerKg','weightG','pricePerUnit','unitsPerPlant','plantsPerUnit','svinn'].includes(key)) {
+      crop[key] = (key === 'pricePerKg' || key === 'weightG' || key === 'pricePerUnit') ? (+value || 0) : (+value || 0); // qty per kasse stays as-is
     } else {
       crop[key] = value;
     }
+
+    // ── Cross-column dependencies ────────────────────────────
+    if ((key === 'pricePerKg' || key === 'weightG') && !crop.pricePerUnitCustom) {
+      if (crop.pricePerKg && crop.weightG)
+        crop.pricePerUnit = Math.round(crop.pricePerKg * crop.weightG / 1000 * 10) / 10;
+    }
+    if (key === 'pricePerUnit') crop.pricePerUnitCustom = true;
+    if (key === 'unitsPerPlant' && +value > 0) crop.plantsPerUnit = 0;
+    if (key === 'plantsPerUnit' && +value > 0) crop.unitsPerPlant = 0;
+
     saveToLocal(); scheduleSync();
-    renderCropListOnly && renderCropListOnly();
+    // Re-render table to reflect dependent columns
+    const tv = document.getElementById('table-view-overlay');
+    if (tv) {
+      const scrollLeft = tv.scrollLeft;
+      renderTableView();
+      requestAnimationFrame(() => { const tv2 = document.getElementById('table-view-overlay'); if (tv2) tv2.scrollLeft = scrollLeft; });
+    } else {
+      renderCropListOnly && renderCropListOnly();
+    }
   } else {
     // beds
     if (!bedSizes[rowId]) bedSizes[rowId] = { length:11, width:1.2 };
@@ -10043,7 +10125,7 @@ function bwHasUnloggedDelta(bw) {
 function updateKasseItem(bwId, idx, field, val) {
   const bw = boxWeeks.find(b => b.id == bwId);
   if (!bw?.items?.[idx]) return;
-  bw.items[idx][field] = field === 'qty' ? roundQty(+val, bw.items[idx].unit) : val;
+  bw.items[idx][field] = field === 'qty' ? (+val || 0) : val; // qty per kasse stored as-is, total is rounded on display
   // If there's now unlogged delta, re-enable the log button
   if (bw.harvested && bwHasUnloggedDelta(bw)) {
     bw.harvested = false;
@@ -10346,9 +10428,8 @@ function openEditBoxItem(i) { openAddBoxItem(i); }
 function saveBoxItem(editIdx) {
   snapshotLev();
   const cropId = +document.getElementById('bi-crop')?.value;
-  const _qty = +document.getElementById('bi-qty')?.value;
+  const qty = +document.getElementById('bi-qty')?.value || 0;
   const unit = document.getElementById('bi-unit')?.value;
-  const qty = roundQty(_qty, unit);
   if (!cropId || !qty) return;
   if (editIdx !== undefined) deliveryBox[editIdx] = {cropId, qty, unit};
   else deliveryBox.push({cropId, qty, unit});
